@@ -1,0 +1,436 @@
+*** Using Compiler 'V6.19', folder: 'C:\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'Target_1'
+Before Build - User command #1: cmd /c ""e:\Renesas\keil5_Project\Robot_FreeRTOS\rasc_launcher.bat" "e:\Renesas\keil5_Project\Robot_FreeRTOS\rasc_version.txt" -nosplash --launcher.suppressErrors --generate --compiler ARMv6 --devicefamily ra "e:\Renesas\keil5_Project\Robot_FreeRTOS\configuration.xml" 2> "%TEMP%\rasc_stderr.out" && echo. > "e:\Renesas\keil5_Project\Robot_FreeRTOS\output.rasc""
+[INFO] Input file "e:\Renesas\keil5_Project\Robot_FreeRTOS\configuration.xml" is older than output file "e:\Renesas\keil5_Project\Robot_FreeRTOS\output.rasc". Skipping RASC invocation.
+compiling hal_warmstart.c...
+compiling Emm_V5.c...
+compiling K230_cmd.c...
+compiling W800_mqtt.c...
+compiling list.c...
+compiling bsp_led.c...
+Middle/robot_cmd.c(59): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+   59 |         ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_RMODE_ENABLE);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./APP\robot.h(83): note: expanded from macro 'ROBOT_STATUS_CLEAR'
+   83 | #define ROBOT_STATUS_CLEAR(x, status)       (x = ((x) & ~(1 << status)))           /* 清除状态位 */
+      |                                                       ~ ^~~~~~~~~~~~~~
+Middle/robot_cmd.c(67): warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+   67 |         return robot_send_rel_rotate_event(joint_id, param[1]);
+      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^~~~~~~~
+Middle/robot_cmd.c(73): warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+   73 |         return robot_send_abs_rotate_event(joint_id, param[1]);
+      |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^~~~~~~~
+Middle/robot_cmd.c(131): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  131 |                 Emm_V5_Reset_CurPos_To_Zero(i + 1);
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~^~~
+Middle/robot_cmd.c(164): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  164 |                 int len = strlen(event);
+      |                     ~~~   ^~~~~~~~~~~~~
+Middle/robot_cmd.c(166): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  166 |                 if (strncmp(cmd, event, len) == 0) {
+      |                     ~~~~~~~             ^~~
+Middle/robot_cmd.c(81): warning: unused function 'robot_joints_sync_handle' [-Wunused-function]
+   81 | static int robot_joints_sync_handle(float *param)
+      |            ^~~~~~~~~~~~~~~~~~~~~~~~
+Middle/robot_cmd.c(98): warning: unused function 'robot_time_func_handle' [-Wunused-function]
+   98 | static int robot_time_func_handle(float *param)
+      |            ^~~~~~~~~~~~~~~~~~~~~~
+8 warnings generated.
+compiling robot_cmd.c...
+compiling heap_4.c...
+compiling bsp_can.c...
+USER_BSP/libemqtt.c(67): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+   67 |                 uint8_t offset = *(buf+1+rlb)<<8;       // topic UTF MSB
+      |                         ~~~~~~   ~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(70): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+   70 |                 id = *(buf+offset)<<8;                          // id MSB
+      |                    ~ ~~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(77): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+   77 |             id = *(buf+1+rlb)<<8;       // id MSB
+      |                ~ ~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(105): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  105 |         len = *(buf+1+rlb)<<8;  // MSB of topic UTF
+      |             ~ ~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(136): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  136 |         uint8_t offset = (*(buf+1+rlb))<<8;     // topic UTF MSB
+      |                 ~~~~~~   ~~~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(218): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  218 |     clientidlen = strlen(broker->clientid);
+      |                 ~ ^~~~~~~~~~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(219): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  219 |     usernamelen = strlen(broker->username);
+      |                 ~ ^~~~~~~~~~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(220): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  220 |     passwordlen = strlen(broker->password);
+      |                 ~ ^~~~~~~~~~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(238): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  238 |     remainLen = sizeof(var_header)+payload_len;
+      |               ~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(263): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  263 |     packet = (uint8_t*)malloc( fixed_headerLen+sizeof(var_header)+payload_len );
+      |                                ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(269): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  269 |     packetLen = fixed_headerLen+sizeof(var_header)+payload_len ;
+      |               ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(269): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  269 |     packetLen = fixed_headerLen+sizeof(var_header)+payload_len ;
+      |                 ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(270): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  270 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(271): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  271 |     memcpy(packet, fixed_header, fixed_headerLen);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(297): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  297 |     ret = broker->mqttsend(broker->socketid, packet, packetLen);
+      |           ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(316): warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+  316 |     if(broker->mqttsend(broker->socketid, packet, sizeof(packet)) < sizeof(packet)) {
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(330): warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+  330 |     if(broker->mqttsend(broker->socketid, packet, sizeof(packet)) < sizeof(packet)) {
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(348): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  348 |     uint16_t topiclen = strlen(topic);
+      |              ~~~~~~~~   ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(382): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  382 |     memset(var_header, 0, var_headerLen);
+      |     ~~~~~~                ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(401): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  401 |     remainLen = var_headerLen+msgLen;
+      |               ~ ~~~~~~~~~~~~~^~~~~~~
+USER_BSP/libemqtt.c(409): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  409 |     fixed_header = (uint8_t *)malloc( fixed_headerLen );
+      |                               ~~~~~~  ^~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(424): warning: implicit conversion loses integer precision: 'uint16_t' (aka 'unsigned short') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  424 |         fixed_header[1] = remainLen;
+      |                         ~ ^~~~~~~~~
+USER_BSP/libemqtt.c(430): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  430 |         fixed_header[2] = remainLen / 128;
+      |                         ~ ~~~~~~~~~~^~~~~
+USER_BSP/libemqtt.c(435): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  435 |     uint8_t *packet = malloc(packetLen);
+      |                       ~~~~~~ ^~~~~~~~~
+USER_BSP/libemqtt.c(442): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  442 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(443): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  443 |     memcpy(packet, fixed_header, fixed_headerLen);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(444): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  444 |     memcpy(packet+fixed_headerLen, var_header, var_headerLen);
+      |     ~~~~~~                                     ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(445): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  445 |     memcpy(packet+fixed_headerLen+var_headerLen, msg, msgLen);
+      |     ~~~~~~                                            ^~~~~~
+USER_BSP/libemqtt.c(448): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  448 |     if(broker->mqttsend(broker->socketid, packet, packetLen ) < packetLen) {
+      |        ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(472): warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+  472 |     if(broker->mqttsend(broker->socketid, packet, sizeof(packet)) < sizeof(packet)) {
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(498): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  498 |     uint16_t topiclen = strlen(topic);
+      |              ~~~~~~~~   ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(528): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  528 |     memset(utf_topic, 0, utf_topicLen);
+      |     ~~~~~~               ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(538): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  538 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                        ~~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(538): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  538 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                                                        ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(543): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  543 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |               ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(543): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  543 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                                    ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(543): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  543 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                   ~^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(544): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  544 |     packet = (uint8_t*)malloc( packetLen );
+      |                        ~~~~~~  ^~~~~~~~~
+USER_BSP/libemqtt.c(550): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  550 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(551): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  551 |     memcpy(packet, fixed_header, fixed_header_len);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(553): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  553 |     memcpy(packet+fixed_header_len+sizeof(var_header), utf_topic, utf_topicLen);
+      |     ~~~~~~                                                        ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(558): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  558 |     if(broker->mqttsend(broker->socketid, packet, packetLen) < packetLen) {
+      |        ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(571): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  571 |     uint16_t topiclen = strlen(topic);
+      |              ~~~~~~~~   ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(598): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  598 |     memset(utf_topic, 0, utf_topicLen);
+      |     ~~~~~~               ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(608): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  608 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                        ~~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(608): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  608 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                                                        ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(611): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  611 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |               ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(611): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  611 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                                    ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(611): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  611 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                   ~^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(612): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  612 |     packet = (uint8_t*)malloc( packetLen );
+      |                        ~~~~~~  ^~~~~~~~~
+USER_BSP/libemqtt.c(618): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  618 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(619): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  619 |     memcpy(packet, fixed_header, fixed_header_len);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(621): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  621 |     memcpy(packet+fixed_header_len+sizeof(var_header), utf_topic, utf_topicLen);
+      |     ~~~~~~                                                        ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(624): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  624 |     if(broker->mqttsend(broker->socketid, packet, packetLen) < packetLen) {
+      |        ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(635): warning: unused parameter 'broker' [-Wunused-parameter]
+  635 | void mqtt_login( mqtt_broker_handle_t* broker )
+      |                                        ^
+55 warnings generated.
+compiling libemqtt.c...
+compiling vision_service_thread_entry.c...
+compiling bsp_uart.c...
+compiling robot_thread_entry.c...
+compiling event_groups.c...
+Middle/robot_kinematics.c(451): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  451 |                         min_diff_result_index = i;      
+      |                                               ~ ^
+Middle/robot_kinematics.c(34): warning: unused function '__robot_clampf' [-Wunused-function]
+   34 | static inline float __robot_clampf(float v, float lo, float hi)
+      |                     ^~~~~~~~~~~~~~
+2 warnings generated.
+compiling robot_kinematics.c...
+compiling queue.c...
+compiling stream_buffer.c...
+APP/robot.c(43): warning: missing field 'status' initializer [-Wmissing-field-initializers]
+   43 |         {90,    MOTOR_DIR_CCW,          50,                     &JOINT_LIMIT_1,         0,         360,    DIR_NEGATIVE},  /* 关节1 */
+      |                                                                                                                        ^
+APP/robot.c(44): warning: missing field 'status' initializer [-Wmissing-field-initializers]
+   44 |         {90,    MOTOR_DIR_CW,           99.99f,         &JOINT_LIMIT_2,        90,         180,    DIR_NEGATIVE},  /* 关节 2 */
+      |                                                                                                                ^
+APP/robot.c(45): warning: missing field 'status' initializer [-Wmissing-field-initializers]
+   45 |         {-90,   MOTOR_DIR_CW,           50.89f,         &JOINT_LIMIT_3,       -90,          90,    DIR_NEGATIVE},  /* 关节 3 */
+      |                                                                                                                ^
+APP/robot.c(46): warning: missing field 'status' initializer [-Wmissing-field-initializers]
+   46 |         {0,     MOTOR_DIR_CW,           51,             &JOINT_LIMIT_4,       -90,          90,    DIR_NEGATIVE},  /* 关节 4 */
+      |                                                                                                                ^
+APP/robot.c(47): warning: missing field 'status' initializer [-Wmissing-field-initializers]
+   47 |         {90,    MOTOR_DIR_CCW,          26.85f,         &JOINT_LIMIT_5,         0,          90,    DIR_POSITIVE},  /* 关节 5 */
+      |                                                                                                                ^
+APP/robot.c(48): warning: missing field 'status' initializer [-Wmissing-field-initializers]
+   48 |         {0,     MOTOR_DIR_CW,           51,             &JOINT_LIMIT_6,         0,         360,    DIR_NEGATIVE},  /* 关节 6 */
+      |                                                                                                                ^
+APP/robot.c(70): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+   70 |         ROBOT_STATUS_CLEAR(g_robot.joints[joint_id].status, ROBOT_STATUS_LIMIT_HAPPENED);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./APP\robot.h(83): note: expanded from macro 'ROBOT_STATUS_CLEAR'
+   83 | #define ROBOT_STATUS_CLEAR(x, status)       (x = ((x) & ~(1 << status)))           /* 清除状态位 */
+      |                                                       ~ ^~~~~~~~~~~~~~
+APP/robot.c(82): warning: implicit conversion loses integer precision: 'enum motor_dir' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+   82 |         uint8_t dir = (velocity > 0) ? joint->postive_direction : !(joint->postive_direction);
+      |                 ~~~                    ~~~~~~~^~~~~~~~~~~~~~~~~
+APP/robot.c(83): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+   83 |         ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_LIMIT_ENABLE);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./APP\robot.h(83): note: expanded from macro 'ROBOT_STATUS_CLEAR'
+   83 | #define ROBOT_STATUS_CLEAR(x, status)       (x = ((x) & ~(1 << status)))           /* 清除状态位 */
+      |                                                       ~ ^~~~~~~~~~~~~~
+APP/robot.c(92): warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+   92 |     Emm_V5_Vel_Control(addr, dir, _velocity, acceleration, false);
+      |     ~~~~~~~~~~~~~~~~~~ ^~~~
+APP/robot.c(126): warning: implicit conversion loses integer precision: 'enum motor_dir' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  126 |                 _dir = (dir == DIR_POSITIVE)? joint->postive_direction :!(joint->postive_direction);
+      |                      ~                        ~~~~~~~^~~~~~~~~~~~~~~~~
+APP/robot.c(129): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+  129 |                         rel_angle = 360 - fabs(rel_angle);
+      |                                   ~ ~~~~^~~~~~~~~~~~~~~~~
+APP/robot.c(131): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+  131 |                         rel_angle = 360 - fabs(rel_angle);
+      |                                   ~ ~~~~^~~~~~~~~~~~~~~~~
+APP/robot.c(140): warning: implicit conversion loses integer precision: 'enum motor_dir' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  140 |                 _dir = (dir == DIR_POSITIVE) ? joint->postive_direction : !(joint->postive_direction);
+      |                      ~                         ~~~~~~~^~~~~~~~~~~~~~~~~
+APP/robot.c(151): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  151 |     ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_READY);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./APP\robot.h(83): note: expanded from macro 'ROBOT_STATUS_CLEAR'
+   83 | #define ROBOT_STATUS_CLEAR(x, status)       (x = ((x) & ~(1 << status)))           /* 清除状态位 */
+      |                                                       ~ ^~~~~~~~~~~~~~
+APP/robot.c(152): warning: implicit conversion loses integer precision: 'uint32_t' (aka 'unsigned int') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  152 |     Emm_V5_Pos_Control(addr, _dir, _velocity, (uint8_t)acceleration, steps, false, false);
+      |     ~~~~~~~~~~~~~~~~~~ ^~~~
+APP/robot.c(327): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  327 |         Emm_V5_En_Control(i + 1, true, false);
+      |         ~~~~~~~~~~~~~~~~~ ~~^~~
+APP/robot.c(340): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  340 |                 robot_update_current_angle(i);
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(362): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  362 |                 robot_joint_rotate_to(i, dir, g_joints_init[i].current_angle, ROBOT_RESET_DEFAULT_VELOCITY, ROBOT_RESET_DEFAULT_ACCELERATION, true);
+      |                 ~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(385): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  385 |     struct position *path = (struct position*)malloc(sizeof(struct position) * path_size);
+      |                                                                              ~ ^~~~~~~~~
+APP/robot.c(391): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  391 |         ret = g_robot_time_func(i * ROBOT_INTERPOLATION_TIME_RESOLUTION, &pos);
+      |               ~~~~~~~~~~~~~~~~~ ~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+APP/robot.c(420): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  420 |     float *result = (float*)malloc(sizeof(float) * ROBOT_MAX_JOINT_NUM * path_size);
+      |                                                                        ~ ^~~~~~~~~
+APP/robot.c(429): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  429 |         robot_kinematics_joint_angle_update_by_id(i, g_robot.joints[i].current_angle);
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(499): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  499 |     float *result = (float*)malloc(sizeof(float) * ROBOT_MAX_JOINT_NUM * path_size);
+      |                                                                        ~ ^~~~~~~~~
+APP/robot.c(508): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  508 |         robot_kinematics_joint_angle_update_by_id(i, g_robot.joints[i].current_angle);
+      |         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(544): warning: comparing floating point with == or != is unsafe [-Wfloat-equal]
+  544 |         if ((joint->velocity == 0) && (fabs(current_angle - target_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE)) {  // 速度为0且角度误差在允许范围内
+      |              ~~~~~~~~~~~~~~~ ^  ~
+APP/robot.c(608): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  608 |                 node_end_time = start_time + ROBOT_INTERPOLATION_TIME_RESOLUTION * p; // 计算 path 节点到达时刻，控制运动周期
+      |                                            ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~
+APP/robot.c(617): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  617 |                     robot_joint_stop(k);
+      |                     ~~~~~~~~~~~~~~~~ ^
+APP/robot.c(632): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  632 |                 robot_joint_stop(j);
+      |                 ~~~~~~~~~~~~~~~~ ^
+APP/robot.c(636): warning: implicit conversion from 'int' to 'float' may lose precision [-Wimplicit-int-float-conversion]
+  636 |                 LOG("[jpint %d] ave_error:%.2f\n", j + 1, total_error[j]/path_size);
+      |                                                                         ~^~~~~~~~~
+./USER_BSP\bsp_uart.h(22): note: expanded from macro 'LOG'
+   22 | #define LOG(format, ...)            safe_printf(format, ##__VA_ARGS__)
+      |                                                           ^~~~~~~~~~~
+APP/robot.c(596): warning: unused parameter 'path' [-Wunused-parameter]
+  596 | static int robot_pid_run(struct position *path, int path_size, float *result)
+      |                                           ^
+APP/robot.c(645): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  645 |                 robot_joint_rotate_to(i, DIR_POSITIVE, event->param[i],
+      |                 ~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(722): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  722 |                 robot_update_current_angle(j);
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(727): warning: implicit conversion when assigning computation result loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+  727 |                         total_error[j] += fabs(error);
+      |                                        ~~ ^~~~~~~~~~~
+APP/robot.c(732): warning: implicit conversion changes signedness: 'int' to 'uint32_t' (aka 'unsigned int') [-Wsign-conversion]
+  732 |                 robot_joint_veloccity_to(j, v, ROBOT_JOINT_DEFAULT_ACCELERATION);
+      |                 ~~~~~~~~~~~~~~~~~~~~~~~~ ^
+APP/robot.c(775): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  775 |                                 robot_joint_stop(j);
+      |                                 ~~~~~~~~~~~~~~~~ ^
+APP/robot.c(799): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  799 |                 robot_joint_stop(j);
+      |                 ~~~~~~~~~~~~~~~~ ^
+APP/robot.c(748): warning: unused variable 'pos' [-Wunused-variable]
+  748 |         struct position pos = {0};
+      |                         ^~~
+APP/robot.c(938): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  938 |         int len = strlen(cmd);
+      |             ~~~   ^~~~~~~~~~~
+APP/robot.c(939): warning: operand of ? changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  939 |         strncpy(robot_cmd.cmd, cmd, (len >= ROBOT_CMD_LENGTH) ? ROBOT_CMD_LENGTH - 1: len);
+      |         ~~~~~~~                                                                       ^~~
+APP/robot.c(1050): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+ 1050 |     struct position* path = (struct position*)malloc(numPoints * sizeof(struct position));
+      |                                                      ^~~~~~~~~ ~
+APP/robot.c(1056): warning: implicit conversion from 'int' to 'float' may lose precision [-Wimplicit-int-float-conversion]
+ 1056 |     double step_x = dx / (numPoints - 1);
+      |                        ~  ~~~~~~~~~~^~~
+APP/robot.c(1057): warning: implicit conversion from 'int' to 'float' may lose precision [-Wimplicit-int-float-conversion]
+ 1057 |     double step_y = dy / (numPoints - 1);
+      |                        ~  ~~~~~~~~~~^~~
+APP/robot.c(1058): warning: implicit conversion from 'int' to 'float' may lose precision [-Wimplicit-int-float-conversion]
+ 1058 |     double step_z = dz / (numPoints - 1);
+      |                        ~  ~~~~~~~~~~^~~
+APP/robot.c(1062): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+ 1062 |         path[i].x = g_robot.cur_pos.x + i * step_x;
+      |                   ~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+APP/robot.c(1063): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+ 1063 |         path[i].y = g_robot.cur_pos.y + i * step_y;
+      |                   ~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+APP/robot.c(1064): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+ 1064 |         path[i].z = g_robot.cur_pos.z + i * step_z;
+      |                   ~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+APP/robot.c(1160): warning: implicit conversion from 'uint32_t' (aka 'unsigned int') to 'float' may lose precision [-Wimplicit-int-float-conversion]
+ 1160 |                 pos->y = (-first_x) * time_ms / 1000;
+      |                                     ~ ^~~~~~~
+APP/robot.c(1167): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+ 1167 |         pos->x = r * sin(angle_vel * time_ms / 1000);
+      |                ~ ~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+APP/robot.c(1167): warning: implicit conversion from 'uint32_t' (aka 'unsigned int') to 'float' may lose precision [-Wimplicit-int-float-conversion]
+ 1167 |         pos->x = r * sin(angle_vel * time_ms / 1000);
+      |                                    ~ ^~~~~~~
+APP/robot.c(1168): warning: implicit conversion loses floating-point precision: 'double' to 'float' [-Wimplicit-float-conversion]
+ 1168 |         pos->y = (r * cos(angle_vel * time_ms / 1000) - r - first_x);
+      |                ~  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~
+APP/robot.c(1168): warning: implicit conversion from 'uint32_t' (aka 'unsigned int') to 'float' may lose precision [-Wimplicit-int-float-conversion]
+ 1168 |         pos->y = (r * cos(angle_vel * time_ms / 1000) - r - first_x);
+      |                                     ~ ^~~~~~~
+APP/robot.c(541): warning: unused function 'robot_joint_is_reach' [-Wunused-function]
+  541 | static inline bool robot_joint_is_reach(struct joint *joint, float target_angle)
+      |                    ^~~~~~~~~~~~~~~~~~~~
+53 warnings generated.
+compiling robot.c...
+compiling timers.c...
+compiling startup.c...
+compiling system.c...
+compiling tasks.c...
+compiling bsp_common.c...
+compiling bsp_delay.c...
+compiling bsp_clocks.c...
+compiling bsp_group_irq.c...
+compiling bsp_guard.c...
+compiling bsp_io.c...
+compiling bsp_irq.c...
+compiling bsp_ipc.c...
+compiling bsp_macl.c...
+compiling bsp_ospi_b.c...
+compiling bsp_register_protection.c...
+compiling bsp_sbrk.c...
+compiling bsp_sdram.c...
+compiling bsp_security.c...
+compiling bsp_linker.c...
+compiling r_dtc.c...
+compiling r_icu.c...
+compiling r_dmac.c...
+compiling r_ioport.c...
+compiling r_canfd.c...
+compiling port.c...
+compiling common_data.c...
+compiling r_sci_uart.c...
+compiling hal_data.c...
+compiling main.c...
+compiling pin_data.c...
+compiling robot_thread.c...
+compiling vector_data.c...
+compiling vision_service_thread.c...
+linking...
+Program Size: Code=44568 RO-data=6232 RW-data=184 ZI-data=57016  
+FromELF: creating hex file...
+After Build - User command #1: cmd /c ""e:\Renesas\keil5_Project\Robot_FreeRTOS\rasc_launcher.bat" "e:\Renesas\keil5_Project\Robot_FreeRTOS\rasc_version.txt" -nosplash --launcher.suppressErrors --gensmartbundle --compiler ARMv6 --devicefamily ra "e:\Renesas\keil5_Project\Robot_FreeRTOS\configuration.xml" "e:\Renesas\keil5_Project\Robot_FreeRTOS\Objects\Robot_FreeRTOS.axf" 2> "%TEMP%\rasc_stderr.out""
+[INFO] Input file "e:\Renesas\keil5_Project\Robot_FreeRTOS\Objects\Robot_FreeRTOS.axf" is newer than output file "e:\Renesas\keil5_Project\Robot_FreeRTOS\Objects\Robot_FreeRTOS.sbd". Proceeding with RASC invocation...
+Generating Smart Bundle..
+".\Objects\Robot_FreeRTOS.axf" - 0 Error(s), 118 Warning(s).
+Build Time Elapsed:  00:00:13
