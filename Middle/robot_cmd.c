@@ -5,31 +5,16 @@
 #include "robot_cmd.h"
 #include "Emm_V5.h"
 #include "gripper.h"
-#include "robot_chassis_app.h"
-
-
-extern volatile bool ROBOT_TAKE_ENABLED;
-
-static int robot_soft_reset_handle(float *param);
-static int robot_rel_rotate_handle(float *param);
-static int robot_auto_handle(float *param);
-static int robot_abs_rotate_handle(float *param);
-static int robot_take_enable_handle(float *param);
-static int robot_take_disable_handle(float *param);
 
 /* --- gripper debug commands (UART1) --- */
+static int robot_soft_reset_handle(float *param);
+static int robot_abs_rotate_handle(float *param);
+static int robot_auto_handle(float *param);
+static int robot_rel_rotate_handle(float *param);
 static int robot_gripper_stop_handle(float *param);
 static int robot_gripper_open_handle(float *param);
 static int robot_gripper_cur_handle(float *param);
 static int robot_gripper_grasp_handle(float *param);
-
-/* --- chassis commands (UART1) --- */
-static int robot_chassis_forward_handle(float *param);
-static int robot_chassis_backward_handle(float *param);
-static int robot_chassis_left_handle(float *param);
-static int robot_chassis_right_handle(float *param);
-static int robot_chassis_stop_handle(float *param);
-static int robot_chassis_help_handle(float *param);
 
 
 void robot_mqtt_handle(struct robot_cmd *cmd)
@@ -85,13 +70,13 @@ static int robot_remote_disable_handle(float *param)
 
 static int robot_rel_rotate_handle(float *param)
 {
-	uint32_t joint_id = (uint32_t)param[0];
+	uint8_t joint_id = (uint8_t)param[0];
 	return robot_send_rel_rotate_event(joint_id, param[1]);
 }
 
 static int robot_abs_rotate_handle(float *param)
 {
-	uint32_t joint_id = (uint32_t)param[0];
+	uint8_t joint_id = (uint8_t)param[0];
 	return robot_send_abs_rotate_event(joint_id, param[1]);
 }
 
@@ -100,10 +85,12 @@ static int robot_auto_handle(float *param)
 	return robot_send_auto_event((struct position *)param);
 }
 
+#if 0
 static int robot_joints_sync_handle(float *param)
 {
 	return robot_send_auto_event((struct position *)param);
 }
+#endif
 
 static int robot_hard_reset_handle(float *param)
 {
@@ -117,26 +104,12 @@ static int robot_soft_reset_handle(float *param)
 	return robot_send_reset_event(false);	
 }
 
+#if 0
 static int robot_time_func_handle(float *param)
 {
 	return robot_send_time_func_event(param[0] * 1000);
 }
-
-static int robot_take_enable_handle(float *param)
-{
-    (void)param;
-    ROBOT_TAKE_ENABLED = true;
-    LOG("Robot take FSM ENABLED.\r\n");
-    return pdPASS;
-}
-
-static int robot_take_disable_handle(float *param)
-{
-    (void)param;
-    ROBOT_TAKE_ENABLED = false;
-    LOG("Robot take FSM DISABLED.\r\n");
-    return pdPASS;
-}
+#endif
 
 static int robot_remote_event_handle(float *param)
 {
@@ -166,67 +139,10 @@ static int robot_zero_handle(float *param)
 	(void)param;
 	LOG("robot reset zero.\r\n");
 	for (int i = 0; i < ROBOT_MAX_JOINT_NUM; i++) {
-		Emm_V5_Reset_CurPos_To_Zero(i + 1);
+		Emm_V5_Reset_CurPos_To_Zero((uint8_t)(i + 1));
 		vTaskDelay(10);
 	}
 	LOG("robot reset zero Finish!!!.\r\n");
-	return pdPASS;
-}
-
-static int robot_chassis_drive_handle(chassis_mode_t mode, float *param, const char *cmd_name)
-{
-	if ((param == NULL) || (param[0] <= 0.0f)) {
-		LOG("usage: %s <rpm>, rpm>0\r\n", cmd_name);
-		return pdFAIL;
-	}
-
-	uint32_t rpm_raw = (uint32_t)param[0];
-	if ((rpm_raw == 0u) || (rpm_raw > 65535u)) {
-		LOG("usage: %s <rpm>, rpm>0\r\n", cmd_name);
-		return pdFAIL;
-	}
-
-	if (!robot_chassis_cmd_drive(mode, (uint16_t)rpm_raw)) {
-		LOG("chassis cmd failed: %s %u\r\n", cmd_name, (unsigned)rpm_raw);
-		return pdFAIL;
-	}
-
-	LOG("chassis cmd: %s %u\r\n", cmd_name, (unsigned)rpm_raw);
-	return pdPASS;
-}
-
-static int robot_chassis_forward_handle(float *param)
-{
-	return robot_chassis_drive_handle(CHASSIS_MODE_FORWARD, param, "ch_f");
-}
-
-static int robot_chassis_backward_handle(float *param)
-{
-	return robot_chassis_drive_handle(CHASSIS_MODE_BACKWARD, param, "ch_b");
-}
-
-static int robot_chassis_left_handle(float *param)
-{
-	return robot_chassis_drive_handle(CHASSIS_MODE_TURN_LEFT, param, "ch_l");
-}
-
-static int robot_chassis_right_handle(float *param)
-{
-	return robot_chassis_drive_handle(CHASSIS_MODE_TURN_RIGHT, param, "ch_r");
-}
-
-static int robot_chassis_stop_handle(float *param)
-{
-	(void)param;
-	robot_chassis_cmd_stop();
-	LOG("chassis cmd: ch_s\r\n");
-	return pdPASS;
-}
-
-static int robot_chassis_help_handle(float *param)
-{
-	(void)param;
-	robot_chassis_print_help();
 	return pdPASS;
 }
 
@@ -282,36 +198,23 @@ static int robot_gripper_grasp_handle(float *param)
 }
 
 static struct robot_cmd_info robot_uart1_cmd_table[] = {
-	//MQTT下的指令
-	{"remote_event", robot_remote_event_handle},
-	{"remote_enable", robot_remote_enable_handle},
+	/* 远程控制指令 */
+	{"remote_event",   robot_remote_event_handle},
+	{"remote_enable",  robot_remote_enable_handle},
 	{"remote_disable", robot_remote_disable_handle},
 
-	//上位机下的指令
-	{"abs_rotate", robot_abs_rotate_handle},
-	{"rel_rotate", robot_rel_rotate_handle},
-	{"auto", robot_auto_handle},
-	{"hard_reset", robot_hard_reset_handle},
-	{"soft_reset", robot_soft_reset_handle},
-	{"zero", robot_zero_handle},
-
-	//系统主任务控制指令
-	{"take_enable", robot_take_enable_handle},
-	{"take_disable", robot_take_disable_handle},
-
-	/* 底盘控制指令 */
-	{"ch_f", robot_chassis_forward_handle},
-	{"ch_b", robot_chassis_backward_handle},
-	{"ch_l", robot_chassis_left_handle},
-	{"ch_r", robot_chassis_right_handle},
-	{"ch_s", robot_chassis_stop_handle},
-	{"ch_help", robot_chassis_help_handle},
+	/* 机械臂控制指令 */
+	{"abs_rotate",  robot_abs_rotate_handle},
+	{"rel_rotate",  robot_rel_rotate_handle},
+	{"auto",        robot_auto_handle},
+	{"hard_reset",  robot_hard_reset_handle},
+	{"soft_reset",  robot_soft_reset_handle},
+	{"zero",        robot_zero_handle},
 
 	/* 夹爪控制指令 */
-
-	{"gripper_stop", robot_gripper_stop_handle},
-	{"gripper_open", robot_gripper_open_handle},
-	{"gripper_cur", robot_gripper_cur_handle},
+	{"gripper_stop",  robot_gripper_stop_handle},
+	{"gripper_open",  robot_gripper_open_handle},
+	{"gripper_cur",   robot_gripper_cur_handle},
 	{"gripper_grasp", robot_gripper_grasp_handle},
 	// {"time_func", robot_time_func_handle},
 	{NULL, NULL},
@@ -329,8 +232,8 @@ void robot_uart1_handle(struct robot_cmd *rb_cmd)
 	}
 
 	for (int i = 0; robot_uart1_cmd_table[i].event_type != NULL; i++) {
-		char *event = robot_uart1_cmd_table[i].event_type;
-		int len = strlen(event);
+		const char *event = robot_uart1_cmd_table[i].event_type;
+		size_t len = strlen(event);
 		// Check if the command starts with the event string
 		if (strncmp(cmd, event, len) == 0) {
 			// Check if it's a full match (followed by space, null terminator, or newline)

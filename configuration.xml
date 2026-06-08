@@ -199,10 +199,6 @@
     <node id="board.clock.cecclk.display" option="board.clock.cecclk.display.value"/>
   </raClockConfiguration>
   <raComponentSelection>
-    <component apiversion="" class="CMSIS" condition="" group="Main" subgroup="DSP" variant="" vendor="Arm" version="1.16.2+fsp.6.4.0">
-      <description>Arm DSP Library Source</description>
-      <originalPack>Arm.CMSIS-DSP.1.16.2+fsp.6.4.0.pack</originalPack>
-    </component>
     <component apiversion="" class="BSP" condition="" group="Board" subgroup="custom" variant="" vendor="Renesas" version="6.4.0">
       <description>Custom Board Support Files</description>
       <originalPack>Renesas.RA_board_custom.6.4.0.pack</originalPack>

@@ -2,7 +2,6 @@
 #define __ROBOT_KINEMATICS_H__
 
 #include "robot.h"
-#include "arm_math.h"
 
 #ifdef __cplusplus
 extern "C" {    

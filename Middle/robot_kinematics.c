@@ -101,7 +101,7 @@ static void robot_kinematics_calc_theta3(void)
 	}
 }
 
-static void __robot_kinematics_calc_theta2(float theta3, float *theta2_1, float *theta2_2)
+static bool __robot_kinematics_calc_theta2(float theta3, float *theta2_1, float *theta2_2)
 {
 	float pz = g_robot_kinematics.T[2][3];
 
@@ -118,9 +118,7 @@ static void __robot_kinematics_calc_theta2(float theta3, float *theta2_1, float 
 	float sqrt_arg = const_eq1 + _2_a2_a3 * cos_theta3 - _2_a2_d4 * sin_theta3 - __robot_sqrf(pz);
 	if (sqrt_arg < -1e-6f)
 	{
-		*theta2_1 = NAN;
-		*theta2_2 = NAN;
-		return;
+		return false;
 	}
 	if (sqrt_arg < 0.0f)
 	{
@@ -132,9 +130,7 @@ static void __robot_kinematics_calc_theta2(float theta3, float *theta2_1, float 
 
 	if (fabsf(eq3) < 1e-6f)
 	{
-		*theta2_1 = NAN;
-		*theta2_2 = NAN;
-		return;
+		return false;
 	}
 
 	float u_theta2_1 = -(a2 + eq1 + eq2) / eq3;
@@ -142,27 +138,34 @@ static void __robot_kinematics_calc_theta2(float theta3, float *theta2_1, float 
 
 	*theta2_1 = atanf(u_theta2_1) * 2.0f;
 	*theta2_2 = atanf(u_theta2_2) * 2.0f;
+	return true;
 }
 
 static void robot_kinematics_calc_theta2(void)
 {
 	// 前4个theta3是同解，后4个theta3是同解
-	float theta3 = 0;
+	float theta3 = 0.0f;
 	float theta2_1 = 0;
 	float theta2_2 = 0;
 
 	theta3 = g_robot_kinematics.result[0][ROBOT_JOINT_3];
-	__robot_kinematics_calc_theta2(theta3, &theta2_1, &theta2_2);
-	g_robot_kinematics.result[0][ROBOT_JOINT_2] = theta2_1;
-	g_robot_kinematics.result[1][ROBOT_JOINT_2] = theta2_2;
+	if (__robot_kinematics_calc_theta2(theta3, &theta2_1, &theta2_2)) {
+		g_robot_kinematics.result[0][ROBOT_JOINT_2] = theta2_1;
+		g_robot_kinematics.result[1][ROBOT_JOINT_2] = theta2_2;
+	} else {
+		g_robot_kinematics.result_invalid_mask |= 0x03u;
+	}
 
 	theta3 = g_robot_kinematics.result[2][ROBOT_JOINT_3];
-	__robot_kinematics_calc_theta2(theta3, &theta2_1, &theta2_2);
-	g_robot_kinematics.result[2][ROBOT_JOINT_2] = theta2_1;
-	g_robot_kinematics.result[3][ROBOT_JOINT_2] = theta2_2;
+	if (__robot_kinematics_calc_theta2(theta3, &theta2_1, &theta2_2)) {
+		g_robot_kinematics.result[2][ROBOT_JOINT_2] = theta2_1;
+		g_robot_kinematics.result[3][ROBOT_JOINT_2] = theta2_2;
+	} else {
+		g_robot_kinematics.result_invalid_mask |= 0x0Cu;
+	}
 }
 
-static float __robot_kinematics_calc_theta1(float theta2, float theta3)
+static bool __robot_kinematics_calc_theta1(float theta2, float theta3, float *theta1)
 {	
 	float px = g_robot_kinematics.T[0][3];
 	float py = g_robot_kinematics.T[1][3];
@@ -179,12 +182,12 @@ static float __robot_kinematics_calc_theta1(float theta2, float theta3)
 	float denom = (px + eq1);
 	if (fabsf(denom) < 1e-6f)
 	{
-		return NAN;
+		return false;
 	}
 	float ratio = (-px + eq1) / denom;
 	if (ratio < -1e-6f)
 	{
-		return NAN;
+		return false;
 	}
 	if (ratio < 0.0f)
 	{
@@ -201,17 +204,25 @@ static float __robot_kinematics_calc_theta1(float theta2, float theta3)
 		u_theta1 = -u_theta1;
 	}
 
-	float theta1 = atanf(u_theta1) * 2.0f;
+	*theta1 = atanf(u_theta1) * 2.0f;
 
-	return theta1;
+	return true;
 }
 
 static void robot_kinematics_calc_theta1(void)
 {
 	for (unsigned int i = 0; i < ROBOT_KINEMATICS_RESULT_NUM; i++) {
+		if ((g_robot_kinematics.result_invalid_mask & (1u << i)) != 0u) {
+			continue;
+		}
 		float theta2 = g_robot_kinematics.result[i][ROBOT_JOINT_2];
 		float theta3 = g_robot_kinematics.result[i][ROBOT_JOINT_3];
-		g_robot_kinematics.result[i][ROBOT_JOINT_1] = __robot_kinematics_calc_theta1(theta2, theta3);
+		float theta1 = 0.0f;
+		if (__robot_kinematics_calc_theta1(theta2, theta3, &theta1)) {
+			g_robot_kinematics.result[i][ROBOT_JOINT_1] = theta1;
+		} else {
+			g_robot_kinematics.result_invalid_mask |= (1u << i);
+		}
 	}
 }
 
@@ -247,6 +258,9 @@ static float __robot_kinematics_calc_theta5(float theta1, float theta2, float th
 static void robot_kinematics_calc_theta5(void)
 {
 	for (unsigned int i = 0; i < ROBOT_KINEMATICS_RESULT_NUM; i++) {
+		if ((g_robot_kinematics.result_invalid_mask & (1u << i)) != 0u) {
+			continue;
+		}
 		float theta2 = g_robot_kinematics.result[i][ROBOT_JOINT_2];
 		float theta3 = g_robot_kinematics.result[i][ROBOT_JOINT_3];
 		float theta1 = g_robot_kinematics.result[i][ROBOT_JOINT_1];
@@ -291,6 +305,9 @@ static float __robot_kinematics_calc_theta4(float theta1, float theta2, float th
 static void robot_kinematics_calc_theta4(void)
 {
 	for (unsigned int i = 0; i < ROBOT_KINEMATICS_RESULT_NUM; i++) {
+		if ((g_robot_kinematics.result_invalid_mask & (1u << i)) != 0u) {
+			continue;
+		}
 		float theta2 = g_robot_kinematics.result[i][ROBOT_JOINT_2];
 		float theta3 = g_robot_kinematics.result[i][ROBOT_JOINT_3];
 		float theta1 = g_robot_kinematics.result[i][ROBOT_JOINT_1];
@@ -338,6 +355,9 @@ static float __robot_kinematics_calc_theta6(float theta1, float theta2, float th
 static void robot_kinematics_calc_theta6(void)
 {
 	for (unsigned int i = 0; i < ROBOT_KINEMATICS_RESULT_NUM; i++) {
+		if ((g_robot_kinematics.result_invalid_mask & (1u << i)) != 0u) {
+			continue;
+		}
 		float theta1 = g_robot_kinematics.result[i][ROBOT_JOINT_1];
 		float theta2 = g_robot_kinematics.result[i][ROBOT_JOINT_2];
 		float theta3 = g_robot_kinematics.result[i][ROBOT_JOINT_3];

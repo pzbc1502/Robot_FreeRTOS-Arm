@@ -18,7 +18,6 @@ extern "C" {
 #include "stdbool.h"
 #include "hal_data.h"
 #include "task.h"
-#include "arm_math.h"
 
 ///* 数学库常量宏定义（兼容性处理） */
 //#if !defined(__STRICT_ANSI__) || defined(_POSIX_C_SOURCE) || defined(_POSIX_SOURCE) || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) || defined(_BSD_SOURCE) || defined(_USE_MATH_DEFINES)
@@ -42,8 +41,6 @@ extern "C" {
 
 #define ROBOT_MQTT_ENABLE                   0U      /* 使能 MQTT 服务开关 */
 #define ESP8266_MQTT_ENABLE                 0U      /* ESP8266 MQTT 使能开关 */
-
-extern volatile bool ROBOT_TAKE_ENABLED;             /* 采摘状态机使能开关 */
 
 
 
@@ -85,9 +82,10 @@ extern volatile bool ROBOT_TAKE_ENABLED;             /* 采摘状态机使能开
 #define ROBOT_STATUS_POSE_VALID             5U      /* 当前末端位姿是否可信 */
 #define ROBOT_STATUS_POSE_DEGRADED          6U      /* 位姿进入退化模式(反馈异常但可继续作业) */
 
-#define ROBOT_STATUS_IS(x, status)          (((x) & (1 << status)) != 0)           /* 判断状态位是否置位 */
-#define ROBOT_STATUS_SET(x, status)         (x = ((x) | (1 << status)))            /* 设置状态位 */
-#define ROBOT_STATUS_CLEAR(x, status)       (x = ((x) & ~(1 << status)))           /* 清除状态位 */
+#define ROBOT_STATUS_MASK(status)           (1u << (uint32_t)(status))
+#define ROBOT_STATUS_IS(x, status)          (((x) & ROBOT_STATUS_MASK(status)) != 0u)     /* 判断状态位是否置位 */
+#define ROBOT_STATUS_SET(x, status)         ((x) = (uint32_t)((x) | ROBOT_STATUS_MASK(status)))      /* 设置状态位 */
+#define ROBOT_STATUS_CLEAR(x, status)       ((x) = (uint32_t)((x) & ~ROBOT_STATUS_MASK(status)))     /* 清除状态位 */
 
 #define ROBOT_CAN_DELAY                     5       /* CAN 发送/接收等待延时，单位 ms */
 
