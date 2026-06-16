@@ -70,7 +70,7 @@ void BSP_CAN_Init(void)
 }
 
 /* 简易状态打印，便于错误定位 */
-static void BSP_CAN_PrintInfo(const char *tag)
+void BSP_CAN_PrintInfo(const char *tag)
 {
     can_info_t info = {0};
     if (R_CANFD_InfoGet(&g_canfd0_ctrl, &info) == FSP_SUCCESS)
@@ -82,6 +82,31 @@ static void BSP_CAN_PrintInfo(const char *tag)
                (unsigned int) info.error_count_receive,
                (unsigned long) info.error_code);
     }
+}
+
+static void BSP_CAN_LogWaitMismatch(uint8_t want_addr,
+                                    uint8_t want_func,
+                                    uint32_t ext_id,
+                                    uint8_t rx_addr,
+                                    uint8_t dlc,
+                                    const uint8_t *data,
+                                    const char *reason)
+{
+    LOG("[CAN][WAIT][drop:%s] want addr=%u func=0x%02X, got id=0x%08lX addr=%u dlc=%u data=%02X %02X %02X %02X %02X %02X %02X %02X\r\n",
+        reason,
+        (unsigned int) want_addr,
+        (unsigned int) want_func,
+        (unsigned long) ext_id,
+        (unsigned int) rx_addr,
+        (unsigned int) dlc,
+        (dlc > 0u) ? data[0] : 0u,
+        (dlc > 1u) ? data[1] : 0u,
+        (dlc > 2u) ? data[2] : 0u,
+        (dlc > 3u) ? data[3] : 0u,
+        (dlc > 4u) ? data[4] : 0u,
+        (dlc > 5u) ? data[5] : 0u,
+        (dlc > 6u) ? data[6] : 0u,
+        (dlc > 7u) ? data[7] : 0u);
 }
 
 /* ============================================================ */
@@ -237,17 +262,26 @@ bool BSP_CAN_WaitReply(uint8_t addr,
 
         uint8_t rx_addr = (uint8_t) (ext_id >> 8);
         if (rx_addr != addr) {
+            BSP_CAN_LogWaitMismatch(addr, expected_func, ext_id, rx_addr, dlc, data, "addr");
             continue;
         }
         if (dlc < 2u) {
+            BSP_CAN_LogWaitMismatch(addr, expected_func, ext_id, rx_addr, dlc, data, "dlc");
             continue;
         }
         if (data[0] != expected_func) {
+            BSP_CAN_LogWaitMismatch(addr, expected_func, ext_id, rx_addr, dlc, data, "func");
             continue;
         }
 
         /* 多数回包以 0x6B 结尾（校验字节），做弱校验 */
         if (data[dlc - 1u] != 0x6Bu) {
+            BSP_CAN_LogWaitMismatch(addr, expected_func, ext_id, rx_addr, dlc, data, "tail");
+            continue;
+        }
+
+        if ((expected_func == 0x36u) && (dlc < 7u)) {
+            BSP_CAN_LogWaitMismatch(addr, expected_func, ext_id, rx_addr, dlc, data, "short_pos");
             continue;
         }
 
@@ -338,5 +372,3 @@ void canfd0_callback(can_callback_args_t *p_args)
             break;
     }
 }
-
-

@@ -80,6 +80,7 @@ void BSP_CAN_Init(void);
  * @return fsp_err_t FSP错误码
  */
 fsp_err_t BSP_CAN_Send(uint32_t id, can_id_mode_t id_mode, uint8_t *p_data, uint8_t dlc);
+void BSP_CAN_PrintInfo(const char *tag);
 
 /**
  * @brief 上层应用接口：发送电机指令

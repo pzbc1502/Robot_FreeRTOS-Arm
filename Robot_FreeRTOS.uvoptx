@@ -143,56 +143,7 @@
           <Name>-U -O206 -S8 -C0 -P00 -N00("") -D00(00000000) -L00(0) -TO65554 -TC10000000 -TT10000000 -TP21 -TDS8007 -TDT0 -TDC1F -TIEFFFFFFFF -TIP8 -FO7 -FD20000000 -FC7800 -FN3 -FF0RA6M5_1M.FLM -FS00 -FL0100000 -FP0($$Device:R7FA6M5BF$Flash\RA6M5_1M.FLM) -FF1RA6M5_DATA_C1M.FLM -FS18000000 -FL12000 -FP1($$Device:R7FA6M5BF$Flash\RA6M5_DATA_C1M.FLM) -FF2RA6M5_CONF.FLM -FS2100A100 -FL2200 -FP2($$Device:R7FA6M5BF$Flash\RA6M5_CONF.FLM)</Name>
         </SetRegEntry>
       </TargetDriverDllRegistry>
-      <Breakpoint>
-        <Bp>
-          <Number>0</Number>
-          <Type>0</Type>
-          <LineNumber>44</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>0</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>0</BreakIfRCount>
-          <Filename>.\APP\robot-take.h</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression></Expression>
-        </Bp>
-        <Bp>
-          <Number>1</Number>
-          <Type>0</Type>
-          <LineNumber>41</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>37578</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>.\src\robot_thread_entry.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\Robot_FreeRTOS\src/robot_thread_entry.c\41</Expression>
-        </Bp>
-        <Bp>
-          <Number>2</Number>
-          <Type>0</Type>
-          <LineNumber>234</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>33828</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>.\APP\robot-take.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\Robot_FreeRTOS\APP/robot-take.c\234</Expression>
-        </Bp>
-      </Breakpoint>
+      <Breakpoint/>
       <WatchWindow1>
         <Ww>
           <count>0</count>

@@ -65,6 +65,7 @@ static struct position *robot_path_interpolation_linear(struct position *target,
 static int robot_update_current_angle(uint8_t joint_id);
 static int robot_update_current_angle_retry(uint8_t joint_id, uint8_t retry_times);
 static int robot_angle_map_soft_reset(float angle, float min_angle, float max_angle, float *result);
+static bool robot_joint_is_full_turn(uint8_t joint_id);
 static int robot_joint_compare_angle(uint8_t joint_id, float raw_angle, float *compare_angle);
 static int robot_joint_compare_error(uint8_t joint_id, float raw_angle, float ref_angle, float *err, float *compare_angle);
 static int robot_joint_stop(uint8_t joint_id);
@@ -77,6 +78,7 @@ static void robot_joint_stop_from_isr(uint8_t joint_id);
 static void robot_set_home_pose_valid(void);
 static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_joint, float *bad_err);
 static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
+static float robot_angle_normalize(float angle);
 static float robot_angle_diff(float cur_angle, float target_angle);
 
 
@@ -198,28 +200,43 @@ static uint32_t robot_joint_rotate_to(uint32_t joint_id, enum dir dir, float ang
 		return 1;
 	}
 
+    uint8_t joint_index = (uint8_t)joint_id;
    float rel_angle = 0;
 	
    uint8_t _dir;
-   struct joint *joint = &g_robot.joints[joint_id];
+   struct joint *joint = &g_robot.joints[joint_index];
 
     if (absolute) {
-        rel_angle = angle - joint->current_angle;
-		
+        float target_angle = angle;
+
+        if (robot_joint_is_full_turn(joint_index)) {
+            target_angle = robot_angle_normalize(target_angle);
+        } else {
+            if (robot_joint_compare_angle(joint_index, target_angle, &target_angle) != 0) {
+                LOG("ERROR: abs target angle out of range, joint:%u target:%.2f\r\n",
+                    (unsigned)joint_id, angle);
+                return 1;
+            }
+        }
+
+        rel_angle = target_angle - joint->current_angle;
+        if (robot_joint_is_full_turn(joint_index)) {
+            if (rel_angle > 180.0f) {
+                rel_angle -= 360.0f;
+            } else if (rel_angle < -180.0f) {
+                rel_angle += 360.0f;
+            }
+        }
+
 		if (fabsf(rel_angle) < ROBOT_JOINT_ANGLE_ERROR_RANGE) {
 			return 0;
 		}
 
-		_dir = (dir == DIR_POSITIVE) ? (uint8_t)joint->postive_direction : (uint8_t)(!joint->postive_direction);
-
-		if ((rel_angle < 0) && (dir != DIR_NEGATIVE)) {
-			rel_angle = 360.0f - fabsf(rel_angle);
-		} else if ((rel_angle > 0) && (dir != DIR_POSITIVE)) {
-			rel_angle = 360.0f - fabsf(rel_angle);
-		}
+		_dir = (rel_angle >= 0.0f) ? (uint8_t)joint->postive_direction : (uint8_t)(!joint->postive_direction);
+		rel_angle = fabsf(rel_angle);
 
 		// LOG_FROM_ISR("id:%d current:%f, target:%f, rel:%f dir:%d\n", joint_id, joint->current_angle, angle, rel_angle, dir);
-		joint->current_angle = angle;
+		joint->current_angle = target_angle;
 	} else {
 		/* 相对旋转分支：按给定角度增量改变当前角度 */
         rel_angle = angle;
@@ -570,6 +587,7 @@ static void robot_joint_soft_reset(void)
         Emm_V5_En_Control((uint8_t)(i + 1), true, false);
         vTaskDelay(pdMS_TO_TICKS(20));
     }
+    vTaskDelay(pdMS_TO_TICKS(100));
     LOG("Soft reset motors enabled (J1~J5, J6 skipped).\r\n");
 
 	float angle = 0;
