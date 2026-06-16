@@ -48,10 +48,6 @@ void BSP_UART_Init(void)
     err = R_SCI_UART_Open(&robot_uart1_ctrl, &robot_uart1_cfg);
     if(FSP_SUCCESS != err) __BKPT(0);
 
-    /* 显式调用一次读取，确保接收中断使能*/
-    static uint8_t dummy;
-    R_SCI_UART_Read(&robot_uart1_ctrl, &dummy, 1); 
-
     /* 2. 初始化 MQTT 串口 */
     err = R_SCI_UART_Open(&robot_mqtt_ctrl, &robot_mqtt_cfg);
     if(FSP_SUCCESS != err) __BKPT(0);
@@ -237,4 +233,3 @@ void safe_printf_from_isr(const char *format, ...)
     
     /* 中断里不能死等 loop，发了就不管了 */
 }
-
