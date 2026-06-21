@@ -22,6 +22,7 @@ void robot_kinematics_show_T(float T[4][4]);
 int robot_kinematics_inverse(float *T_target, volatile float *result, int show);
 void robot_kinematics_joint_angle_update_by_id(uint32_t joint_id ,float angle);
 void robot_kinematics_joint_angle_update(volatile float *joint_angle);
+void robot_kinematics_reset_branch_lock(void);
 
 #ifdef __cplusplus
 }

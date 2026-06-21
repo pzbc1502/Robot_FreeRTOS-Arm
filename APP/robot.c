@@ -48,10 +48,10 @@ const float joint_weight[ROBOT_MAX_JOINT_NUM] = {5, 3, 3, 1, 1, 0};
 /* 各关节默认初始化参数（角度、方向、减速比、限位实例、最小角、最大角、回零方向） */
 static struct joint g_joints_init[ROBOT_MAX_JOINT_NUM] = {
 	{90.0f,  MOTOR_DIR_CCW, 50.0f,  &JOINT_LIMIT_1,   0.0f, 360.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节1 */
-	{90.0f,  MOTOR_DIR_CW,  99.99f, &JOINT_LIMIT_2,  90.0f, 180.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 2 */
-	{-90.0f, MOTOR_DIR_CW,  50.89f, &JOINT_LIMIT_3, -90.0f,  90.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 3 */
+	{90.0f,  MOTOR_DIR_CW,  99.99f, &JOINT_LIMIT_2,  88.0f, 180.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 2 */
+	{-90.0f, MOTOR_DIR_CW,  50.89f, &JOINT_LIMIT_3, -92.0f,  90.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 3 */
 	{0.0f,   MOTOR_DIR_CW,  51.0f,  &JOINT_LIMIT_6, -90.0f,  90.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 4 */
-	{90.0f,  MOTOR_DIR_CCW, 26.85f, &JOINT_LIMIT_5,   0.0f,  90.0f, DIR_POSITIVE, 0u, 0.0f, 0.0f},  /* 关节 5 */
+	{90.0f,  MOTOR_DIR_CCW, 26.85f, &JOINT_LIMIT_5,   0.0f,  92.0f, DIR_POSITIVE, 0u, 0.0f, 0.0f},  /* 关节 5 */
 	{0.0f,   MOTOR_DIR_CW,  51.0f,  &JOINT_LIMIT_4,   0.0f, 360.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 6 */
 };
 
@@ -64,6 +64,8 @@ static struct position *robot_path_interpolation_linear(struct position *target,
 
 static int robot_update_current_angle(uint8_t joint_id);
 static int robot_update_current_angle_retry(uint8_t joint_id, uint8_t retry_times);
+static int robot_update_current_angle_from_data(uint8_t joint_id, uint8_t addr, const uint8_t *rx, uint8_t dlc);
+static int robot_update_all_angles(uint8_t joint_num, uint32_t *missing_mask_out, uint32_t *elapsed_ms_out);
 static int robot_angle_map_soft_reset(float angle, float min_angle, float max_angle, float *result);
 static bool robot_joint_is_full_turn(uint8_t joint_id);
 static int robot_joint_compare_angle(uint8_t joint_id, float raw_angle, float *compare_angle);
@@ -74,12 +76,14 @@ static int robot_pid_run(struct position *path, int path_size, float *result);
 static void robot_pid_one_period(float *target_angle, float *intg_error, float *pre_error, float *total_error, int joint_num);
 static int robot_pid_remote(void);
 static int robot_mqtt_joints_sync(void);
+static void robot_read_all_debug(void);
 static void robot_joint_stop_from_isr(uint8_t joint_id);
 static void robot_set_home_pose_valid(void);
 static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_joint, float *bad_err);
 static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
 static float robot_angle_normalize(float angle);
 static float robot_angle_diff(float cur_angle, float target_angle);
+static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration);
 
 
 static robot_time_func g_robot_time_func = time_func_circle; /* 默认时间函数 */
@@ -185,6 +189,30 @@ uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acc
 
     BSP_CAN_Unlock();
 	return 0;
+}
+
+/* PID 控制循环专用：发送速度命令但不等待回包（fire-and-forget）。
+ * 参考 MechanicalArm Motor_VelControl，仅发送，靠下一周期读角度闭环校正。 */
+static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration)
+{
+    if (joint_id >= ROBOT_MAX_JOINT_NUM) {
+        return;
+    }
+    struct joint *joint = &g_robot.joints[joint_id];
+    uint8_t dir  = (velocity > 0.0f) ? (uint8_t)joint->postive_direction
+                                     : (uint8_t)(!joint->postive_direction);
+    uint8_t addr = (uint8_t)(joint_id + 1u);
+
+    ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_LIMIT_ENABLE);
+    joint->velocity = velocity;
+    uint16_t rpm = (uint16_t)fabsf(velocity * 600.0f * joint->reduction_ratio / 360.0f);
+
+    /* 与并行读角度共用总线，加锁但不等回包，发完立即释放 */
+    if (!BSP_CAN_Lock(20u)) {
+        return;
+    }
+    Emm_V5_Vel_Control(addr, dir, rpm, acceleration, false);
+    BSP_CAN_Unlock();
 }
 
 /* 控制单关节旋转（支持相对与绝对两种模式） */
@@ -402,26 +430,32 @@ static int robot_angle_map(float angle, float min_angle, float max_angle, float 
 		return 1;
 	}
 
-    float tmp_angle = angle;
-	
-	// 处理边界情况
-	if (fabsf(angle - min_angle) < ROBOT_JOINT_ANGLE_ERROR_RANGE) {
-        tmp_angle = min_angle;
-    } else if (fabsf(angle - max_angle) < ROBOT_JOINT_ANGLE_ERROR_RANGE) {
-        tmp_angle = max_angle;
+	// 处理边界情况，避免限位附近的微小误差被卷绕到另一圈
+	if (fabsf(angle - min_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+        *result = min_angle;
+        return 0;
+    }
+    if (fabsf(angle - max_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+        *result = max_angle;
+        return 0;
     }
 
+    float tmp_angle = angle;
+
 	if (angle < min_angle) {
-		tmp_angle += 360;
+		tmp_angle += 360.0f;
     } else if (angle > max_angle) {
-    	tmp_angle -= 360;
+    	tmp_angle -= 360.0f;
     }
 
 	// 再次处理边界情况
-	if (fabsf(tmp_angle - min_angle) < ROBOT_JOINT_ANGLE_ERROR_RANGE) {
-        tmp_angle = min_angle;
-    } else if (fabsf(tmp_angle - max_angle) < ROBOT_JOINT_ANGLE_ERROR_RANGE) {
-        tmp_angle = max_angle;
+	if (fabsf(tmp_angle - min_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+        *result = min_angle;
+        return 0;
+    }
+    if (fabsf(tmp_angle - max_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+        *result = max_angle;
+        return 0;
     }
 
 	if ((tmp_angle < min_angle) || (tmp_angle > max_angle)) {
@@ -442,6 +476,124 @@ static int robot_update_current_angle_retry(uint8_t joint_id, uint8_t retry_time
 	}
 	LOG("joint %u update current angle retry failed.\r\n", joint_id);
 	return 1;
+}
+
+static int robot_update_current_angle_from_data(uint8_t joint_id, uint8_t addr, const uint8_t *rx, uint8_t dlc)
+{
+    if ((joint_id >= ROBOT_MAX_JOINT_NUM) || (rx == NULL)) {
+        return 1;
+    }
+
+    if ((dlc < 7u) || (rx[0] != 0x36u) || (rx[dlc - 1u] != 0x6Bu) || (addr != (uint8_t)(joint_id + 1u)))
+    {
+        LOG("CAN RX validation failed! Joint: %u, addr: %u, Data[0]: 0x%02x\r\n", joint_id, addr, rx[0]);
+        return 1;
+    }
+
+    struct joint *joint = &g_robot.joints[joint_id];
+    float angle = 0.0f;
+    for (int i = 5; i >= 2; i--)
+    {
+        angle += (float)(((uint32_t)rx[i]) << ((5 - i) << 3));
+    }
+
+    if (rx[1] == 0x01u)
+    {
+        angle = -angle;
+    }
+
+    if (joint->postive_direction == MOTOR_DIR_CCW)
+    {
+        angle = -angle;
+    }
+
+    angle = angle * 360.0f / 65536.0f / joint->reduction_ratio + g_joints_init[joint_id].current_angle;
+    joint->current_angle = robot_angle_normalize(angle);
+    return 0;
+}
+
+static int robot_update_all_angles(uint8_t joint_num, uint32_t *missing_mask_out, uint32_t *elapsed_ms_out)
+{
+    uint32_t missing_mask = 0u;
+    uint32_t start_ms = HAL_GetTick();
+
+    if (joint_num > ROBOT_MAX_JOINT_NUM) {
+        joint_num = ROBOT_MAX_JOINT_NUM;
+    }
+    if (joint_num == 0u) {
+        if (missing_mask_out != NULL) {
+            *missing_mask_out = 0u;
+        }
+        if (elapsed_ms_out != NULL) {
+            *elapsed_ms_out = 0u;
+        }
+        return 0;
+    }
+
+    if (!BSP_CAN_Lock(200u)) {
+        for (uint8_t i = 0; i < joint_num; i++) {
+            missing_mask |= (1u << i);
+        }
+        if (missing_mask_out != NULL) {
+            *missing_mask_out = missing_mask;
+        }
+        if (elapsed_ms_out != NULL) {
+            *elapsed_ms_out = HAL_GetTick() - start_ms;
+        }
+        LOG("batch angle read: CAN bus lock timeout.\r\n");
+        return 1;
+    }
+
+    BSP_CAN_ClearMotorFlags();
+    for (uint8_t i = 0; i < joint_num; i++) {
+        Emm_V5_Read_Sys_Params((uint8_t)(i + 1u), S_CPOS);
+    }
+
+    bool all_ok = BSP_CAN_WaitAllMotors(joint_num, 6u);
+
+    for (uint8_t i = 0; i < joint_num; i++) {
+        uint8_t rx[8] = {0};
+        uint8_t dlc = 0u;
+        uint8_t flag = 0u;
+
+        __disable_irq();
+        flag = g_can_context.motor_rx_flag[i];
+        dlc = g_can_context.motor_rx_dlc[i];
+        if (dlc > 8u) {
+            dlc = 8u;
+        }
+        for (uint8_t j = 0; j < dlc; j++) {
+            rx[j] = g_can_context.motor_rx_buf[i][j];
+        }
+        __enable_irq();
+
+        if (flag == 0u) {
+            missing_mask |= (1u << i);
+            continue;
+        }
+
+        if (robot_update_current_angle_from_data(i, (uint8_t)(i + 1u), rx, dlc) != 0) {
+            missing_mask |= (1u << i);
+        }
+    }
+
+    BSP_CAN_Unlock();
+
+    if (missing_mask_out != NULL) {
+        *missing_mask_out = missing_mask;
+    }
+    if (elapsed_ms_out != NULL) {
+        *elapsed_ms_out = HAL_GetTick() - start_ms;
+    }
+
+    if ((!all_ok) || (missing_mask != 0u)) {
+        LOG("batch angle read timeout/missing mask=0x%02lX elapsed=%lu ms\r\n",
+            (unsigned long)missing_mask,
+            (unsigned long)(HAL_GetTick() - start_ms));
+        return 1;
+    }
+
+    return 0;
 }
 
 static int robot_angle_map_soft_reset(float angle, float min_angle, float max_angle, float *result)
@@ -718,6 +870,8 @@ static void robot_joint_soft_reset(void)
 
     robot_mqtt_joints_sync();
     g_soft_reset_done = true;
+    /* 复位完成，清除 IK 分支锁，避免复位后锁定到旧分支 */
+    robot_kinematics_reset_branch_lock();
 }
 
 
@@ -780,6 +934,8 @@ static void robot_time_func_move(uint32_t time_limit_ms)
     for (int i = 0; i < ROBOT_MAX_JOINT_NUM; i++) {
         robot_kinematics_joint_angle_update_by_id((uint32_t)i, g_robot.joints[i].current_angle);
     }
+    /* 新运动起步：复位 IK 分支锁，首帧从实际姿态最近解开始 */
+    robot_kinematics_reset_branch_lock();
 
     /* time_func 过程中锁定 J6，避免夹爪随整臂轨迹抖动 */
     float j6_hold_angle = g_robot.joints[ROBOT_JOINT_6].current_angle;
@@ -855,6 +1011,8 @@ static void robot_auto_move_interpolation(struct robot_event *event)
     for (int i = 0; i < ROBOT_MAX_JOINT_NUM; i++) {
         robot_kinematics_joint_angle_update_by_id((uint32_t)i, g_robot.joints[i].current_angle);
     }
+    /* 新运动起步：复位 IK 分支锁，首帧从实际姿态最近解开始 */
+    robot_kinematics_reset_branch_lock();
 
     /* auto 过程中锁定 J6，避免夹爪随整臂轨迹抖动 */
     float j6_hold_angle = g_robot.joints[ROBOT_JOINT_6].current_angle;
@@ -1069,9 +1227,28 @@ static void robot_control_task(void *arg)
 				LOG("ROBOT_JOINTS_SYNC_EVENT\n");
 				robot_joints_sync_to(&event);
 				break;
+            case ROBOT_READ_ALL_EVENT:
+                LOG("ROBOT_READ_ALL_EVENT\n");
+                robot_read_all_debug();
+                break;
 			default:
 				LOG("robot event type error\n");
         }
+    }
+}
+
+static void robot_read_all_debug(void)
+{
+    uint32_t missing_mask = 0u;
+    uint32_t elapsed_ms = 0u;
+    int ret = robot_update_all_angles(ROBOT_ARM_JOINT_NUM, &missing_mask, &elapsed_ms);
+
+    LOG("read_all ret=%d elapsed=%lu ms missing=0x%02lX\r\n",
+        ret,
+        (unsigned long)elapsed_ms,
+        (unsigned long)missing_mask);
+    for (uint8_t i = 0; i < ROBOT_ARM_JOINT_NUM; i++) {
+        LOG("J%u angle=%.2f\r\n", (unsigned int)(i + 1u), g_robot.joints[i].current_angle);
     }
 }
 
@@ -1080,8 +1257,8 @@ static void robot_pid_one_period(float *target_angle, float *intg_error, float *
 	float error = 0;
 	float v;
 	uint32_t pid_end_time = xTaskGetTickCount() + ROBOT_PID_PERIOD;
+    (void)robot_update_all_angles((uint8_t)joint_num, NULL, NULL);
 	for (int j = 0; j < joint_num; j++) {
-		robot_update_current_angle((uint8_t)j);
 		g_current_angle[j] = g_robot.joints[j].current_angle; // debug
 		error = robot_angle_diff(g_robot.joints[j].current_angle, target_angle[j]);
 		intg_error[j] += error;
@@ -1091,7 +1268,7 @@ static void robot_pid_one_period(float *target_angle, float *intg_error, float *
 
 		v = ROBOT_PID_KP * error + ROBOT_PID_KI * intg_error[j] + ROBOT_PID_KD * (error - pre_error[j]);
 		pre_error[j] = error;
-		robot_joint_veloccity_to((uint32_t)j, v, ROBOT_JOINT_DEFAULT_ACCELERATION);
+		robot_joint_velocity_nowait((uint32_t)j, v, ROBOT_JOINT_DEFAULT_ACCELERATION);
 	}
 
 	uint32_t time = xTaskGetTickCount();
@@ -1114,6 +1291,9 @@ static int robot_pid_remote(void)
 	LOG("wait robot reset....\n");
 	vTaskDelay(3000);
 	LOG("robot into remote mode!!!!\n");
+
+	/* 进入遥控连续控制前复位 IK 分支锁 */
+	robot_kinematics_reset_branch_lock();
 
 	end_time = xTaskGetTickCount();
 	while(ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_RMODE_ENABLE)) {
@@ -1291,6 +1471,17 @@ int robot_send_time_func_event(float time_limit_ms)
 	event.type = ROBOT_TIME_FUNC_EVENT;
 	event.param[0] = time_limit_ms;
 	return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+}
+
+int robot_send_read_all_event(void)
+{
+    if (g_robot.event_queue == NULL) {
+        return -1;
+    }
+
+    struct robot_event event = {0};
+    event.type = ROBOT_READ_ALL_EVENT;
+    return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
 }
 
 int robot_send_reset_event(bool hard_reset)
@@ -1475,7 +1666,6 @@ static int robot_update_current_angle(uint8_t joint_id)
 //    LOG("robot_update_current_angle START!!!\r\n");
 
 
-    struct joint *joint = &g_robot.joints[joint_id];
     uint8_t addr = (uint8_t)(joint_id + 1u);
 
     if (!BSP_CAN_Lock(200)) {
@@ -1507,27 +1697,7 @@ static int robot_update_current_angle(uint8_t joint_id)
         return 1;
     }
 
-    float angle = 0;
-    for (int i = 5; i >= 2; i--)
-    {
-        angle += (float)(((uint32_t)rx[i]) << ((5 - i) << 3));
-    }
-
-    if (rx[1] == 0x01u)
-    { // 负值
-        angle = -angle;
-    }
-
-    // 根据电机方向调整
-    if (joint->postive_direction == MOTOR_DIR_CCW)
-    { // 逆时针为正向
-        angle = -angle;
-    }
-
-    // 转换为实际角度
-    angle = angle * 360 / 65536 / joint->reduction_ratio + g_joints_init[joint_id].current_angle;
-    joint->current_angle = robot_angle_normalize(angle);
-    return 0;
+    return robot_update_current_angle_from_data(joint_id, addr, rx, dlc);
 }
 
 static int robot_joint_stop(uint8_t joint_id)

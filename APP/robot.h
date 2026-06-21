@@ -90,9 +90,9 @@ extern "C" {
 #define ROBOT_CAN_DELAY                     5       /* CAN 发送/接收等待延时，单位 ms */
 
 #define ROBOT_PID_KP                        (10.0f) /* PID 比例系数 */
-#define ROBOT_PID_KI                        (0.002f)/* PID 积分系数 */
+#define ROBOT_PID_KI                        (0.001f)/* PID 积分系数（周期减半后由 0.002 减半，保持积分等效） */
 #define ROBOT_PID_KD                        (0.0f)  /* PID 微分系数 */
-#define ROBOT_PID_PERIOD                    (20)    /* PID 控制周期，单位 ms (建议不小于 10ms) */
+#define ROBOT_PID_PERIOD                    (10)    /* PID 控制周期，单位 ms (100Hz) */
 
 #define ROBOT_CAN_TIMEOUT                   (15)    /* CAN 通信超时时间，单位 ms */
 
@@ -198,6 +198,7 @@ enum robot_event_type
     ROBOT_TEST_EVENT,               /* 测试事件：用于验证系统功能的专用事件 */
     ROBOT_REMOTE_CONTROL_EVENT,     /* 远程控制事件：根据上位机/遥控器的速度指令实时控制 */
     ROBOT_JOINTS_SYNC_EVENT,        /* 关节同步事件：强制同步所有关节状态 */
+    ROBOT_READ_ALL_EVENT,           /* 批量读取 J1~J5 当前角度 */
 };
 
 /* 关节索引枚举 */
@@ -256,6 +257,7 @@ bool robot_is_hard_reset_done(void);
 int robot_send_abs_rotate_event(uint8_t joint_id, float angle);
 int robot_send_remote_event(void);
 int robot_send_time_func_event(float time_limit_ms);
+int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);
 
 #ifdef __cplusplus

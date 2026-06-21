@@ -17,6 +17,14 @@
 static struct robot_kinematics g_robot_kinematics = {0};
 static float g_current_joint_angle[ROBOT_MAX_JOINT_NUM] = {0};
 
+/* IK 分支锁定（移植自 MechanicalArm Inverse_Kinematics::SelectBestSolution）：
+ * 记录上一帧选中的解索引，对非上次解施加惩罚，避免路径经过对称分支边界时关节角突变。 */
+static int g_last_best_index = -1;
+/* 选解权重：近基座关节权重大（与参考工程 DEFAULT_WEIGHTS 一致） */
+static const float IK_SELECT_WEIGHTS[ROBOT_MAX_JOINT_NUM] = {20.0f, 15.0f, 12.0f, 5.0f, 3.0f, 1.0f};
+/* 切换分支惩罚系数，>1 表示不鼓励切换 */
+#define IK_SWITCH_PENALTY   (10.0f)
+
 static inline float __robot_sqrf(float x)
 {
 	return x * x;
@@ -444,33 +452,53 @@ static void robot_kinematics_radians_to_degrees(void)
  */
 static int robot_kinematics_get_optimal_result(volatile float *result)
 {
-	// 选择最接近当前关节位置的解
-	float diff = 0;
-	float min_diff = FLT_MAX;
-	int min_diff_result_index = -1;
+	/* 选择最接近当前关节位置的解：加权平方距离 + 分支锁定惩罚（移植自 MechanicalArm） */
+	float min_dist = FLT_MAX;
+	int best_index = -1;
 	for (unsigned int i = 0; i < ROBOT_KINEMATICS_RESULT_NUM; i++) {
-		if (g_robot_kinematics.result_invalid_mask & (1 << i)) {
+		if (g_robot_kinematics.result_invalid_mask & (1u << i)) {
 			continue;	// 跳过无效解
 		}
-		diff = 0;
+		float dist = 0.0f;
 		for (unsigned int j = 0; j < ROBOT_MAX_JOINT_NUM; j++) {
-			diff += fabsf(g_robot_kinematics.result[i][j] - g_current_joint_angle[j]) * joint_weight[j];
+			float diff = g_robot_kinematics.result[i][j] - g_current_joint_angle[j];
+			/* 角度差归一化到 [-180, 180]，避免 ±360 等价性干扰距离计算 */
+			while (diff > 180.0f)  diff -= 360.0f;
+			while (diff < -180.0f) diff += 360.0f;
+			dist += IK_SELECT_WEIGHTS[j] * (diff * diff);
 		}
-		if (diff < min_diff) {
-			min_diff = diff;
-			min_diff_result_index = (int)i;	
+
+		/* 分支锁定：上次选中的解仍有效时，对其它候选施加惩罚 */
+		if ((g_last_best_index != -1)
+			&& !(g_robot_kinematics.result_invalid_mask & (1u << (unsigned int)g_last_best_index))
+			&& ((int)i != g_last_best_index)) {
+			dist *= IK_SWITCH_PENALTY;
+		}
+
+		if (dist < min_dist) {
+			min_dist = dist;
+			best_index = (int)i;
 		}
 	}
 
-	if (min_diff_result_index == -1) {
+	if (best_index == -1) {
 		return -1;
 	}
 
+	g_last_best_index = best_index;
+
 	for (unsigned int j = 0; j < ROBOT_MAX_JOINT_NUM; j++) {
-		result[j] = g_robot_kinematics.result[min_diff_result_index][j];	
+		result[j] = g_robot_kinematics.result[best_index][j];
 	}
 
 	return 0;
+}
+
+/* 复位 IK 分支锁定：在每段新运动开始前调用，使首帧从实际姿态最近解起步，
+ * 不被上一段运动锁定的分支带偏。 */
+void robot_kinematics_reset_branch_lock(void)
+{
+	g_last_best_index = -1;
 }
 
 /**

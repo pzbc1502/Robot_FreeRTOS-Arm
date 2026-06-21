@@ -39,6 +39,11 @@ typedef struct {
 
     /* CAN 接收信号量，用于替代 rxFrameFlag */
     SemaphoreHandle_t can_rx_sem;
+
+    /* Batch position feedback cache for motor address 1..6. */
+    volatile uint8_t motor_rx_buf[6][8];
+    volatile uint8_t motor_rx_dlc[6];
+    volatile uint8_t motor_rx_flag[6];
     
 } CAN_Context_t;
 
@@ -104,6 +109,9 @@ bool BSP_CAN_Lock(uint32_t timeout_ms);
  * @brief 释放 CAN 总线锁
  */
 void BSP_CAN_Unlock(void);
+
+void BSP_CAN_ClearMotorFlags(void);
+bool BSP_CAN_WaitAllMotors(uint8_t joint_num, uint32_t timeout_ms);
 
 /**
  * @brief 等待指定电机(addr)的指定功能码(expected_func)回包。

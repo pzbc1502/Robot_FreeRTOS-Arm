@@ -11,6 +11,7 @@ static int robot_soft_reset_handle(float *param);
 static int robot_abs_rotate_handle(float *param);
 static int robot_auto_handle(float *param);
 static int robot_rel_rotate_handle(float *param);
+static int robot_read_all_handle(float *param);
 static int robot_gripper_stop_handle(float *param);
 static int robot_gripper_open_handle(float *param);
 static int robot_gripper_cur_handle(float *param);
@@ -102,6 +103,12 @@ static int robot_soft_reset_handle(float *param)
 {
 	(void)param;
 	return robot_send_reset_event(false);	
+}
+
+static int robot_read_all_handle(float *param)
+{
+    (void)param;
+    return robot_send_read_all_event();
 }
 
 #if 0
@@ -209,6 +216,7 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"auto",        robot_auto_handle},
 	{"hard_reset",  robot_hard_reset_handle},
 	{"soft_reset",  robot_soft_reset_handle},
+    {"read_all",    robot_read_all_handle},
 	{"zero",        robot_zero_handle},
 
 	/* 夹爪控制指令 */

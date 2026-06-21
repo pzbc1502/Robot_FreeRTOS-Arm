@@ -216,6 +216,75 @@ void BSP_CAN_Unlock(void)
     }
 }
 
+static void BSP_CAN_DrainRxSem(void)
+{
+    if ((g_can_context.can_rx_sem == NULL) ||
+        (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED)) {
+        return;
+    }
+
+    while (xSemaphoreTake(g_can_context.can_rx_sem, 0u) == pdTRUE) {
+    }
+}
+
+void BSP_CAN_ClearMotorFlags(void)
+{
+    __disable_irq();
+    for (uint8_t i = 0; i < 6u; i++) {
+        g_can_context.motor_rx_dlc[i] = 0u;
+        g_can_context.motor_rx_flag[i] = 0u;
+        for (uint8_t j = 0; j < 8u; j++) {
+            g_can_context.motor_rx_buf[i][j] = 0u;
+        }
+    }
+    __enable_irq();
+    BSP_CAN_DrainRxSem();
+}
+
+bool BSP_CAN_WaitAllMotors(uint8_t joint_num, uint32_t timeout_ms)
+{
+    if (joint_num == 0u) {
+        return true;
+    }
+    if (joint_num > 6u) {
+        joint_num = 6u;
+    }
+
+    TickType_t start = xTaskGetTickCount();
+    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+    if ((timeout_ms > 0u) && (timeout_ticks == 0u)) {
+        timeout_ticks = 1u;
+    }
+
+    while ((TickType_t)(xTaskGetTickCount() - start) <= timeout_ticks)
+    {
+        bool all_ok = true;
+
+        __disable_irq();
+        for (uint8_t i = 0; i < joint_num; i++) {
+            if (g_can_context.motor_rx_flag[i] == 0u) {
+                all_ok = false;
+                break;
+            }
+        }
+        __enable_irq();
+
+        if (all_ok) {
+            BSP_CAN_DrainRxSem();
+            return true;
+        }
+
+        if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) {
+            __NOP();
+        } else {
+            taskYIELD();
+        }
+    }
+
+    BSP_CAN_DrainRxSem();
+    return false;
+}
+
 bool BSP_CAN_WaitReply(uint8_t addr,
                       uint8_t expected_func,
                       uint8_t *out_buf,
@@ -313,13 +382,31 @@ void canfd0_callback(can_callback_args_t *p_args)
              * p_args->frame 包含接收到的完整帧数据
              */
 
-            // 保存帧ID和数据长度
+            /* Save received frame ID and DLC. */
             g_can_context.CAN_RxMsg.ExtId = p_args->frame.id;
             g_can_context.CAN_RxMsg.DLC   = p_args->frame.data_length_code;
 
-            // 限制最大拷贝8字节 (标准CAN帧)
+            /* Standard CAN frame payload is at most 8 bytes. */
             uint8_t copy_len = (uint8_t)((g_can_context.CAN_RxMsg.DLC > 8) ? 8 : g_can_context.CAN_RxMsg.DLC);
             memcpy(g_can_context.rxData, p_args->frame.data, copy_len);
+
+            uint8_t motor_addr = (uint8_t)(g_can_context.CAN_RxMsg.ExtId >> 8);
+            if ((motor_addr >= 1u) &&
+                (motor_addr <= 6u) &&
+                (copy_len >= 7u) &&
+                (g_can_context.rxData[0] == 0x36u) &&
+                (g_can_context.rxData[copy_len - 1u] == 0x6Bu))
+            {
+                uint8_t idx = (uint8_t)(motor_addr - 1u);
+                for (uint8_t i = 0; i < copy_len; i++) {
+                    g_can_context.motor_rx_buf[idx][i] = g_can_context.rxData[i];
+                }
+                for (uint8_t i = copy_len; i < 8u; i++) {
+                    g_can_context.motor_rx_buf[idx][i] = 0u;
+                }
+                g_can_context.motor_rx_dlc[idx] = copy_len;
+                g_can_context.motor_rx_flag[idx] = 1u;
+            }
 
             /* --- 业务逻辑处理 --- */
             // 从ID解析关节ID (ID高8位)
@@ -339,7 +426,7 @@ void canfd0_callback(can_callback_args_t *p_args)
                 }
             }
 
-            // 释放信号量，通知等待的任务
+            /* Notify tasks waiting for the legacy single-frame receive path. */
             if (g_can_context.can_rx_sem != NULL)
             {
                 xSemaphoreGiveFromISR(g_can_context.can_rx_sem, &xHigherPriorityTaskWoken);
