@@ -1,108 +1,939 @@
-[18:24:39.455] ===== opened COM7 @ 115200 =====
-[18:24:40.457] >>> SEND: soft_reset
-[18:24:40.546] Found handler for 'soft_reset', executing...
-[18:24:40.546] ROBOT_SOFT_RESET_EVENT
-[18:24:40.546] --- Starting soft reset ---
-[18:24:40.712] Soft reset motors enabled (J1~J5, J6 skipped).
-[18:24:40.712] Soft resetting joint 4...
-[18:24:40.712] [CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
-[18:24:40.712] robot_update_current_angle 4...
-[18:24:40.712] [4] current:90.00, target:90.00, dir:-1
-[18:24:40.933] Soft resetting joint 3...
-[18:24:40.934] robot_update_current_angle 3...
-[18:24:40.934] [3] current:0.00, target:0.00, dir:-1
-[18:24:41.042] Soft resetting joint 1...
-[18:24:41.042] robot_update_current_angle 1...
-[18:24:41.042] [1] current:90.00, target:90.00, dir:1
-[18:24:41.151] Soft resetting joint 2...
-[18:24:41.260] robot_update_current_angle 2...
-[18:24:41.260] [2] current:-90.00, target:-90.00, dir:1
-[18:24:41.367] Soft resetting joint 0...
-[18:24:41.367] robot_update_current_angle 0...
-[18:24:41.367] [0] current:90.00, target:90.00, dir:1
-[18:24:41.582] soft reset final verify PASS (issues:0), pose set HOME.
-[18:24:48.458] >>> SEND: auto 15 0 0
-[18:24:48.583] Found handler for 'auto', executing...
-[18:24:48.583] ROBOT_AUTO_EVENT
-[18:24:48.583] [0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
-[18:24:48.583] [1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
-[18:24:48.583] [2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
-[18:24:48.604] [3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
-[18:24:48.604] [4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
-[18:24:48.604] [5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
-[18:24:48.627] [6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
-[18:24:48.627] [7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
-[18:24:48.627] [8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
-[18:24:48.627] [9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
-[18:24:48.650] [10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
-[18:24:48.650] [11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
-[18:24:48.650] [12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
-[18:24:48.650] [13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
-[18:24:48.750] [14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
-[18:24:48.750] [15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
-[18:24:50.275] [jpint 1] ave_error:74.49
-[18:24:50.275] [jpint 2] ave_error:56.81
-[18:24:50.275] [jpint 3] ave_error:56.28
-[18:24:50.275] [jpint 4] ave_error:22.35
-[18:24:50.275] [jpint 5] ave_error:83.49
-[18:24:50.275] 
-[18:24:50.275] robot pid run finished!!
-[18:24:58.458] >>> SEND: soft_reset
-[18:24:58.525] Found handler for 'soft_reset', executing...
-[18:24:58.525] ROBOT_SOFT_RESET_EVENT
-[18:24:58.525] --- Starting soft reset ---
-[18:24:58.742] Soft reset motors enabled (J1~J5, J6 skipped).
-[18:24:58.742] Soft resetting joint 4...
-[18:24:58.742] [CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
-[18:24:58.742] robot_update_current_angle 4...
-[18:24:58.742] [4] current:86.27, target:90.00, dir:1
-[18:24:58.848] [CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:24:59.387] Soft resetting joint 3...
-[18:24:59.387] robot_update_current_angle 3...
-[18:24:59.387] [3] current:-15.58, target:0.00, dir:1
-[18:24:59.387] [CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:00.250] soft reset joint 3 settle timeout, keep going
-[18:25:00.250] Soft resetting joint 1...
-[18:25:00.357] robot_update_current_angle 1...
-[18:25:00.357] [1] current:90.69, target:90.00, dir:-1
-[18:25:00.357] [CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:00.465] Soft resetting joint 2...
-[18:25:00.465] robot_update_current_angle 2...
-[18:25:00.465] [2] current:-88.62, target:-90.00, dir:-1
-[18:25:00.572] [CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:00.788] Soft resetting joint 0...
-[18:25:00.788] robot_update_current_angle 0...
-[18:25:00.788] [0] current:106.04, target:90.00, dir:-1
-[18:25:00.897] [CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:01.767] soft reset joint 0 settle timeout, keep going
-[18:25:01.767] soft reset verify not pass, start refine loop...
-[18:25:01.873] soft reset refine joint 0 round 1: cur=97.87 target=90.00 err=7.87 dir=-1
-[18:25:01.873] [CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:02.523] soft reset refine joint 0 round 2: cur=95.38 target=90.00 err=5.38 dir=-1
-[18:25:02.523] [CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:03.175] soft reset refine joint 0 round 3: cur=93.00 target=90.00 err=3.00 dir=-1
-[18:25:03.175] [CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
-[18:25:03.826] soft reset refine pass 1 success.
-[18:25:03.826] soft reset final verify PASS (issues:2), pose set HOME.
-[18:25:06.459] >>> SEND: auto 10 0 0
-[18:25:06.527] Found handler for 'auto', executing...
-[18:25:06.527] ROBOT_AUTO_EVENT
-[18:25:06.551] [0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
-[18:25:06.551] [1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
-[18:25:06.551] [2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
-[18:25:06.551] [3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
-[18:25:06.574] [4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
-[18:25:06.574] [5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
-[18:25:06.574] [6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
-[18:25:06.574] [7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
-[18:25:06.682] [8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
-[18:25:06.682] [9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
-[18:25:06.682] [10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
-[18:25:07.765] [jpint 1] ave_error:8.42
-[18:25:07.765] [jpint 2] ave_error:0.23
-[18:25:07.765] [jpint 3] ave_error:0.12
-[18:25:07.765] [jpint 4] ave_error:8.06
-[18:25:07.765] [jpint 5] ave_error:0.00
-[18:25:07.765] 
-[18:25:07.765] robot pid run finished!!
-[18:25:14.460] ===== test sequence complete =====
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:90.00, target:90.00, dir:1
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-15.14, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:90.10, target:90.00, dir:-1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-89.80, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:105.17, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=97.03 target=90.00 err=7.03 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 2: cur=94.54 target=90.00 err=4.54 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 3: cur=92.16 target=90.00 err=2.16 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:90.00, target:90.00, dir:1
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:0.00, target:0.00, dir:-1
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:90.10, target:90.00, dir:-1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-90.00, target:-90.00, dir:-1
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:89.92, target:90.00, dir:1
+soft reset final verify PASS (issues:0), pose set HOME.
+
+auto 0 0 15
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.00 0.00 1.00> result: 90.00 88.90 -89.90 0.00 88.80 0.00 
+robot_auto_move_interpolation robot kinematics inverse failed
+
+auto 20 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
+[2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
+[3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
+[4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
+[5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
+[6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
+[7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
+[8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
+[9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
+[10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
+[11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
+[12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
+[13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
+[14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
+[15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
+[16] <16.00 0.00 0.00> result: 108.57 90.73 -89.25 -18.57 89.98 0.00 
+[17] <17.00 0.00 0.00> result: 109.64 90.82 -89.15 -19.64 89.98 0.00 
+[18] <18.00 0.00 0.00> result: 110.70 90.91 -89.06 -20.70 89.97 0.00 
+[19] <19.00 0.00 0.00> result: 111.75 91.01 -88.95 -21.75 89.97 0.00 
+[20] <20.00 0.00 0.00> result: 112.78 91.11 -88.84 -22.78 89.96 0.00 
+ERROR: PID run received invalid angle for point 14, joint 4. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:86.41, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-16.65, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:89.93, target:90.00, dir:1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-86.65, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:106.89, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=98.71 target=90.00 err=8.71 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 2: cur=96.23 target=90.00 err=6.23 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 3: cur=93.85 target=90.00 err=3.85 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 not enough, continue...
+soft reset refine pass 2 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+auto 25 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
+[2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
+[3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
+[4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
+[5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
+[6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
+[7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
+[8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
+[9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
+[10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
+[11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
+[12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
+[13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
+[14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
+[15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
+[16] <16.00 0.00 0.00> result: 108.57 90.73 -89.25 -18.57 89.98 0.00 
+[17] <17.00 0.00 0.00> result: 109.64 90.82 -89.15 -19.64 89.98 0.00 
+[18] <18.00 0.00 0.00> result: 110.70 90.91 -89.06 -20.70 89.97 0.00 
+[19] <19.00 0.00 0.00> result: 111.75 91.01 -88.95 -21.75 89.97 0.00 
+[20] <20.00 0.00 0.00> result: 112.78 91.11 -88.84 -22.78 89.96 0.00 
+[21] <21.00 0.00 0.00> result: -680564693277057680000000000000000000000.00 0.00 0.00 0.00 0.00 0.00 
+[22] <22.00 0.00 0.00> result: 0.00 0.00 0.00 0.00 89.94 0.00 
+[23] <23.00 0.00 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[24] <24.00 0.00 0.00> result: 0.00 0.00 0.00 -37160344017526848000.00 0.00 0.00 
+[25] <25.00 0.00 0.00> result: 0.00 -680564612147419280000000000000000000000.00 -88.23 -27.69 89.91 0.00 
+ERROR: PID run received invalid angle for point 12, joint 0. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:83.62, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-16.04, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:88.86, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-87.35, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:106.25, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=98.07 target=90.00 err=8.07 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 2: cur=95.59 target=90.00 err=5.59 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 3: cur=93.21 target=90.00 err=3.21 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+auto 30 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
+[2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
+[3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
+[4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
+[5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
+[6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
+[7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
+[8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
+[9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
+[10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
+[11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
+[12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
+[13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
+[14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
+[15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
+[16] <16.00 0.00 0.00> result: 108.57 90.73 -89.25 -18.57 89.98 0.00 
+[17] <17.00 0.00 0.00> result: 109.64 90.82 -89.15 -19.64 89.98 0.00 
+[18] <18.00 0.00 0.00> result: 110.70 90.91 -89.06 -20.70 -680564693277057680000000000000000000000.00 0.00 
+[19] <19.00 0.00 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[20] <20.00 0.00 0.00> result: 0.00 0.00 -88.84 0.00 0.00 0.00 
+[21] <21.00 0.00 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[22] <22.00 0.00 0.00> result: 0.00 -37160344017526848000.00 0.00 0.00 0.00 -680564612147419280000000000000000000000.00 
+[23] <23.00 0.00 0.00> result: 115.78 91.44 -88.49 -25.78 89.93 0.00 
+[24] <24.00 0.00 0.00> result: 116.74 91.55 -88.36 -26.74 89.92 0.00 
+[25] <25.00 0.00 0.00> result: 117.69 91.67 -88.23 -27.69 89.91 0.00 
+[26] <26.00 0.00 0.00> result: 118.63 91.79 -88.09 -28.63 89.90 0.00 
+[27] <27.00 0.00 0.00> result: 119.55 91.92 -87.95 -29.55 89.88 0.00 
+[28] <28.00 0.00 0.00> result: 120.45 92.04 -87.80 -30.45 89.87 0.00 
+[29] <29.00 0.00 0.00> result: 121.34 92.17 -87.66 -31.34 89.85 0.00 
+[30] <30.00 0.00 0.00> result: 122.20 92.30 -87.50 -32.21 89.84 0.00 
+ERROR: PID run received invalid angle for point 9, joint 4. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:86.49, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-9.48, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:88.63, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-87.84, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:100.64, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=93.07 target=90.00 err=3.07 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+auto 30 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
+[2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
+[3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
+[4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
+[5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
+[6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
+[7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
+[8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
+[9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
+[10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
+[11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
+[12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
+[13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
+[14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
+[15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
+[16] <16.00 0.00 0.00> result: 108.57 90.73 -89.25 -18.57 89.98 0.00 
+[17] <17.00 0.00 0.00> result: 109.64 90.82 -89.15 -19.64 89.98 0.00 
+[18] <18.00 0.00 0.00> result: 110.70 90.91 -89.06 -20.70 -680564693277057680000000000000000000000.00 0.00 
+[19] <19.00 0.00 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[20] <20.00 0.00 0.00> result: 0.00 0.00 -88.84 0.00 0.00 0.00 
+[21] <21.00 0.00 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[22] <22.00 0.00 0.00> result: 0.00 -37160344017526848000.00 0.00 0.00 0.00 -680564612147419280000000000000000000000.00 
+[23] <23.00 0.00 0.00> result: 115.78 91.44 -88.49 -25.78 89.93 0.00 
+[24] <24.00 0.00 0.00> result: 116.74 91.55 -88.36 -26.74 89.92 0.00 
+[25] <25.00 0.00 0.00> result: 117.69 91.67 -88.23 -27.69 89.91 0.00 
+[26] <26.00 0.00 0.00> result: 118.63 91.79 -88.09 -28.63 89.90 0.00 
+[27] <27.00 0.00 0.00> result: 119.55 91.92 -87.95 -29.55 89.88 0.00 
+[28] <28.00 0.00 0.00> result: 120.45 92.04 -87.80 -30.45 89.87 0.00 
+[29] <29.00 0.00 0.00> result: 121.34 92.17 -87.66 -31.34 89.85 0.00 
+[30] <30.00 0.00 0.00> result: 122.20 92.30 -87.50 -32.21 89.84 0.00 
+ERROR: PID run received invalid angle for point 9, joint 4. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:86.41, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-9.38, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:88.72, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-87.73, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:100.53, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=92.98 target=90.00 err=2.98 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+abs_rotate 0 85
+Found handler for 'abs_rotate', executing...
+[joint_id: 0] ROBOT_JOINT_ABS_ROTATE 85.000000
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:90.00, target:90.00, dir:1
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-0.00, target:0.00, dir:1
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:90.00, target:90.00, dir:1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-90.00, target:-90.00, dir:-1
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:84.23, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset final verify PASS (issues:1), pose set HOME.
+
+auto -20 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <-1.00 0.00 0.00> result: 88.80 90.00 -90.00 1.20 90.00 0.00 
+[2] <-2.00 0.00 0.00> result: 87.60 90.01 -89.99 2.40 90.00 0.00 
+[3] <-3.00 0.00 0.00> result: 86.40 90.03 -89.97 3.60 90.00 0.00 
+[4] <-4.00 0.00 0.00> result: 85.20 90.05 -89.95 4.80 90.00 0.00 
+[5] <-5.00 0.00 0.00> result: 84.01 90.07 -89.92 5.99 90.00 0.00 
+[6] <-6.00 0.00 0.00> result: 82.82 90.11 -89.89 7.18 90.00 0.00 
+[7] <-7.00 0.00 0.00> result: 81.64 90.15 -89.85 8.36 90.00 0.00 
+[8] <-8.00 0.00 0.00> result: 80.47 90.19 -89.81 9.53 90.00 0.00 
+[9] <-9.00 0.00 0.00> result: 79.30 90.24 -89.76 10.70 90.00 0.00 
+[10] <-10.00 0.00 0.00> result: 78.14 90.29 -89.70 11.86 90.00 0.00 
+[11] <-11.00 0.00 0.00> result: 77.00 90.35 -89.64 13.00 90.00 0.00 
+[12] <-12.00 0.00 0.00> result: 75.86 90.42 -89.57 14.14 89.99 0.00 
+[13] <-13.00 0.00 0.00> result: 74.73 90.49 -89.50 15.27 89.99 0.00 
+[14] <-14.00 0.00 0.00> result: 73.62 90.57 -89.42 16.38 89.99 0.00 
+[15] <-15.00 0.00 0.00> result: 72.52 90.65 -89.34 17.48 89.99 0.00 
+[16] <-16.00 0.00 0.00> result: 71.43 90.73 -89.25 18.57 89.98 0.00 
+[17] <-17.00 0.00 0.00> result: 70.36 90.82 -89.15 19.64 89.98 0.00 
+[18] <-18.00 0.00 0.00> result: 69.30 90.91 -89.06 20.70 89.97 0.00 
+[19] <-19.00 0.00 0.00> result: 68.25 91.01 -88.95 21.75 89.97 0.00 
+[20] <-20.00 0.00 0.00> result: 67.22 91.11 -88.84 22.78 89.96 0.00 
+ERROR: PID run received invalid angle for point 14, joint 4. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:86.41, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:16.65, target:0.00, dir:-1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:89.38, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-86.32, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:70.48, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=78.67 target=90.00 err=11.33 dir=1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 2: cur=81.14 target=90.00 err=8.86 dir=1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 3: cur=83.52 target=90.00 err=6.48 dir=1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 not enough, continue...
+soft reset refine joint 0 round 1: cur=86.72 target=90.00 err=3.28 dir=1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 2 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:90.00, target:90.00, dir:-1
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:0.00, target:0.00, dir:-1
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:90.00, target:90.00, dir:1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-90.00, target:-90.00, dir:1
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:90.10, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset final verify PASS (issues:0), pose set HOME.
+
+auto 20 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
+[2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
+[3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
+[4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
+[5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
+[6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
+[7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
+[8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
+[9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
+[10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
+[11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
+[12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
+[13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
+[14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
+[15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
+[16] <16.00 0.00 0.00> result: 108.57 90.73 -89.25 -18.57 89.98 0.00 
+[17] <17.00 0.00 0.00> result: 109.64 90.82 -89.15 -19.64 89.98 0.00 
+[18] <18.00 0.00 0.00> result: 110.70 90.91 -89.06 -20.70 89.97 0.00 
+[19] <19.00 0.00 0.00> result: 111.75 91.01 -88.95 -21.75 89.97 0.00 
+[20] <20.00 0.00 0.00> result: 112.78 91.11 -88.84 -22.78 89.96 0.00 
+ERROR: PID run received invalid angle for point 14, joint 4. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:86.42, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-16.64, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:89.12, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-88.37, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:106.98, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=98.79 target=90.00 err=8.79 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 2: cur=96.31 target=90.00 err=6.31 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 3: cur=93.93 target=90.00 err=3.93 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 not enough, continue...
+soft reset refine pass 2 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+auto 20 15 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.80 0.60 0.00> result: 90.97 89.83 -90.17 -0.97 90.00 0.00 
+[2] <1.60 1.20 0.00> result: 91.97 89.66 -90.34 -1.97 90.00 0.00 
+[3] <2.40 1.80 0.00> result: 93.00 89.49 -90.50 -3.00 89.99 0.00 
+[4] <3.20 2.40 0.00> result: 94.05 89.33 -90.65 -4.05 89.98 0.00 
+[5] <4.00 3.00 0.00> result: 95.12 89.17 -90.81 -5.12 89.97 0.00 
+[6] <4.80 3.60 0.00> result: 96.22 89.01 -90.95 -6.22 89.96 0.00 
+[7] <5.60 4.20 0.00> result: 97.35 88.86 -91.10 -7.35 89.95 0.00 
+[8] <6.40 4.80 0.00> result: 98.50 88.70 -91.23 -8.50 89.94 0.00 
+[9] <7.20 5.40 0.00> result: 99.68 88.56 -91.37 -9.68 89.92 0.00 
+[10] <8.00 6.00 0.00> result: 100.88 88.41 -91.49 -10.88 89.91 0.00 
+[11] <8.80 6.60 0.00> result: 102.11 88.28 -91.62 -12.11 89.89 0.00 
+[12] <9.60 7.20 0.00> result: 103.36 88.14 -91.73 -13.36 89.88 0.00 
+[13] <10.40 7.80 0.00> result: 104.63 88.02 -91.84 -14.63 89.86 0.00 
+robot_auto_move_interpolation robot kinematics inverse failed
+
+auto 20 15 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.80 0.60 0.00> result: 90.97 89.83 -90.17 -0.97 90.00 0.00 
+[2] <1.60 1.20 0.00> result: 91.97 89.66 -90.34 -1.97 90.00 0.00 
+[3] <2.40 1.80 0.00> result: 93.00 89.49 -90.50 -3.00 89.99 0.00 
+[4] <3.20 2.40 0.00> result: 94.05 89.33 -90.65 -4.05 89.98 0.00 
+[5] <4.00 3.00 0.00> result: 95.12 89.17 -90.81 -5.12 89.97 0.00 
+[6] <4.80 3.60 0.00> result: 96.22 89.01 -90.95 -6.22 89.96 0.00 
+[7] <5.60 4.20 0.00> result: 97.35 88.86 -91.10 -7.35 89.95 0.00 
+[8] <6.40 4.80 0.00> result: 98.50 88.70 -91.23 -8.50 89.94 0.00 
+[9] <7.20 5.40 0.00> result: 99.68 88.56 -91.37 -9.68 89.92 0.00 
+[10] <8.00 6.00 0.00> result: 100.88 88.41 -91.49 -10.88 89.91 0.00 
+[11] <8.80 6.60 0.00> result: 102.11 88.28 -91.62 -12.11 89.89 0.00 
+[12] <9.60 7.20 0.00> result: 103.36 88.14 -91.73 -13.36 89.88 0.00 
+[13] <10.40 7.80 0.00> result: 104.63 88.02 -91.84 -14.63 89.86 0.00 
+robot_auto_move_interpolation robot kinematics inverse failed
+
+auto 20 15 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.80 0.60 0.00> result: 90.97 89.83 -90.17 -0.97 90.00 0.00 
+[2] <1.60 1.20 0.00> result: 91.97 89.66 -90.34 -1.97 90.00 0.00 
+[3] <2.40 1.80 0.00> result: 93.00 89.49 -90.50 -3.00 89.99 0.00 
+[4] <3.20 2.40 0.00> result: 94.05 89.33 -90.65 -4.05 89.98 0.00 
+[5] <4.00 3.00 0.00> result: 95.12 89.17 -90.81 -5.12 89.97 0.00 
+[6] <4.80 3.60 0.00> result: 96.22 89.01 -90.95 -6.22 89.96 0.00 
+[7] <5.60 4.20 0.00> result: 97.35 88.86 -91.10 -7.35 89.95 0.00 
+[8] <6.40 4.80 0.00> result: 98.50 88.70 -91.23 -8.50 89.94 0.00 
+[9] <7.20 5.40 0.00> result: 99.68 88.56 -91.37 -9.68 89.92 0.00 
+[10] <8.00 6.00 0.00> result: 100.88 88.41 -91.49 -10.88 89.91 0.00 
+[11] <8.80 6.60 0.00> result: 102.11 88.28 -91.62 -12.11 89.89 0.00 
+[12] <9.60 7.20 0.00> result: 103.36 88.14 -91.73 -13.36 89.88 0.00 
+[13] <10.40 7.80 0.00> result: 104.63 88.02 -91.84 -14.63 89.86 0.00 
+robot_auto_move_interpolation robot kinematics inverse failed
+
+auto 20 20 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.69 0.69 0.00> result: 90.84 89.80 -90.20 -0.84 90.00 0.00 
+[2] <1.38 1.38 0.00> result: 91.71 89.61 -90.39 -1.71 89.99 0.00 
+[3] <2.07 2.07 0.00> result: 92.60 89.41 -90.58 -2.60 89.99 0.00 
+[4] <2.76 2.76 0.00> result: 93.52 89.21 -90.76 -3.52 89.98 0.00 
+[5] <3.45 3.45 0.00> result: 94.46 89.02 -90.95 -4.46 89.96 0.00 
+[6] <4.14 4.14 0.00> result: 95.43 88.82 -91.13 -5.43 89.95 0.00 
+[7] <4.83 4.83 0.00> result: 96.44 88.63 -91.30 -6.44 89.93 0.00 
+[8] <5.52 5.52 0.00> result: 97.46 88.44 -91.47 -7.46 89.91 0.00 
+[9] <6.21 6.21 0.00> result: 98.52 88.25 -91.64 -8.52 89.89 0.00 
+[10] <6.90 6.90 0.00> result: 99.61 88.06 -91.80 -9.61 89.87 0.00 
+robot_auto_move_interpolation robot kinematics inverse failed
+
+auto 20 -20 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.69 -0.69 0.00> result: 90.82 90.20 -89.80 -0.82 90.00 0.00 
+[2] <1.38 -1.38 0.00> result: 91.61 90.40 -89.60 -1.61 89.99 0.00 
+[3] <2.07 -2.07 0.00> result: 92.38 90.59 -89.39 -2.38 89.99 0.00 
+[4] <2.76 -2.76 0.00> result: 93.13 90.79 -89.19 -3.13 89.98 0.00 
+[5] <3.45 -3.45 0.00> result: 93.86 90.99 -88.98 -3.86 89.96 0.00 
+[6] <4.14 -4.14 0.00> result: 94.57 91.19 -88.76 -4.57 89.95 0.00 
+[7] <4.83 -4.83 0.00> result: 95.26 91.38 -88.55 -5.26 89.93 0.00 
+[8] <5.52 -5.52 0.00> result: 95.93 91.58 -88.33 -5.93 89.91 0.00 
+[9] <6.21 -6.21 0.00> result: 96.58 91.77 -88.11 -6.58 89.89 0.00 
+[10] <6.90 -6.90 0.00> result: 97.21 91.97 -87.89 -7.21 89.86 0.00 
+[11] <7.59 -7.59 0.00> result: 97.82 92.16 -87.66 -7.82 89.83 0.00 
+[12] <8.28 -8.28 0.00> result: 98.42 92.36 -87.44 -8.42 89.80 0.00 
+[13] <8.97 -8.97 0.00> result: 99.00 92.55 -87.21 -9.00 89.77 0.00 
+[14] <9.66 -9.66 0.00> result: 99.57 92.75 -86.98 -9.57 89.73 0.00 
+[15] <10.34 -10.34 0.00> result: 100.12 92.94 -86.75 -10.12 89.69 0.00 
+[16] <11.03 -11.03 0.00> result: 100.65 93.13 -86.51 -10.65 89.65 0.00 
+[17] <11.72 -11.72 0.00> result: 101.17 93.32 -86.28 -11.17 89.61 0.00 
+[18] <12.41 -12.41 0.00> result: 101.68 93.51 -86.04 -11.68 89.56 0.00 
+[19] <13.10 -13.10 0.00> result: -680564693277057680000000000000000000000.00 0.00 0.00 0.00 0.00 0.00 
+[20] <13.79 -13.79 0.00> result: 0.00 0.00 0.00 0.00 89.47 0.00 
+[21] <14.48 -14.48 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[22] <15.17 -15.17 0.00> result: 0.00 0.00 0.00 -37160344017526848000.00 0.00 0.00 
+[23] <15.86 -15.86 0.00> result: 0.00 -680564612147419280000000000000000000000.00 -84.84 -14.03 89.31 0.00 
+[24] <16.55 -16.55 0.00> result: 104.46 94.64 -84.59 -14.46 89.26 0.00 
+[25] <17.24 -17.24 0.00> result: 104.88 94.83 -84.34 -14.89 89.20 0.00 
+[26] <17.93 -17.93 0.00> result: 105.30 95.01 -84.10 -15.30 89.14 0.00 
+[27] <18.62 -18.62 0.00> result: 105.70 95.20 -83.85 -15.70 89.08 0.00 
+[28] <19.31 -19.31 0.00> result: 106.09 95.38 -83.60 -16.09 89.02 0.00 
+[29] <20.00 -20.00 0.00> result: 106.47 95.56 -83.35 -16.48 88.95 0.00 
+ERROR: PID run received invalid angle for point 10, joint 0. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+auto 20 -20 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.69 -0.69 0.00> result: 90.82 90.20 -89.80 -0.82 90.00 0.00 
+[2] <1.38 -1.38 0.00> result: 91.61 90.40 -89.60 -1.61 89.99 0.00 
+[3] <2.07 -2.07 0.00> result: 92.38 90.59 -89.39 -2.38 89.99 0.00 
+[4] <2.76 -2.76 0.00> result: 93.13 90.79 -89.19 -3.13 89.98 0.00 
+[5] <3.45 -3.45 0.00> result: 93.86 90.99 -88.98 -3.86 89.96 0.00 
+[6] <4.14 -4.14 0.00> result: 94.57 91.19 -88.76 -4.57 89.95 0.00 
+[7] <4.83 -4.83 0.00> result: 95.26 91.38 -88.55 -5.26 89.93 0.00 
+[8] <5.52 -5.52 0.00> result: 95.93 91.58 -88.33 -5.93 89.91 0.00 
+[9] <6.21 -6.21 0.00> result: 96.58 91.77 -88.11 -6.58 89.89 0.00 
+[10] <6.90 -6.90 0.00> result: 97.21 91.97 -87.89 -7.21 89.86 0.00 
+[11] <7.59 -7.59 0.00> result: 97.82 92.16 -87.66 -7.82 89.83 0.00 
+[12] <8.28 -8.28 0.00> result: 98.42 92.36 -87.44 -8.42 89.80 0.00 
+[13] <8.97 -8.97 0.00> result: 99.00 92.55 -87.21 -9.00 89.77 0.00 
+[14] <9.66 -9.66 0.00> result: 99.57 92.75 -86.98 -9.57 89.73 0.00 
+[15] <10.34 -10.34 0.00> result: 100.12 92.94 -86.75 -10.12 89.69 0.00 
+[16] <11.03 -11.03 0.00> result: 100.65 93.13 -86.51 -10.65 89.65 0.00 
+[17] <11.72 -11.72 0.00> result: 101.17 93.32 -86.28 -11.17 89.61 0.00 
+[18] <12.41 -12.41 0.00> result: 101.68 93.51 -86.04 -11.68 89.56 0.00 
+[19] <13.10 -13.10 0.00> result: -680564693277057680000000000000000000000.00 0.00 0.00 0.00 0.00 0.00 
+[20] <13.79 -13.79 0.00> result: 0.00 0.00 0.00 0.00 89.47 0.00 
+[21] <14.48 -14.48 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[22] <15.17 -15.17 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[23] <15.86 -15.86 0.00> result: 0.00 -680564612147419280000000000000000000000.00 -84.84 -14.03 89.31 0.00 
+[24] <16.55 -16.55 0.00> result: 104.46 94.64 -84.59 -14.46 89.26 0.00 
+[25] <17.24 -17.24 0.00> result: 104.88 94.83 -84.34 -14.89 89.20 0.00 
+[26] <17.93 -17.93 0.00> result: 105.30 95.01 -84.10 -15.30 89.14 0.00 
+[27] <18.62 -18.62 0.00> result: 105.70 95.20 -83.85 -15.70 89.08 0.00 
+[28] <19.31 -19.31 0.00> result: 106.09 95.38 -83.60 -16.09 89.02 0.00 
+[29] <20.00 -20.00 0.00> result: 106.47 95.56 -83.35 -16.48 88.95 0.00 
+ERROR: PID run received invalid angle for point 10, joint 0. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+soft reset skip joint 4: angle map failed, current:96.68 range:[0.00, 92.00]
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:4.97, target:0.00, dir:-1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:89.92, target:90.00, dir:1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+soft reset skip joint 2: angle map failed, current:267.89 range:[-92.00, 90.00]
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:85.30, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset verify not pass, start refine loop...
+soft reset refine pass 1 not enough, continue...
+soft reset refine pass 2 not enough, continue...
+soft reset final FAIL: joint 2 angle map failed after refine, pose invalid.
+
+zero
+Found handler for 'zero', executing...
+robot reset zero.
+robot reset zero Finish!!!.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:90.00, target:90.00, dir:1
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:0.00, target:0.00, dir:-1
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:90.00, target:90.00, dir:-1
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-90.00, target:-90.00, dir:1
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:90.00, target:90.00, dir:-1
+soft reset final verify PASS (issues:0), pose set HOME.
+
+auto 20 -20 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.69 -0.69 0.00> result: 90.82 90.20 -89.80 -0.82 90.00 0.00 
+[2] <1.38 -1.38 0.00> result: 91.61 90.40 -89.60 -1.61 89.99 0.00 
+[3] <2.07 -2.07 0.00> result: 92.38 90.59 -89.39 -2.38 89.99 0.00 
+[4] <2.76 -2.76 0.00> result: 93.13 90.79 -89.19 -3.13 89.98 0.00 
+[5] <3.45 -3.45 0.00> result: 93.86 90.99 -88.98 -3.86 89.96 0.00 
+[6] <4.14 -4.14 0.00> result: 94.57 91.19 -88.76 -4.57 89.95 0.00 
+[7] <4.83 -4.83 0.00> result: 95.26 91.38 -88.55 -5.26 89.93 0.00 
+[8] <5.52 -5.52 0.00> result: 95.93 91.58 -88.33 -5.93 89.91 0.00 
+[9] <6.21 -6.21 0.00> result: 96.58 91.77 -88.11 -6.58 89.89 0.00 
+[10] <6.90 -6.90 0.00> result: 97.21 91.97 -87.89 -7.21 89.86 0.00 
+[11] <7.59 -7.59 0.00> result: 97.82 92.16 -87.66 -7.82 89.83 0.00 
+[12] <8.28 -8.28 0.00> result: 98.42 92.36 -87.44 -8.42 89.80 0.00 
+[13] <8.97 -8.97 0.00> result: 99.00 92.55 -87.21 -9.00 89.77 0.00 
+[14] <9.66 -9.66 0.00> result: 99.57 92.75 -86.98 -9.57 89.73 0.00 
+[15] <10.34 -10.34 0.00> result: 100.12 92.94 -86.75 -10.12 89.69 0.00 
+[16] <11.03 -11.03 0.00> result: 100.65 93.13 -86.51 -10.65 89.65 0.00 
+[17] <11.72 -11.72 0.00> result: 101.17 93.32 -86.28 -11.17 89.61 0.00 
+[18] <12.41 -12.41 0.00> result: 101.68 93.51 -86.04 -11.68 89.56 0.00 
+[19] <13.10 -13.10 0.00> result: -680564693277057680000000000000000000000.00 0.00 0.00 0.00 0.00 0.00 
+[20] <13.79 -13.79 0.00> result: 0.00 0.00 0.00 0.00 89.47 0.00 
+[21] <14.48 -14.48 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[22] <15.17 -15.17 0.00> result: 0.00 0.00 0.00 -37160344017526848000.00 0.00 0.00 
+[23] <15.86 -15.86 0.00> result: 0.00 -680564612147419280000000000000000000000.00 -84.84 -14.03 89.31 0.00 
+[24] <16.55 -16.55 0.00> result: 104.46 94.64 -84.59 -14.46 89.26 0.00 
+[25] <17.24 -17.24 0.00> result: 104.88 94.83 -84.34 -14.89 89.20 0.00 
+[26] <17.93 -17.93 0.00> result: 105.30 95.01 -84.10 -15.30 89.14 0.00 
+[27] <18.62 -18.62 0.00> result: 105.70 95.20 -83.85 -15.70 89.08 0.00 
+[28] <19.31 -19.31 0.00> result: 106.09 95.38 -83.60 -16.09 89.02 0.00 
+[29] <20.00 -20.00 0.00> result: 106.47 95.56 -83.35 -16.48 88.95 0.00 
+ERROR: PID run received invalid angle for point 10, joint 0. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:82.52, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-7.84, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:89.90, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-85.75, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:98.00, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=91.29 target=90.00 err=1.29 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+auto 20 0 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <1.00 0.00 0.00> result: 91.20 90.00 -90.00 -1.20 90.00 0.00 
+[2] <2.00 0.00 0.00> result: 92.40 90.01 -89.99 -2.40 90.00 0.00 
+[3] <3.00 0.00 0.00> result: 93.60 90.03 -89.97 -3.60 90.00 0.00 
+[4] <4.00 0.00 0.00> result: 94.80 90.05 -89.95 -4.80 90.00 0.00 
+[5] <5.00 0.00 0.00> result: 95.99 90.07 -89.92 -5.99 90.00 0.00 
+[6] <6.00 0.00 0.00> result: 97.18 90.11 -89.89 -7.18 90.00 0.00 
+[7] <7.00 0.00 0.00> result: 98.36 90.15 -89.85 -8.36 90.00 0.00 
+[8] <8.00 0.00 0.00> result: 99.53 90.19 -89.81 -9.53 90.00 0.00 
+[9] <9.00 0.00 0.00> result: 100.70 90.24 -89.76 -10.70 90.00 0.00 
+[10] <10.00 0.00 0.00> result: 101.86 90.29 -89.70 -11.86 90.00 0.00 
+[11] <11.00 0.00 0.00> result: 103.00 90.35 -89.64 -13.00 90.00 0.00 
+[12] <12.00 0.00 0.00> result: 104.14 90.42 -89.57 -14.14 89.99 0.00 
+[13] <13.00 0.00 0.00> result: 105.27 90.49 -89.50 -15.27 89.99 0.00 
+[14] <14.00 0.00 0.00> result: 106.38 90.57 -89.42 -16.38 89.99 0.00 
+[15] <15.00 0.00 0.00> result: 107.48 90.65 -89.34 -17.48 89.99 0.00 
+[16] <16.00 0.00 0.00> result: 108.57 90.73 -89.25 -18.57 89.98 0.00 
+[17] <17.00 0.00 0.00> result: 109.64 90.82 -89.15 -19.64 89.98 0.00 
+[18] <18.00 0.00 0.00> result: 110.70 90.91 -89.06 -20.70 89.97 0.00 
+[19] <19.00 0.00 0.00> result: 111.75 91.01 -88.95 -21.75 89.97 0.00 
+[20] <20.00 0.00 0.00> result: 112.78 91.11 -88.84 -22.78 89.96 0.00 
+ERROR: PID run received invalid angle for point 14, joint 4. Value: -680564693277057680000000000000000000000.00
+Aborting PID run.
+joint 5 stop timeout.
+
+soft_reset
+Found handler for 'soft_reset', executing...
+ROBOT_SOFT_RESET_EVENT
+--- Starting soft reset ---
+Soft reset motors enabled (J1~J5, J6 skipped).
+Soft resetting joint 4...
+[CAN][WAIT][drop:addr] want addr=5 func=0x36, got id=0x00000100 addr=1 dlc=3 data=F3 02 6B 00 00 00 00 00
+robot_update_current_angle 4...
+[4] current:86.41, target:90.00, dir:1
+[CAN][WAIT][drop:func] want addr=5 func=0x36, got id=0x00000500 addr=5 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 3...
+robot_update_current_angle 3...
+[3] current:-16.65, target:0.00, dir:1
+[CAN][WAIT][drop:func] want addr=4 func=0x36, got id=0x00000400 addr=4 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 3 settle timeout, keep going
+Soft resetting joint 1...
+robot_update_current_angle 1...
+[1] current:90.41, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=2 func=0x36, got id=0x00000200 addr=2 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 2...
+robot_update_current_angle 2...
+[2] current:-86.63, target:-90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=3 func=0x36, got id=0x00000300 addr=3 dlc=3 data=FD 02 6B 00 00 00 00 00
+Soft resetting joint 0...
+robot_update_current_angle 0...
+[0] current:106.91, target:90.00, dir:-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset joint 0 settle timeout, keep going
+soft reset verify not pass, start refine loop...
+soft reset refine joint 0 round 1: cur=98.73 target=90.00 err=8.73 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 2: cur=96.25 target=90.00 err=6.25 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine joint 0 round 3: cur=93.87 target=90.00 err=3.87 dir=-1
+[CAN][WAIT][drop:func] want addr=1 func=0x36, got id=0x00000100 addr=1 dlc=3 data=FD 02 6B 00 00 00 00 00
+soft reset refine pass 1 not enough, continue...
+soft reset refine pass 2 success.
+soft reset final verify PASS (issues:2), pose set HOME.
+
+auto 20 50 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.37 0.93 0.00> result: 90.45 89.73 -90.26 -0.45 90.00 0.00 
+[2] <0.74 1.85 0.00> result: 90.93 89.46 -90.53 -0.93 89.99 0.00 
+[3] <1.11 2.78 0.00> result: 91.42 89.19 -90.79 -1.42 89.98 0.00 
+[4] <1.48 3.70 0.00> result: 91.93 88.91 -91.05 -1.93 89.96 0.00 
+[5] <1.85 4.63 0.00> result: 92.47 88.62 -91.31 -2.47 89.93 0.00 
+[6] <2.22 5.56 0.00> result: 93.02 88.33 -91.57 -3.02 -680564693277057680000000000000000000000.00 0.00 
+[7] <2.59 6.48 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+robot_auto_move_interpolation robot kinematics inverse failed
+
+auto 20 -30 0
+Found handler for 'auto', executing...
+ROBOT_AUTO_EVENT
+[0] <0.00 0.00 0.00> result: 90.00 90.00 -90.00 0.00 90.00 0.00 
+[1] <0.54 -0.81 0.00> result: 90.64 90.23 -89.77 -0.64 90.00 0.00 
+[2] <1.08 -1.62 0.00> result: 91.26 90.46 -89.53 -1.26 89.99 0.00 
+[3] <1.62 -2.43 0.00> result: 91.86 90.69 -89.29 -1.86 89.98 0.00 
+[4] <2.16 -3.24 0.00> result: 92.43 90.91 -89.06 -2.43 89.97 0.00 
+[5] <2.70 -4.05 0.00> result: 92.99 91.14 -88.81 -2.99 89.95 0.00 
+[6] <3.24 -4.86 0.00> result: 93.54 91.36 -88.57 -3.54 89.93 0.00 
+[7] <3.78 -5.68 0.00> result: 94.06 91.58 -88.33 -4.06 89.91 0.00 
+[8] <4.32 -6.49 0.00> result: 94.57 91.80 -88.08 -4.57 89.88 0.00 
+[9] <4.86 -7.30 0.00> result: 95.06 92.02 -87.84 -5.06 89.85 0.00 
+[10] <5.41 -8.11 0.00> result: 95.54 92.23 -87.59 -5.54 89.82 0.00 
+[11] <5.95 -8.92 0.00> result: 96.00 92.44 -87.34 -6.00 89.78 0.00 
+[12] <6.49 -9.73 0.00> result: 96.45 92.66 -87.09 -6.45 89.75 0.00 
+[13] <7.03 -10.54 0.00> result: 96.89 92.87 -86.83 -6.89 89.70 0.00 
+[14] <7.57 -11.35 0.00> result: 97.31 93.08 -86.58 -7.31 89.66 0.00 
+[15] <8.11 -12.16 0.00> result: -680564693277057680000000000000000000000.00 0.00 0.00 0.00 0.00 0.00 
+[16] <8.65 -12.97 0.00> result: 0.00 0.00 0.00 0.00 89.56 0.00 
+[17] <9.19 -13.78 0.00> result: 0.00 0.00 0.00 0.00 0.00 0.00 
+[18] <9.73 -14.59 0.00> result: 0.00 0.00 0.00 -37160344017526848000.00 0.00 0.00 
+[19] <10.27 -15.41 0.00> result: 0.00 -680564612147419280000000000000000000000.00 -85.30 -9.25 89.40 0.00 
+[20] <10.81 -16.22 0.00> result: 99.61 94.30 -85.04 -9.61 89.35 0.00 
+[21] <11.35 -17.03 0.00> result: 99.96 94.50 -84.78 -9.96 89.29 0.00 
+[22] <11.89 -17.84 0.00> result: 100.30 94.70 -84.52 -10.30 89.23 0.00 
+[23] <12.43 -18.65 0.00> result: 100.62 94.89 -84.25 -10.63 89.16 0.00 
+[24] <12.97 -19.46 0.00> result: 100.94 95.09 -83.99 -10.95 89.10 0.00 
+[25] <13.51 -20.27 0.00> result: 101.26 95.29 -83.73 -11.26 89.03 0.00 
+[26] <14.05 -21.08 0.00> result: 101.56 95.48 -83.46 -11.56 88.96 0.00 
+[27] <14.59 -21.89 0.00> result: 101.86 95.67 -83.19 -11.86 88.89 0.00 
+[28] <15.14 -22.70 0.00> result: 102.14 95.86 -82.93 -12.15 88.82 0.00 
+[29] <15.68 -23.51 0.00> result: 102.43 96.05 -82.66 -12.43 88.74 0.00 
+[30] <16.22 -24.32 0.00> result: 102.70 96.24 -82.39 -12.70 88.67 0.00 
+[31] <16.76 -25.14 0.00> result: 102.97 96.43 -82.12 -12.97 88.59 0.00 
+[32] <17.30 -25.95 0.00> result: 103.23 96.62 -81.85 -13.23 88.51 0.00 
+[33] <17.84 -26.76 0.00> result: 103.48 96.81 -81.58 -13.49 88.44 0.00 
+[34] <18.38 -27.57 0.00> result: 103.73 96.99 -81.31 -13.74 88.36 0.00 
+[35] <18.92 -28.38 0.00> result: 103.98 97.18 -81.04 -13.98 88.27 0.00 
+[36] <19.46 -29.19 0.00> result: 104.21 97.36 -80.77 -14.22 88.19 0.00 
+[37] <20.00 -30.00 0.00> result: 104.45 97.55 -80.50 -14.46 88.11 0.00 
+
+auto 20 -30 0
+
+soft_reset
+BSP_UART_Init Success!!!
+BSP_CAN_Init Success!!!
+robot control task runing!!!
+robot cmd service task ready and running!
