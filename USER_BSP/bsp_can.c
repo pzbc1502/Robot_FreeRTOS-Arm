@@ -227,6 +227,11 @@ static void BSP_CAN_DrainRxSem(void)
     }
 }
 
+void BSP_CAN_DrainRx(void)
+{
+    BSP_CAN_DrainRxSem();
+}
+
 void BSP_CAN_ClearMotorFlags(void)
 {
     __disable_irq();
@@ -281,6 +286,45 @@ bool BSP_CAN_WaitAllMotors(uint8_t joint_num, uint32_t timeout_ms)
         }
     }
 
+    BSP_CAN_DrainRxSem();
+    return false;
+}
+
+void BSP_CAN_ClearStopFlags(uint8_t joint_num)
+{
+    if (joint_num > 6u) joint_num = 6u;
+    __disable_irq();
+    for (uint8_t i = 0; i < joint_num; i++) {
+        g_can_context.motor_stop_flag[i] = 0u;
+    }
+    __enable_irq();
+}
+
+bool BSP_CAN_WaitStopAll(uint8_t joint_num, uint32_t timeout_ms)
+{
+    if (joint_num == 0u) return true;
+    if (joint_num > 6u) joint_num = 6u;
+
+    TickType_t start = xTaskGetTickCount();
+    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+    if ((timeout_ms > 0u) && (timeout_ticks == 0u)) timeout_ticks = 1u;
+
+    while ((TickType_t)(xTaskGetTickCount() - start) <= timeout_ticks)
+    {
+        bool all_ok = true;
+        __disable_irq();
+        for (uint8_t i = 0; i < joint_num; i++) {
+            if (g_can_context.motor_stop_flag[i] == 0u) { all_ok = false; break; }
+        }
+        __enable_irq();
+        if (all_ok) {
+            BSP_CAN_DrainRxSem();
+            return true;
+        }
+
+        if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) { __NOP(); }
+        else { taskYIELD(); }
+    }
     BSP_CAN_DrainRxSem();
     return false;
 }
@@ -406,6 +450,16 @@ void canfd0_callback(can_callback_args_t *p_args)
                 }
                 g_can_context.motor_rx_dlc[idx] = copy_len;
                 g_can_context.motor_rx_flag[idx] = 1u;
+            }
+
+            /* Per-motor stop reply (0xFE) flag. */
+            if ((motor_addr >= 1u) &&
+                (motor_addr <= 6u) &&
+                (copy_len >= 2u) &&
+                (g_can_context.rxData[0] == 0xFEu) &&
+                (g_can_context.rxData[copy_len - 1u] == 0x6Bu))
+            {
+                g_can_context.motor_stop_flag[motor_addr - 1u] = 1u;
             }
 
             /* --- 业务逻辑处理 --- */

@@ -44,7 +44,10 @@ typedef struct {
     volatile uint8_t motor_rx_buf[6][8];
     volatile uint8_t motor_rx_dlc[6];
     volatile uint8_t motor_rx_flag[6];
-    
+
+    /* Per-motor stop reply (0xFE) flag, set by ISR. */
+    volatile uint8_t motor_stop_flag[6];
+
 } CAN_Context_t;
 
 /* ============================================================ */
@@ -112,6 +115,9 @@ void BSP_CAN_Unlock(void);
 
 void BSP_CAN_ClearMotorFlags(void);
 bool BSP_CAN_WaitAllMotors(uint8_t joint_num, uint32_t timeout_ms);
+void BSP_CAN_ClearStopFlags(uint8_t joint_num);
+bool BSP_CAN_WaitStopAll(uint8_t joint_num, uint32_t timeout_ms);
+void BSP_CAN_DrainRx(void);
 
 /**
  * @brief 等待指定电机(addr)的指定功能码(expected_func)回包。

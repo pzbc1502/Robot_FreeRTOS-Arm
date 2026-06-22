@@ -50,12 +50,14 @@ def main():
 
     time.sleep(1.0)
 
-    # Test sequence: 100Hz validation on +X (avoids HOME wrist singularity)
+    # 验证静态缓冲区修复：以前 auto 20/30 必崩，修复后应全部通过
     plan = [
-        ("soft_reset", 8),
-        ("auto 15 0 0", 10),
-        ("soft_reset", 8),
-        ("auto 10 0 0", 8),
+        ("soft_reset",  8),
+        ("auto 20 0 0", 10),   # path_size=21, 之前在 point14 崩
+        ("soft_reset",  8),
+        ("auto 30 0 0", 12),   # path_size=31, 之前在 point9  崩
+        ("soft_reset",  8),
+        ("auto 20 -20 0", 12), # 之前在 point10 崩（带 Y 分量）
     ]
 
     for cmd, wait in plan:

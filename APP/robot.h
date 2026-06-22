@@ -66,7 +66,7 @@ extern "C" {
 #define ROBOT_JOINT_DEFAULT_VELOCITY        (10.0f) /* 关节默认速度 */
 #define ROBOT_JOINT_DEFAULT_ACCELERATION    200     /* 关节默认加速度 */
 
-#define ROBOT_INTERPOLATION_TIME_RESOLUTION (100)   /* 插补时间分辨率，单位 ms */
+#define ROBOT_INTERPOLATION_TIME_RESOLUTION (50)    /* 插补时间分辨率，单位 ms（100→50，步进感减半） */
 #define ROBOT_INTERPOLATION_RESOLUTION      (1.0f)  /* 路径插补空间分辨率，单位 mm */
 
 #define ROBOT_RESET_DEFAULT_ANGLE           360     /* 复位默认搜索角度范围 */
@@ -89,10 +89,8 @@ extern "C" {
 
 #define ROBOT_CAN_DELAY                     5       /* CAN 发送/接收等待延时，单位 ms */
 
-#define ROBOT_PID_KP                        (10.0f) /* PID 比例系数 */
-#define ROBOT_PID_KI                        (0.001f)/* PID 积分系数（周期减半后由 0.002 减半，保持积分等效） */
-#define ROBOT_PID_KD                        (0.0f)  /* PID 微分系数 */
-#define ROBOT_PID_PERIOD                    (10)    /* PID 控制周期，单位 ms (100Hz) */
+#define ROBOT_PID_PERIOD                    (10)    /* 控制周期，单位 ms (100Hz) */
+#define ROBOT_FF_OUTPUT_LIMIT               (200.0f)/* 前馈+P 输出限幅，单位 °/s */
 
 #define ROBOT_CAN_TIMEOUT                   (15)    /* CAN 通信超时时间，单位 ms */
 
