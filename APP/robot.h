@@ -66,8 +66,15 @@ extern "C" {
 #define ROBOT_JOINT_DEFAULT_VELOCITY        (10.0f) /* 关节默认速度 */
 #define ROBOT_JOINT_DEFAULT_ACCELERATION    200     /* 关节默认加速度 */
 
-#define ROBOT_INTERPOLATION_TIME_RESOLUTION (50)    /* 插补时间分辨率，单位 ms（100→50，步进感减半） */
-#define ROBOT_INTERPOLATION_RESOLUTION      (1.0f)  /* 路径插补空间分辨率，单位 mm */
+#define ROBOT_INTERPOLATION_TIME_RESOLUTION (10)    /* 插补时间分辨率，单位 ms（与控制周期对齐，S曲线每点=1个控制周期） */
+#define ROBOT_INTERPOLATION_RESOLUTION      (1.0f)  /* 线性插补空间分辨率，单位 mm（已由 S 曲线替代，保留备用） */
+
+/* S 曲线速度规划参数（参考 MechanicalArm_Code_V4） */
+#define SCURVE_VMAX     (300.0f)                              /* 最大速度 mm/s */
+#define SCURVE_AMAX     (500.0f)                              /* 最大加速度 mm/s² */
+#define SCURVE_OMEGA    (2.0f * SCURVE_AMAX / SCURVE_VMAX)   /* 角频率 rad/s ≈ 3.333 */
+#define SCURVE_T_ACCEL  (3.14159265f / SCURVE_OMEGA)          /* 加速段时长 s ≈ 0.9425 */
+#define SCURVE_S_ACCEL  (SCURVE_VMAX * SCURVE_T_ACCEL / 2.0f)/* 加速段位移 mm ≈ 141.76 */
 
 #define ROBOT_RESET_DEFAULT_ANGLE           360     /* 复位默认搜索角度范围 */
 #define ROBOT_RESET_DEFAULT_VELOCITY        (10.0f) /* 复位默认速度，单位 rpm */
@@ -90,6 +97,7 @@ extern "C" {
 #define ROBOT_CAN_DELAY                     5       /* CAN 发送/接收等待延时，单位 ms */
 
 #define ROBOT_PID_PERIOD                    (10)    /* 控制周期，单位 ms (100Hz) */
+#define ROBOT_PID_SETTLE_PERIODS            (10)     /* 末端稳定段：前馈清零后额外执行的周期数(50ms) */
 #define ROBOT_FF_OUTPUT_LIMIT               (200.0f)/* 前馈+P 输出限幅，单位 °/s */
 
 #define ROBOT_CAN_TIMEOUT                   (15)    /* CAN 通信超时时间，单位 ms */

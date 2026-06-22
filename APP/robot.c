@@ -76,7 +76,7 @@ volatile struct robot_remote_control g_remote_control = {0};
 static volatile bool g_soft_reset_done = false;
 static volatile bool g_hard_reset_done = false;
 
-static struct position *robot_path_interpolation_linear(struct position *target, int *size);
+static int robot_path_interpolation_scurve(struct position *target, int *size);
 
 static int robot_update_current_angle(uint8_t joint_id);
 static int robot_update_current_angle_retry(uint8_t joint_id, uint8_t retry_times);
@@ -1011,30 +1011,10 @@ static void robot_auto_move_interpolation(struct robot_event *event)
     struct position *path   = s_path_buf;
     float           *result = s_result_buf;
 
-    /* 先计算路径点数，超出静态缓冲区则截断并警告 */
-    {
-        float dx = target_pos->x - g_robot.cur_pos.x;
-        float dy = target_pos->y - g_robot.cur_pos.y;
-        float dz = target_pos->z - g_robot.cur_pos.z;
-        float dist = sqrtf(dx*dx + dy*dy + dz*dz);
-        path_size = (int)(ceilf(dist) / ROBOT_INTERPOLATION_RESOLUTION) + 1;
-        if (path_size > ROBOT_MAX_PATH_SIZE) {
-            LOG("[WARN] path_size %d > ROBOT_MAX_PATH_SIZE %d, truncated\r\n",
-                path_size, ROBOT_MAX_PATH_SIZE);
-            path_size = ROBOT_MAX_PATH_SIZE;
-        }
-        if (path_size <= 1) {
-            path[0] = *target_pos;
-        } else {
-            float step_x = dx / (float)(path_size - 1);
-            float step_y = dy / (float)(path_size - 1);
-            float step_z = dz / (float)(path_size - 1);
-            for (int i = 0; i < path_size; i++) {
-                path[i].x = g_robot.cur_pos.x + (float)i * step_x;
-                path[i].y = g_robot.cur_pos.y + (float)i * step_y;
-                path[i].z = g_robot.cur_pos.z + (float)i * step_z;
-            }
-        }
+    /* 生成 S 曲线路径（写入 s_path_buf），返回点数已受 ROBOT_MAX_PATH_SIZE 限制 */
+    if (robot_path_interpolation_scurve(target_pos, &path_size) <= 0) {
+        LOG("[WARN] scurve path generation failed\r\n");
+        return;
     }
 
 	// 更新当前关节角度到运动学模块
@@ -1144,16 +1124,12 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 {
 	(void)path;
 	int p;
-	uint32_t start_time = 0;
-	uint32_t node_end_time = 0;
 	float target_angle[ROBOT_MAX_JOINT_NUM] = {0};
 	float feedforward[ROBOT_MAX_JOINT_NUM] = {0};
 	float total_error[ROBOT_MAX_JOINT_NUM] = {0};
 	int sample_count = 0;
 
-	start_time = xTaskGetTickCount();
 	for (p = 1; p < path_size; p++) {
-		node_end_time = start_time + (uint32_t)ROBOT_INTERPOLATION_TIME_RESOLUTION * (uint32_t)p;
 		for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
 			float angle = result[p * ROBOT_MAX_JOINT_NUM + j];
 			if (isnan(angle) || isinf(angle) || fabsf(angle) > 10000.0f) {
@@ -1164,18 +1140,29 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 			}
 			target_angle[j] = robot_angle_normalize(angle);
 			g_target_angle[j] = target_angle[j];
-			/* 节点前馈：相邻 IK 节点角差 / 节点时长 × 0.3
-			 * 只保留 30% 前馈：避免节点内固定目标时前馈持续推动导致超调抖动 */
+			/* 节点前馈：S 曲线保证每10ms步进一次目标，全量前馈无超调风险 */
 			float prev_angle = robot_angle_normalize(result[(p - 1) * ROBOT_MAX_JOINT_NUM + j]);
-			feedforward[j] = 0.3f * robot_angle_diff(prev_angle, target_angle[j])
+			feedforward[j] = robot_angle_diff(prev_angle, target_angle[j])
 			                  / (ROBOT_INTERPOLATION_TIME_RESOLUTION / 1000.0f);
 		}
 
-		while(xTaskGetTickCount() < node_end_time) {
-			robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);
-			sample_count++;
+		/* 每个路径点恰好执行一个控制周期(one_period 自带 10ms 节拍)，
+		 * 不再用外层 while 二次定时，避免跳点/重复导致的冲击与抖动 */
+		robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);
+		sample_count++;
+
+		if ((p % 10) == 0) {
+			robot_mqtt_joints_sync();
 		}
-		robot_mqtt_joints_sync();
+	}
+
+	/* 末端稳定段：保持终点目标、前馈清零，让 P 控制器平滑收敛后再停止，消除末端冲击 */
+	for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
+		feedforward[j] = 0.0f;
+	}
+	for (int k = 0; k < ROBOT_PID_SETTLE_PERIODS; k++) {
+		robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);
+		sample_count++;
 	}
 
 	robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
@@ -1642,53 +1629,85 @@ void robot_cmd_service(void *pvParameters)
 	}
 }
 
-/**
- * @brief 生成直线插补路径
- * 
- * 从当前位置到目标位置生成一系列中间点
- * 路径点之间的距离由 ROBOT_INTERPOLATION_RESOLUTION 控制
- * 
- * @param target 目标位置，包含 x, y, z 坐标
- * @param size 返回生成的路径点数量
- * @return struct position* 生成的路径点数组
- *         失败时返回 NULL
- */
-static struct position *robot_path_interpolation_linear(struct position *target, int *size)
+/* S 曲线路径生成：以 ROBOT_PID_PERIOD(10ms) 为步长，按正弦速度剖面生成笛卡尔路径点
+ * 三段式（S ≥ 2·S_acc）：加速 + 匀速 + 减速
+ * 两段式（S <  2·S_acc）：加速 + 减速（Vpeak 降低）
+ * 输出写入 s_path_buf，返回生成点数（0 表示距离过小） */
+static int robot_path_interpolation_scurve(struct position *target, int *size)
 {
     float dx = target->x - g_robot.cur_pos.x;
     float dy = target->y - g_robot.cur_pos.y;
     float dz = target->z - g_robot.cur_pos.z;
-    float distance = sqrtf(dx * dx + dy * dy + dz * dz);
+    float S = sqrtf(dx*dx + dy*dy + dz*dz);
 
-    int numPoints = (int)(ceilf(distance) / ROBOT_INTERPOLATION_RESOLUTION) + 1; // 加1确保包含终点
-    *size = numPoints;
-
-    struct position* path = (struct position*)malloc((size_t)numPoints * sizeof(struct position));
-    if (path == NULL) {
-        return NULL;
+    if (S < 1e-3f) {
+        s_path_buf[0] = *target;
+        *size = 1;
+        return 1;
     }
 
-    if (numPoints <= 1) {
-        path[0] = *target;
-        LOG("AUTO near-zero distance: cur<%.2f %.2f %.2f> target<%.2f %.2f %.2f>\r\n",
-            g_robot.cur_pos.x, g_robot.cur_pos.y, g_robot.cur_pos.z,
-            target->x, target->y, target->z);
-        return path;
+    float dir_x = dx / S, dir_y = dy / S, dir_z = dz / S;
+
+    const float dt = ROBOT_PID_PERIOD / 1000.0f; /* 10ms */
+    int n = 0;
+    float t = 0.0f, s = 0.0f;
+
+    if (S >= 2.0f * SCURVE_S_ACCEL) {
+        /* 三段式 */
+        float T_const = (S - 2.0f * SCURVE_S_ACCEL) / SCURVE_VMAX;
+        float T_total = 2.0f * SCURVE_T_ACCEL + T_const;
+        while (t <= T_total + dt * 0.5f && n < ROBOT_MAX_PATH_SIZE) {
+            float v;
+            if (t <= SCURVE_T_ACCEL) {
+                v = (SCURVE_VMAX * 0.5f) * (sinf(SCURVE_OMEGA * t - 3.14159265f * 0.5f) + 1.0f);
+            } else if (t <= SCURVE_T_ACCEL + T_const) {
+                v = SCURVE_VMAX;
+            } else {
+                float t2 = t - SCURVE_T_ACCEL - T_const;
+                v = (SCURVE_VMAX * 0.5f) * (sinf(3.14159265f * 0.5f - SCURVE_OMEGA * t2) + 1.0f);
+            }
+            s += v * dt;
+            if (s > S) s = S;
+            s_path_buf[n].x = g_robot.cur_pos.x + dir_x * s;
+            s_path_buf[n].y = g_robot.cur_pos.y + dir_y * s;
+            s_path_buf[n].z = g_robot.cur_pos.z + dir_z * s;
+            n++;
+            t += dt;
+        }
+    } else {
+        /* 两段式：降低峰值速度 */
+        float Vpeak = sqrtf(S * SCURVE_AMAX * 3.14159265f * 0.5f);
+        float omega2 = 2.0f * SCURVE_AMAX / Vpeak;
+        float T_half = 3.14159265f / omega2;
+        float T_total = 2.0f * T_half;
+        while (t <= T_total + dt * 0.5f && n < ROBOT_MAX_PATH_SIZE) {
+            float v;
+            if (t <= T_half) {
+                v = (Vpeak * 0.5f) * (sinf(omega2 * t - 3.14159265f * 0.5f) + 1.0f);
+            } else {
+                float t2 = t - T_half;
+                v = (Vpeak * 0.5f) * (sinf(3.14159265f * 0.5f - omega2 * t2) + 1.0f);
+            }
+            s += v * dt;
+            if (s > S) s = S;
+            s_path_buf[n].x = g_robot.cur_pos.x + dir_x * s;
+            s_path_buf[n].y = g_robot.cur_pos.y + dir_y * s;
+            s_path_buf[n].z = g_robot.cur_pos.z + dir_z * s;
+            n++;
+            t += dt;
+        }
     }
 
-	// 计算每一步的增量
-	float step_x = dx / (float)(numPoints - 1);
-	float step_y = dy / (float)(numPoints - 1);
-	float step_z = dz / (float)(numPoints - 1);
+    /* 确保末点精确 */
+    if (n > 0) {
+        s_path_buf[n - 1] = *target;
+    } else {
+        s_path_buf[0] = *target;
+        n = 1;
+    }
 
-	// 生成路径点
-	for (int i = 0; i < numPoints; i++) {
-		path[i].x = g_robot.cur_pos.x + (float)i * step_x;
-		path[i].y = g_robot.cur_pos.y + (float)i * step_y;
-		path[i].z = g_robot.cur_pos.z + (float)i * step_z;
-	}
-
-    return path;
+    *size = n;
+    return n;
 }
 
 static int robot_update_current_angle(uint8_t joint_id)
