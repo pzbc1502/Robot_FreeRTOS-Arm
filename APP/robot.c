@@ -58,7 +58,6 @@ const float T_0_6_reset[4][4] = {
 
 
 /* 各关节权重：用于逆解结果选择时的加权误差计算（J6权重为0，不参与选解） */
-const float joint_weight[ROBOT_MAX_JOINT_NUM] = {5, 3, 3, 1, 1, 0};
 
 
 /* 各关节默认初始化参数（角度、方向、减速比、限位实例、最小角、最大角、回零方向） */
@@ -1058,26 +1057,6 @@ static void robot_auto_move_interpolation(struct robot_event *event)
 	}
 }
 
-#if 0
-static inline bool robot_joint_is_reach(struct joint *joint, float target_angle)
-{
-	float current_angle = joint->current_angle;
-	if ((joint->velocity == 0.0f) && (fabsf(current_angle - target_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE)) {	// 速度为0且角度误差在允许范围内
-		return true;
-	}
-
-	if ((joint->velocity < 0) && (current_angle <= (target_angle + ROBOT_JOINT_ANGLE_ERROR_RANGE))) { // 速度为负，且已到达或超过目标位置
-		return true;
-	}
-
-	if ((joint->velocity > 0) && (current_angle >= (target_angle - ROBOT_JOINT_ANGLE_ERROR_RANGE))) { // 速度为正，且已到达或超过目标位置
-		return true;
-	}
-
-	return false;
-}
-#endif
-
 static float robot_angle_normalize(float angle)
 {
 	// 将角度规范化到 0-360 范围
@@ -1112,9 +1091,6 @@ static float robot_angle_diff(float cur_angle, float target_angle)
 	return diff;
 }
 
-float g_target_angle[ROBOT_MAX_JOINT_NUM] = {0};
-float g_current_angle[ROBOT_MAX_JOINT_NUM] = {0};
-
 /* 各关节独立比例系数（单位: 1/s）
  * J2(Kp=4.0): 减速比99.99，已调好
  * J3(Kp=2.5): 承载前臂重量，稳态滞后1.7°，上调至2.5 */
@@ -1139,7 +1115,6 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 				return 1;
 			}
 			target_angle[j] = robot_angle_normalize(angle);
-			g_target_angle[j] = target_angle[j];
 			/* 节点前馈：S 曲线保证每10ms步进一次目标，全量前馈无超调风险 */
 			float prev_angle = robot_angle_normalize(result[(p - 1) * ROBOT_MAX_JOINT_NUM + j]);
 			feedforward[j] = robot_angle_diff(prev_angle, target_angle[j])
@@ -1275,7 +1250,6 @@ static void robot_pid_one_period(float *target_angle, float *feedforward, float 
 	uint32_t pid_end_time = xTaskGetTickCount() + ROBOT_PID_PERIOD;
 	(void)robot_update_all_angles((uint8_t)joint_num, NULL, NULL);
 	for (int j = 0; j < joint_num; j++) {
-		g_current_angle[j] = g_robot.joints[j].current_angle;
 		float error = robot_angle_diff(g_robot.joints[j].current_angle, target_angle[j]);
 		if (total_error != NULL) {
 			total_error[j] += fabsf(error);
@@ -1341,7 +1315,6 @@ static int robot_pid_remote(void)
 
 		for (int j = 0; j < ROBOT_MAX_JOINT_NUM; j++) {
 			target_angle[j] = robot_angle_normalize(g_remote_control.result[j]);
-			g_target_angle[j] = target_angle[j];
 			/* remote 前馈：相邻目标角差 / 时间步长；首次更新为 0，避免进入时冲击 */
 			if (first_update) {
 				feedforward[j] = 0.0f;

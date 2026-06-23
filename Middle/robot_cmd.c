@@ -86,13 +86,6 @@ static int robot_auto_handle(float *param)
 	return robot_send_auto_event((struct position *)param);
 }
 
-#if 0
-static int robot_joints_sync_handle(float *param)
-{
-	return robot_send_auto_event((struct position *)param);
-}
-#endif
-
 static int robot_hard_reset_handle(float *param)
 {
 	(void)param;
@@ -110,13 +103,6 @@ static int robot_read_all_handle(float *param)
     (void)param;
     return robot_send_read_all_event();
 }
-
-#if 0
-static int robot_time_func_handle(float *param)
-{
-	return robot_send_time_func_event(param[0] * 1000);
-}
-#endif
 
 static int robot_remote_event_handle(float *param)
 {
@@ -224,7 +210,7 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"gripper_open",  robot_gripper_open_handle},
 	{"gripper_cur",   robot_gripper_cur_handle},
 	{"gripper_grasp", robot_gripper_grasp_handle},
-	// {"time_func", robot_time_func_handle},
+	// {"time_func", NULL},
 	{NULL, NULL},
 };
 

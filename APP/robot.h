@@ -67,8 +67,6 @@ extern "C" {
 #define ROBOT_JOINT_DEFAULT_ACCELERATION    200     /* 关节默认加速度 */
 
 #define ROBOT_INTERPOLATION_TIME_RESOLUTION (10)    /* 插补时间分辨率，单位 ms（与控制周期对齐，S曲线每点=1个控制周期） */
-#define ROBOT_INTERPOLATION_RESOLUTION      (1.0f)  /* 线性插补空间分辨率，单位 mm（已由 S 曲线替代，保留备用） */
-
 /* S 曲线速度规划参数（参考 MechanicalArm_Code_V4） */
 #define SCURVE_VMAX     (300.0f)                              /* 最大速度 mm/s */
 #define SCURVE_AMAX     (500.0f)                              /* 最大加速度 mm/s² */
@@ -247,7 +245,6 @@ typedef int(*robot_time_func)(uint32_t time_ms, struct position *pos);
 extern struct robot g_robot;              /* 机器人全局单例 */
 extern const float D_H[6][4];             /* DH 参数表 */
 extern const float T_0_6_reset[4][4];     /* 复位姿态矩阵 */
-extern const float joint_weight[ROBOT_MAX_JOINT_NUM]; /* 关节运动权重 */
 extern volatile struct robot_remote_control g_remote_control; /* 远程控制数据 */
 
 /* 函数声明 */
