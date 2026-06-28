@@ -573,6 +573,16 @@
               <FilePath>.\USER_BSP\bsp_led.h</FilePath>
             </File>
             <File>
+              <FileName>bsp_laser.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\USER_BSP\bsp_laser.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_laser.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\USER_BSP\bsp_laser.h</FilePath>
+            </File>
+            <File>
               <FileName>Emm_V5.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\USER_BSP\Emm_V5.c</FilePath>

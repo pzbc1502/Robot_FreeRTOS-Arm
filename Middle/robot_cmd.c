@@ -5,6 +5,7 @@
 #include "robot_cmd.h"
 #include "Emm_V5.h"
 #include "gripper.h"
+#include "bsp_laser.h"
 
 /* --- gripper debug commands (UART1) --- */
 static int robot_soft_reset_handle(float *param);
@@ -16,6 +17,8 @@ static int robot_gripper_stop_handle(float *param);
 static int robot_gripper_open_handle(float *param);
 static int robot_gripper_cur_handle(float *param);
 static int robot_gripper_grasp_handle(float *param);
+static int robot_laser_on_handle(float *param);
+static int robot_laser_off_handle(float *param);
 
 
 void robot_mqtt_handle(struct robot_cmd *cmd)
@@ -190,6 +193,22 @@ static int robot_gripper_grasp_handle(float *param)
 	return (r == GRIPPER_OK) ? pdPASS : pdFAIL;
 }
 
+static int robot_laser_on_handle(float *param)
+{
+	(void)param;
+	BSP_Laser_On();
+	LOG("laser_on\r\n");
+	return pdPASS;
+}
+
+static int robot_laser_off_handle(float *param)
+{
+	(void)param;
+	BSP_Laser_Off();
+	LOG("laser_off\r\n");
+	return pdPASS;
+}
+
 static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	/* 远程控制指令 */
 	{"remote_event",   robot_remote_event_handle},
@@ -210,6 +229,10 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"gripper_open",  robot_gripper_open_handle},
 	{"gripper_cur",   robot_gripper_cur_handle},
 	{"gripper_grasp", robot_gripper_grasp_handle},
+
+	/* Laser control */
+	{"laser_on",  robot_laser_on_handle},
+	{"laser_off", robot_laser_off_handle},
 	// {"time_func", NULL},
 	{NULL, NULL},
 };

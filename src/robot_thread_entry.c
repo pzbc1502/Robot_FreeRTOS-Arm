@@ -1,5 +1,6 @@
 #include "robot_thread.h"
 #include "bsp_led.h"
+#include "bsp_laser.h"
 #include "bsp_can.h"
 #include "bsp_uart.h"
 #include "robot.h"
@@ -18,6 +19,7 @@ void robot_thread_entry(void * pvParameters)
     FSP_PARAMETER_NOT_USED(pvParameters);
 
     LED_Init();
+    BSP_Laser_Init();
     USER_LED_ON;
     BSP_UART_Init();
     LOG("BSP_UART_Init Success!!!\r\n");
