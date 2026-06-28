@@ -418,14 +418,14 @@
               <FilePath>.\APP\robot.h</FilePath>
             </File>
             <File>
-              <FileName>robot-take.c</FileName>
+              <FileName>robot_target.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\APP\robot-take.c</FilePath>
+              <FilePath>.\APP\robot_target.c</FilePath>
             </File>
             <File>
-              <FileName>robot-take.h</FileName>
+              <FileName>robot_target.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\APP\robot-take.h</FilePath>
+              <FilePath>.\APP\robot_target.h</FilePath>
             </File>
             <File>
               <FileName>robot_chassis_app.c</FileName>
@@ -473,14 +473,14 @@
               <FilePath>.\Middle\gripper.h</FilePath>
             </File>
             <File>
-              <FileName>K230_cmd.c</FileName>
+              <FileName>jetson_vision.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\Middle\K230_cmd.c</FilePath>
+              <FilePath>.\Middle\jetson_vision.c</FilePath>
             </File>
             <File>
-              <FileName>K230_cmd.h</FileName>
+              <FileName>jetson_vision.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\Middle\K230_cmd.h</FilePath>
+              <FilePath>.\Middle\jetson_vision.h</FilePath>
             </File>
             <File>
               <FileName>W800_mqtt.c</FileName>

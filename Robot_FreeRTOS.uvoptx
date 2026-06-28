@@ -324,8 +324,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>.\APP\robot-take.c</PathWithFileName>
-      <FilenameWithoutPath>robot-take.c</FilenameWithoutPath>
+      <PathWithFileName>.\APP\robot_target.c</PathWithFileName>
+      <FilenameWithoutPath>robot_target.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>
@@ -336,8 +336,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>.\APP\robot-take.h</PathWithFileName>
-      <FilenameWithoutPath>robot-take.h</FilenameWithoutPath>
+      <PathWithFileName>.\APP\robot_target.h</PathWithFileName>
+      <FilenameWithoutPath>robot_target.h</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>
@@ -452,8 +452,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>.\Middle\K230_cmd.c</PathWithFileName>
-      <FilenameWithoutPath>K230_cmd.c</FilenameWithoutPath>
+      <PathWithFileName>.\Middle\jetson_vision.c</PathWithFileName>
+      <FilenameWithoutPath>jetson_vision.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>
@@ -464,8 +464,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>.\Middle\K230_cmd.h</PathWithFileName>
-      <FilenameWithoutPath>K230_cmd.h</FilenameWithoutPath>
+      <PathWithFileName>.\Middle\jetson_vision.h</PathWithFileName>
+      <FilenameWithoutPath>jetson_vision.h</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>

@@ -230,7 +230,7 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"gripper_cur",   robot_gripper_cur_handle},
 	{"gripper_grasp", robot_gripper_grasp_handle},
 
-	/* Laser control */
+	/* 激光控制指令 */
 	{"laser_on",  robot_laser_on_handle},
 	{"laser_off", robot_laser_off_handle},
 	// {"time_func", NULL},

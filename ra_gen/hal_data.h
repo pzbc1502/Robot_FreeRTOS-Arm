@@ -71,8 +71,8 @@ extern const transfer_cfg_t g_transfer_k230_rx_cfg;
             extern const uart_cfg_t robot_k230_cfg;
             extern const sci_uart_extended_cfg_t robot_k230_cfg_extend;
 
-            #ifndef robot_k230_callback
-            void robot_k230_callback(uart_callback_args_t * p_args);
+            #ifndef robot_jetson_callback
+            void robot_jetson_callback(uart_callback_args_t * p_args);
             #endif
 /** UART on SCI Instance. */
             extern const uart_instance_t      robot_mqtt;

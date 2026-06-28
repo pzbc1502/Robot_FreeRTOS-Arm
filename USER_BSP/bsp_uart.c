@@ -1,7 +1,7 @@
 #include "bsp_uart.h"
 #include "robot.h"
 #include "Middle/W800_mqtt.h"
-#include "K230_cmd.h"
+#include "jetson_vision.h"
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
@@ -18,9 +18,6 @@ static volatile bool g_uart1_tx_complete = true; // 发送完成标志
 /* 2. MQTT 串口 */
 
 /* 3. K230 视觉串口*/
-static char k230_rx_buff[128] = {0};
-static uint32_t k230_rx_pos = 0;
-
 /* 打印互斥锁，保证多任务打印不冲突 */
 static SemaphoreHandle_t g_log_mutex = NULL;
 /* 发送完成信号量，用于任务与中断同步 */
@@ -139,21 +136,16 @@ void robot_mqtt_callback(uart_callback_args_t * p_args)
 /**
  * @brief Robot K230 回调 (新增预留)
  */
-void robot_k230_callback(uart_callback_args_t * p_args)
+void robot_jetson_callback(uart_callback_args_t * p_args)
 {
     switch (p_args->event)
     {
         case UART_EVENT_RX_CHAR:
             /* K230 数据处理逻辑预留 */
-            if (k230_rx_pos < 128) {
-                k230_rx_buff[k230_rx_pos++] = (char)p_args->data;
-            } else {
-                k230_rx_pos = 0;
-            }
             break;
 
         case UART_EVENT_TX_COMPLETE:
-            k230_notify_tx_complete_from_isr();
+            jetson_notify_tx_complete_from_isr();
             break;
 
         default:

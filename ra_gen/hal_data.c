@@ -387,7 +387,7 @@ sci_uart_instance_ctrl_t     robot_k230_ctrl;
                 .data_bits           = UART_DATA_BITS_8,
                 .parity              = UART_PARITY_OFF,
                 .stop_bits           = UART_STOP_BITS_1,
-                .p_callback          = robot_k230_callback,
+                .p_callback          = robot_jetson_callback,
                 .p_context           = NULL,
                 .p_extend            = &robot_k230_cfg_extend,
 #define RA_NOT_DEFINED (1)
