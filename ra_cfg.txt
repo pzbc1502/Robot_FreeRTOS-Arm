@@ -150,7 +150,7 @@ FSP Configuration
       AVCCUSBHS H13 USB_HS0_AVCC_USBHS - - - - - - - - IO "Read only" - 
       AVSS0 N9 ANALOG0_AVSS0 - - - - - - - - IO "Read only" - 
       AVSSUSBHS G14 USB_HS0_AVSS_USBHS - - - - - - - - IO "Read only" - 
-      P000 R12 - - - - Disabled - - "ADC0: AN000; ADC1: AN100; ICU0: IRQ06" - None - - 
+      P000 R12 GPIO - - None "Input mode" - None "ADC0: AN000; ADC1: AN100; ICU0: IRQ06" - IO - - 
       P001 N11 - - - - Disabled - - "ADC0: AN001; ADC1: AN101; ICU0: IRQ07" - None - - 
       P002 R11 GPIO - - None "Output mode (Initial Low)" CMOS - "ADC0: AN002; ADC1: AN102; ICU0: IRQ08" - IO - - 
       P003 M5 - - - - Disabled - - "ADC0: AN003" - None - - 
@@ -679,8 +679,8 @@ FSP Configuration
       Interrupts: Transmit End Interrupt Priority: Priority 12
       Interrupts: Error Interrupt Priority: Priority 12
       
-    Instance "robot_k230 UART (r_sci_uart)"
-      General: Name: robot_k230
+    Instance "robot_jeston UART (r_sci_uart)"
+      General: Name: robot_jeston
       General: Channel: 2
       General: Data Bits: 8bits
       General: Parity: None
@@ -702,14 +702,14 @@ FSP Configuration
       Extra: RS-485: DE Pin Polarity: Active High
       Extra: RS-485: DE Port Number: Disabled
       Extra: RS-485: DE Pin Number: Disabled
-      Interrupts: Callback: robot_k230_callback
+      Interrupts: Callback: robot_jetson_callback
       Interrupts: Receive Interrupt Priority: Priority 8
       Interrupts: Transmit Data Empty Interrupt Priority: Priority 8
       Interrupts: Transmit End Interrupt Priority: Priority 12
       Interrupts: Error Interrupt Priority: Priority 12
       
-      Instance "g_transfer_k230_rx Transfer (r_dtc) SCI2 RXI (Receive data full)"
-        Name: g_transfer_k230_rx
+      Instance "g_transfer_jeston_rx Transfer (r_dtc) SCI2 RXI (Receive data full)"
+        Name: g_transfer_jeston_rx
         Mode: Normal
         Transfer Size: 1 Byte
         Destination Address Mode: Incremented
@@ -760,8 +760,8 @@ FSP Configuration
       Interrupts: Channel Interrupt Priority Level: Priority 6
       Filter List Array: p_canfd0_afl
       
-    Instance "g_dma_k230_rx Transfer (r_dmac) SCI2 RXI (Receive data full)"
-      Name: g_dma_k230_rx
+    Instance "g_dma_jeston_rx Transfer (r_dmac) SCI2 RXI (Receive data full)"
+      Name: g_dma_jeston_rx
       Channel: 7
       Mode: Normal
       Transfer Size: 1 Byte

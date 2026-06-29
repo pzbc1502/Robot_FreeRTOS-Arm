@@ -93,8 +93,8 @@ const uart_instance_t esp8266 =
     .p_api         = &g_uart_on_sci
 };
 
-dmac_instance_ctrl_t g_dma_k230_rx_ctrl;
-transfer_info_t g_dma_k230_rx_info =
+dmac_instance_ctrl_t g_dma_jeston_rx_ctrl;
+transfer_info_t g_dma_jeston_rx_info =
 {
     .transfer_settings_word_b.dest_addr_mode = TRANSFER_ADDR_MODE_INCREMENTED,
     .transfer_settings_word_b.repeat_area    = TRANSFER_REPEAT_AREA_DESTINATION,
@@ -108,7 +108,7 @@ transfer_info_t g_dma_k230_rx_info =
     .num_blocks                              = 0,
     .length                                  = 1024,
 };
-const dmac_extended_cfg_t g_dma_k230_rx_extend =
+const dmac_extended_cfg_t g_dma_jeston_rx_extend =
 {
     .offset              = 1,
     .src_buffer_size     = 1,
@@ -123,16 +123,16 @@ const dmac_extended_cfg_t g_dma_k230_rx_extend =
     .p_context           = NULL,
     .activation_source   = ELC_EVENT_SCI2_RXI,
 };
-const transfer_cfg_t g_dma_k230_rx_cfg =
+const transfer_cfg_t g_dma_jeston_rx_cfg =
 {
-    .p_info              = &g_dma_k230_rx_info,
-    .p_extend            = &g_dma_k230_rx_extend,
+    .p_info              = &g_dma_jeston_rx_info,
+    .p_extend            = &g_dma_jeston_rx_extend,
 };
 /* Instance structure to use this module. */
-const transfer_instance_t g_dma_k230_rx =
+const transfer_instance_t g_dma_jeston_rx =
 {
-    .p_ctrl        = &g_dma_k230_rx_ctrl,
-    .p_cfg         = &g_dma_k230_rx_cfg,
+    .p_ctrl        = &g_dma_jeston_rx_ctrl,
+    .p_cfg         = &g_dma_jeston_rx_cfg,
     .p_api         = &g_transfer_on_dmac
 };
 /* Nominal and Data bit timing configuration */
@@ -294,10 +294,10 @@ const transfer_instance_t robot_mqtt_dma =
     .p_cfg         = &robot_mqtt_dma_cfg,
     .p_api         = &g_transfer_on_dmac
 };
-dtc_instance_ctrl_t g_transfer_k230_rx_ctrl;
+dtc_instance_ctrl_t g_transfer_jeston_rx_ctrl;
 
 #if (1 == 1)
-transfer_info_t g_transfer_k230_rx_info DTC_TRANSFER_INFO_ALIGNMENT =
+transfer_info_t g_transfer_jeston_rx_info DTC_TRANSFER_INFO_ALIGNMENT =
 {
     .transfer_settings_word_b.dest_addr_mode = TRANSFER_ADDR_MODE_INCREMENTED,
     .transfer_settings_word_b.repeat_area    = TRANSFER_REPEAT_AREA_DESTINATION,
@@ -314,50 +314,50 @@ transfer_info_t g_transfer_k230_rx_info DTC_TRANSFER_INFO_ALIGNMENT =
 
 #elif (1 > 1)
 /* User is responsible to initialize the array. */
-transfer_info_t g_transfer_k230_rx_info[1] DTC_TRANSFER_INFO_ALIGNMENT;
+transfer_info_t g_transfer_jeston_rx_info[1] DTC_TRANSFER_INFO_ALIGNMENT;
 #else
 /* User must call api::reconfigure before enable DTC transfer. */
 #endif
 
-const dtc_extended_cfg_t g_transfer_k230_rx_cfg_extend =
+const dtc_extended_cfg_t g_transfer_jeston_rx_cfg_extend =
 {
     .activation_source   = VECTOR_NUMBER_SCI2_RXI,
 };
 
-const transfer_cfg_t g_transfer_k230_rx_cfg =
+const transfer_cfg_t g_transfer_jeston_rx_cfg =
 {
 #if (1 == 1)
-    .p_info              = &g_transfer_k230_rx_info,
+    .p_info              = &g_transfer_jeston_rx_info,
 #elif (1 > 1)
-    .p_info              = g_transfer_k230_rx_info,
+    .p_info              = g_transfer_jeston_rx_info,
 #else
     .p_info = NULL,
 #endif
-    .p_extend            = &g_transfer_k230_rx_cfg_extend,
+    .p_extend            = &g_transfer_jeston_rx_cfg_extend,
 };
 
 /* Instance structure to use this module. */
-const transfer_instance_t g_transfer_k230_rx =
+const transfer_instance_t g_transfer_jeston_rx =
 {
-    .p_ctrl        = &g_transfer_k230_rx_ctrl,
-    .p_cfg         = &g_transfer_k230_rx_cfg,
+    .p_ctrl        = &g_transfer_jeston_rx_ctrl,
+    .p_cfg         = &g_transfer_jeston_rx_cfg,
     .p_api         = &g_transfer_on_dtc
 };
-sci_uart_instance_ctrl_t     robot_k230_ctrl;
+sci_uart_instance_ctrl_t     robot_jeston_ctrl;
 
-            baud_setting_t               robot_k230_baud_setting =
+            baud_setting_t               robot_jeston_baud_setting =
             {
                 /* Baud rate calculated with 0.469% error. */ .semr_baudrate_bits_b.abcse = 0, .semr_baudrate_bits_b.abcs = 0, .semr_baudrate_bits_b.bgdm = 1, .cks = 0, .brr = 53, .mddr = (uint8_t) 256, .semr_baudrate_bits_b.brme = false
             };
 
             /** UART extended configuration for UARTonSCI HAL driver */
-            const sci_uart_extended_cfg_t robot_k230_cfg_extend =
+            const sci_uart_extended_cfg_t robot_jeston_cfg_extend =
             {
                 .clock                = SCI_UART_CLOCK_INT,
                 .rx_edge_start          = SCI_UART_START_BIT_FALLING_EDGE,
                 .noise_cancel         = SCI_UART_NOISE_CANCELLATION_DISABLE,
                 .rx_fifo_trigger        = SCI_UART_RX_FIFO_TRIGGER_MAX,
-                .p_baud_setting         = &robot_k230_baud_setting,
+                .p_baud_setting         = &robot_jeston_baud_setting,
                 .flow_control           = SCI_UART_FLOW_CONTROL_RTS,
                 #if 0xFF != 0xFF
                 .flow_control_pin       = BSP_IO_PORT_FF_PIN_0xFF,
@@ -381,7 +381,7 @@ sci_uart_instance_ctrl_t     robot_k230_ctrl;
             };
 
             /** UART interface configuration */
-            const uart_cfg_t robot_k230_cfg =
+            const uart_cfg_t robot_jeston_cfg =
             {
                 .channel             = 2,
                 .data_bits           = UART_DATA_BITS_8,
@@ -389,17 +389,17 @@ sci_uart_instance_ctrl_t     robot_k230_ctrl;
                 .stop_bits           = UART_STOP_BITS_1,
                 .p_callback          = robot_jetson_callback,
                 .p_context           = NULL,
-                .p_extend            = &robot_k230_cfg_extend,
+                .p_extend            = &robot_jeston_cfg_extend,
 #define RA_NOT_DEFINED (1)
 #if (RA_NOT_DEFINED == RA_NOT_DEFINED)
                 .p_transfer_tx       = NULL,
 #else
                 .p_transfer_tx       = &RA_NOT_DEFINED,
 #endif
-#if (RA_NOT_DEFINED == g_transfer_k230_rx)
+#if (RA_NOT_DEFINED == g_transfer_jeston_rx)
                 .p_transfer_rx       = NULL,
 #else
-                .p_transfer_rx       = &g_transfer_k230_rx,
+                .p_transfer_rx       = &g_transfer_jeston_rx,
 #endif
 #undef RA_NOT_DEFINED
                 .rxi_ipl             = (8),
@@ -429,10 +429,10 @@ sci_uart_instance_ctrl_t     robot_k230_ctrl;
             };
 
 /* Instance structure to use this module. */
-const uart_instance_t robot_k230 =
+const uart_instance_t robot_jeston =
 {
-    .p_ctrl        = &robot_k230_ctrl,
-    .p_cfg         = &robot_k230_cfg,
+    .p_ctrl        = &robot_jeston_ctrl,
+    .p_cfg         = &robot_jeston_cfg,
     .p_api         = &g_uart_on_sci
 };
 sci_uart_instance_ctrl_t     robot_mqtt_ctrl;

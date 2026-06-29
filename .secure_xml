@@ -75,6 +75,8 @@
       <configSetting altId="irq0.irq04.p411" configurationId="irq0.irq04" isUsedByDriver="true" peripheral="ICU0"/>
       <configSetting altId="irq0.irq05.p302" configurationId="irq0.irq05" isUsedByDriver="true" peripheral="ICU0"/>
       <configSetting altId="irq0.irq06.p301" configurationId="irq0.irq06" isUsedByDriver="true" peripheral="ICU0"/>
+      <configSetting altId="p000.input" configurationId="p000"/>
+      <configSetting altId="p000.gpio_mode.gpio_mode_in" configurationId="p000.gpio_mode"/>
       <configSetting altId="p002.output.low" configurationId="p002"/>
       <configSetting altId="p002.gpio_mode.gpio_mode_out.low" configurationId="p002.gpio_mode"/>
       <configSetting altId="p108.gpio_mode.gpio_mode_peripheral" configurationId="p108.gpio_mode"/>

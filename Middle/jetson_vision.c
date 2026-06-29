@@ -4,17 +4,12 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 
-/* FSP generated UART names are kept unchanged to avoid regenerating FSP config. */
-extern sci_uart_instance_ctrl_t robot_k230_ctrl;
-extern const uart_cfg_t robot_k230_cfg;
+/* FSP generated UART names. */
+extern sci_uart_instance_ctrl_t robot_jeston_ctrl;
+extern const uart_cfg_t robot_jeston_cfg;
 
-#if defined(g_dma_k230_rx)
-extern const transfer_instance_t g_dma_k230_rx;
-#define JETSON_TRANSFER_INSTANCE g_dma_k230_rx
-#else
-extern const transfer_instance_t g_transfer_k230_rx;
-#define JETSON_TRANSFER_INSTANCE g_transfer_k230_rx
-#endif
+extern const transfer_instance_t g_transfer_jeston_rx;
+#define JETSON_TRANSFER_INSTANCE g_transfer_jeston_rx
 
 typedef enum
 {
@@ -24,6 +19,9 @@ typedef enum
     JETSON_PARSER_READ_PAYLOAD,
     JETSON_PARSER_READ_CHECKSUM,
     JETSON_PARSER_READ_EOF,
+    JETSON_PARSER_READ_CTRL_FUNC,
+    JETSON_PARSER_READ_CTRL_VALUE,
+    JETSON_PARSER_READ_CTRL_EOF,
 } jetson_parser_state_t;
 
 typedef struct
@@ -34,6 +32,7 @@ typedef struct
     uint8_t payload[JETSON_VISION_PAYLOAD_LEN];
     uint8_t payload_index;
     uint8_t checksum;
+    uint8_t ctrl_value;
 } jetson_parser_t;
 
 static jetson_parser_t s_parser = { .state = JETSON_PARSER_WAIT_SOF };
@@ -43,6 +42,8 @@ static uint32_t s_last_read_pos = 0u;
 static int16_t s_latest_dcx = 0;
 static int16_t s_latest_dcy = 0;
 static volatile bool s_new_error = false;
+static bool s_target_control_enable = false;
+static volatile bool s_new_target_control = false;
 
 static SemaphoreHandle_t s_tx_sem = NULL;
 static uint8_t s_tx_frame[4];
@@ -54,6 +55,7 @@ static void parser_reset(void)
     s_parser.func = 0u;
     s_parser.payload_index = 0u;
     s_parser.checksum = 0u;
+    s_parser.ctrl_value = 0u;
 }
 
 static void handle_valid_error_frame(void)
@@ -68,6 +70,14 @@ static void handle_valid_error_frame(void)
     __enable_irq();
 }
 
+static void handle_valid_target_control_frame(void)
+{
+    __disable_irq();
+    s_target_control_enable = (s_parser.ctrl_value != 0u);
+    s_new_target_control = true;
+    __enable_irq();
+}
+
 static void process_byte(uint8_t byte)
 {
     switch (s_parser.state)
@@ -78,6 +88,10 @@ static void process_byte(uint8_t byte)
                 s_parser.state = JETSON_PARSER_READ_LEN;
                 s_parser.payload_index = 0u;
                 s_parser.checksum = 0u;
+            }
+            else if (byte == JETSON_CTRL_SOF)
+            {
+                s_parser.state = JETSON_PARSER_READ_CTRL_FUNC;
             }
             break;
 
@@ -128,6 +142,34 @@ static void process_byte(uint8_t byte)
             parser_reset();
             break;
 
+        case JETSON_PARSER_READ_CTRL_FUNC:
+            if (byte != JETSON_FUNC_TARGET_CTRL)
+            {
+                parser_reset();
+                break;
+            }
+            s_parser.func = byte;
+            s_parser.state = JETSON_PARSER_READ_CTRL_VALUE;
+            break;
+
+        case JETSON_PARSER_READ_CTRL_VALUE:
+            if ((byte != 0u) && (byte != 1u))
+            {
+                parser_reset();
+                break;
+            }
+            s_parser.ctrl_value = byte;
+            s_parser.state = JETSON_PARSER_READ_CTRL_EOF;
+            break;
+
+        case JETSON_PARSER_READ_CTRL_EOF:
+            if (byte == JETSON_CTRL_EOF)
+            {
+                handle_valid_target_control_frame();
+            }
+            parser_reset();
+            break;
+
         default:
             parser_reset();
             break;
@@ -144,14 +186,14 @@ void jetson_vision_init(void)
     parser_reset();
     s_last_read_pos = 0u;
 
-    fsp_err_t err = R_SCI_UART_Open(&robot_k230_ctrl, &robot_k230_cfg);
+    fsp_err_t err = R_SCI_UART_Open(&robot_jeston_ctrl, &robot_jeston_cfg);
     if (FSP_SUCCESS != err)
     {
         LOG("Jetson UART open failed, err=%d\r\n", (int)err);
         __BKPT(0);
     }
 
-    err = R_SCI_UART_Read(&robot_k230_ctrl, s_rx_buffer, sizeof(s_rx_buffer));
+    err = R_SCI_UART_Read(&robot_jeston_ctrl, s_rx_buffer, sizeof(s_rx_buffer));
     if (FSP_SUCCESS != err)
     {
         LOG("Jetson RX start failed, err=%d\r\n", (int)err);
@@ -184,7 +226,7 @@ void jetson_vision_process(void)
         }
 
         s_last_read_pos = 0u;
-        (void)R_SCI_UART_Read(&robot_k230_ctrl, s_rx_buffer, rx_buf_size);
+        (void)R_SCI_UART_Read(&robot_jeston_ctrl, s_rx_buffer, rx_buf_size);
         return;
     }
 
@@ -221,6 +263,25 @@ bool jetson_get_vision_error(int16_t *dcx, int16_t *dcy)
     return true;
 }
 
+bool jetson_get_target_control(bool *enable)
+{
+    if (enable == NULL)
+    {
+        return false;
+    }
+
+    if (!s_new_target_control)
+    {
+        return false;
+    }
+
+    __disable_irq();
+    *enable = s_target_control_enable;
+    s_new_target_control = false;
+    __enable_irq();
+    return true;
+}
+
 bool jetson_send_status_u8(uint8_t func, uint8_t value)
 {
     if (s_tx_sem == NULL)
@@ -234,7 +295,7 @@ bool jetson_send_status_u8(uint8_t func, uint8_t value)
     s_tx_frame[3] = RA6_TO_JETSON_EOF;
 
     (void)xSemaphoreTake(s_tx_sem, 0);
-    fsp_err_t err = R_SCI_UART_Write(&robot_k230_ctrl, s_tx_frame, sizeof(s_tx_frame));
+    fsp_err_t err = R_SCI_UART_Write(&robot_jeston_ctrl, s_tx_frame, sizeof(s_tx_frame));
     if (FSP_SUCCESS != err)
     {
         LOG("Jetson TX start failed, err=%d\r\n", (int)err);

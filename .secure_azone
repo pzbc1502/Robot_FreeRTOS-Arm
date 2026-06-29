@@ -3,6 +3,7 @@
     <rzone name="R7FA6M5BF2CBG.rzone"/>
     <partition>
         <peripheral name="PORT0.CM33" group="PORT">
+            <slot name="P000.CM33" secure="true"/>
             <slot name="P002.CM33" secure="true"/>
         </peripheral>
         <peripheral name="PORT1.CM33" group="PORT">

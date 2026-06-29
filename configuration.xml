@@ -401,7 +401,7 @@
       <property id="module.driver.uart.eri_ipl" value="board.icu.common.irq.priority12"/>
     </module>
     <module id="module.driver.uart_on_sci_uart.1246705956">
-      <property id="module.driver.uart.name" value="robot_k230"/>
+      <property id="module.driver.uart.name" value="robot_jeston"/>
       <property id="module.driver.uart.channel" value="2"/>
       <property id="module.driver.uart.data_bits" value="module.driver.uart.data_bits.data_bits_8"/>
       <property id="module.driver.uart.parity" value="module.driver.uart.parity.parity_off"/>
@@ -469,7 +469,7 @@
       <property id="module.driver.canfd.afl_array" value="p_canfd0_afl"/>
     </module>
     <module id="module.driver.transfer_on_dmac.1916437709">
-      <property id="module.driver.transfer.name" value="g_dma_k230_rx"/>
+      <property id="module.driver.transfer.name" value="g_dma_jeston_rx"/>
       <property id="module.driver.transfer.channel" value="7"/>
       <property id="module.driver.transfer.mode" value="module.driver.transfer.mode.mode_normal"/>
       <property id="module.driver.transfer.size" value="module.driver.transfer.size.size_1_byte"/>
@@ -486,7 +486,7 @@
       <property id="module.driver.transfer.src.buffer" value="1"/>
     </module>
     <module id="module.driver.transfer_on_dtc.261029654">
-      <property id="module.driver.transfer.name" value="g_transfer_k230_rx"/>
+      <property id="module.driver.transfer.name" value="g_transfer_jeston_rx"/>
       <property id="module.driver.transfer.mode" value="module.driver.transfer.mode.mode_normal"/>
       <property id="module.driver.transfer.size" value="module.driver.transfer.size.size_2_byte"/>
       <property id="module.driver.transfer.dest_addr_mode" value="module.driver.transfer.dest_addr_mode.addr_mode_fixed"/>
@@ -799,6 +799,8 @@
       <configSetting altId="irq0.irq05.p302" configurationId="irq0.irq05"/>
       <configSetting altId="irq0.irq06.p301" configurationId="irq0.irq06"/>
       <configSetting altId="irq0.mode.enabled" configurationId="irq0.mode"/>
+      <configSetting altId="p000.input" configurationId="p000"/>
+      <configSetting altId="p000.gpio_mode.gpio_mode_in" configurationId="p000.gpio_mode"/>
       <configSetting altId="p002.output.low" configurationId="p002"/>
       <configSetting altId="p002.gpio_mode.gpio_mode_out.low" configurationId="p002.gpio_mode"/>
       <configSetting altId="p108.debug0.swdio" configurationId="p108"/>

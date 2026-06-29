@@ -35,7 +35,7 @@
             #define configUSE_IDLE_HOOK (1)
             #endif
             #ifndef configUSE_MALLOC_FAILED_HOOK
-            #define configUSE_MALLOC_FAILED_HOOK (1)
+            #define configUSE_MALLOC_FAILED_HOOK (0)
             #endif
             #ifndef configUSE_DAEMON_TASK_STARTUP_HOOK
             #define configUSE_DAEMON_TASK_STARTUP_HOOK (0)
@@ -92,7 +92,7 @@
             #define configUSE_ALTERNATIVE_API (0U)
             #endif
             #ifndef configCHECK_FOR_STACK_OVERFLOW
-            #define configCHECK_FOR_STACK_OVERFLOW (2)
+            #define configCHECK_FOR_STACK_OVERFLOW (0)
             #endif
             #ifndef configQUEUE_REGISTRY_SIZE
             #define configQUEUE_REGISTRY_SIZE (10)

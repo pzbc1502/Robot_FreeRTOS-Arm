@@ -107,6 +107,26 @@ void robot_target_init(void)
     force_laser_off();
 }
 
+bool robot_target_enable_request(void)
+{
+    force_laser_off();
+    if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID))
+    {
+        ROBOT_TARGET_ENABLED = false;
+        return false;
+    }
+
+    ROBOT_TARGET_ENABLED = true;
+    return true;
+}
+
+void robot_target_disable_request(void)
+{
+    ROBOT_TARGET_ENABLED = false;
+    ROBOT_TARGET_FIRE_ENABLE = false;
+    force_laser_off();
+}
+
 void robot_target_step(const target_obs_t *obs)
 {
     uint32_t now = (obs != NULL) ? obs->now_ms : HAL_GetTick();
@@ -125,7 +145,6 @@ void robot_target_step(const target_obs_t *obs)
 
     if (!ROBOT_TARGET_ENABLED)
     {
-        force_laser_off();
         enter_state(TARGET_INIT, now);
         return;
     }
@@ -230,7 +249,18 @@ void robot_target_step(const target_obs_t *obs)
                 enter_state(TARGET_DONE, now);
                 break;
             }
-            BSP_Laser_On();
+            taskENTER_CRITICAL();
+            bool enabled_now = ROBOT_TARGET_ENABLED;
+            if (enabled_now)
+            {
+                BSP_Laser_On();
+            }
+            taskEXIT_CRITICAL();
+            if (!enabled_now)
+            {
+                force_laser_off();
+                enter_state(TARGET_INIT, now);
+            }
             break;
 
         case TARGET_DONE:

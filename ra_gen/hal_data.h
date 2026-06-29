@@ -25,11 +25,11 @@ FSP_HEADER
             void esp8266_uart_callback(uart_callback_args_t * p_args);
             #endif
 /* Transfer on DMAC Instance. */
-extern const transfer_instance_t g_dma_k230_rx;
+extern const transfer_instance_t g_dma_jeston_rx;
 
 /** Access the DMAC instance using these structures when calling API functions directly (::p_api is not used). */
-extern dmac_instance_ctrl_t g_dma_k230_rx_ctrl;
-extern const transfer_cfg_t g_dma_k230_rx_cfg;
+extern dmac_instance_ctrl_t g_dma_jeston_rx_ctrl;
+extern const transfer_cfg_t g_dma_jeston_rx_cfg;
 
 #ifndef NULL
 void NULL(transfer_callback_args_t * p_args);
@@ -58,18 +58,18 @@ extern const transfer_cfg_t robot_mqtt_dma_cfg;
 void NULL(transfer_callback_args_t * p_args);
 #endif
 /* Transfer on DTC Instance. */
-extern const transfer_instance_t g_transfer_k230_rx;
+extern const transfer_instance_t g_transfer_jeston_rx;
 
 /** Access the DTC instance using these structures when calling API functions directly (::p_api is not used). */
-extern dtc_instance_ctrl_t g_transfer_k230_rx_ctrl;
-extern const transfer_cfg_t g_transfer_k230_rx_cfg;
+extern dtc_instance_ctrl_t g_transfer_jeston_rx_ctrl;
+extern const transfer_cfg_t g_transfer_jeston_rx_cfg;
 /** UART on SCI Instance. */
-            extern const uart_instance_t      robot_k230;
+            extern const uart_instance_t      robot_jeston;
 
             /** Access the UART instance using these structures when calling API functions directly (::p_api is not used). */
-            extern sci_uart_instance_ctrl_t     robot_k230_ctrl;
-            extern const uart_cfg_t robot_k230_cfg;
-            extern const sci_uart_extended_cfg_t robot_k230_cfg_extend;
+            extern sci_uart_instance_ctrl_t     robot_jeston_ctrl;
+            extern const uart_cfg_t robot_jeston_cfg;
+            extern const sci_uart_extended_cfg_t robot_jeston_cfg_extend;
 
             #ifndef robot_jetson_callback
             void robot_jetson_callback(uart_callback_args_t * p_args);

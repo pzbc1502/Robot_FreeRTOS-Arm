@@ -6,6 +6,7 @@
 #include "Emm_V5.h"
 #include "gripper.h"
 #include "bsp_laser.h"
+#include "robot_target.h"
 
 /* --- gripper debug commands (UART1) --- */
 static int robot_soft_reset_handle(float *param);
@@ -19,6 +20,8 @@ static int robot_gripper_cur_handle(float *param);
 static int robot_gripper_grasp_handle(float *param);
 static int robot_laser_on_handle(float *param);
 static int robot_laser_off_handle(float *param);
+static int robot_target_enable_handle(float *param);
+static int robot_target_disable_handle(float *param);
 
 
 void robot_mqtt_handle(struct robot_cmd *cmd)
@@ -209,6 +212,25 @@ static int robot_laser_off_handle(float *param)
 	return pdPASS;
 }
 
+static int robot_target_enable_handle(float *param)
+{
+	(void)param;
+	if (!robot_target_enable_request()) {
+		LOG("target_enable rejected: pose invalid, please soft_reset first.\r\n");
+		return pdFAIL;
+	}
+	LOG("target_enable\r\n");
+	return pdPASS;
+}
+
+static int robot_target_disable_handle(float *param)
+{
+	(void)param;
+	robot_target_disable_request();
+	LOG("target_disable\r\n");
+	return pdPASS;
+}
+
 static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	/* 远程控制指令 */
 	{"remote_event",   robot_remote_event_handle},
@@ -231,8 +253,10 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"gripper_grasp", robot_gripper_grasp_handle},
 
 	/* 激光控制指令 */
-	{"laser_on",  robot_laser_on_handle},
-	{"laser_off", robot_laser_off_handle},
+	{"target_enable",  robot_target_enable_handle},
+	{"target_disable", robot_target_disable_handle},
+	{"laser_on",       robot_laser_on_handle},
+	{"laser_off",      robot_laser_off_handle},
 	// {"time_func", NULL},
 	{NULL, NULL},
 };

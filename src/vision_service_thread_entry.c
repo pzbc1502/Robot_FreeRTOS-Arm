@@ -1,6 +1,7 @@
 #include "vision_service_thread.h"
 #include "jetson_vision.h"
 #include "robot_target.h"
+#include "bsp_laser.h"
 
 void vision_service_thread_entry(void * pvParameters)
 {
@@ -15,8 +16,23 @@ void vision_service_thread_entry(void * pvParameters)
         obs.now_ms = HAL_GetTick();
 
         jetson_vision_process();
+        bool target_enable = false;
+        if (jetson_get_target_control(&target_enable))
+        {
+            bool enabled = false;
+            if (target_enable)
+            {
+                enabled = robot_target_enable_request();
+            }
+            else
+            {
+                robot_target_disable_request();
+            }
+            (void)jetson_send_status_u8(RA6_TO_JETSON_TARGET_CTRL, enabled ? 1u : 0u);
+        }
+
         obs.has_vision = jetson_get_vision_error(&obs.dcx, &obs.dcy);
-        obs.fire_button = ROBOT_TARGET_FIRE_ENABLE;
+        obs.fire_button = BSP_Laser_FireKey_IsPressed();
 
         robot_target_step(&obs);
         vTaskDelay(pdMS_TO_TICKS(10));
