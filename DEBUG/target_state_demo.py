@@ -17,12 +17,16 @@ JETSON_SOF = 0xFF
 JETSON_EOF = 0xFE
 JETSON_LEN = 0x05
 JETSON_FUNC_VISION_ERROR = 0x03
+JETSON_CTRL_SOF = 0xAA
+JETSON_CTRL_EOF = 0xBB
+JETSON_FUNC_TARGET_CTRL = 0x01
 
 RA6_SOF = 0xCC
 RA6_EOF = 0xDD
 RA6_READY = 0x01
 RA6_ALIGN_DONE = 0x02
 RA6_OUTPUT = 0x03
+RA6_TARGET_CTRL = 0x04
 RA6_ERROR = 0xFE
 
 
@@ -235,6 +239,8 @@ def status_name(func, value):
         (RA6_ALIGN_DONE, 0x01): "ALIGN_DONE",
         (RA6_OUTPUT, 0x01): "OUTPUT_ON",
         (RA6_OUTPUT, 0x00): "OUTPUT_OFF",
+        (RA6_TARGET_CTRL, 0x01): "TARGET_CTRL_ON",
+        (RA6_TARGET_CTRL, 0x00): "TARGET_CTRL_OFF",
         (RA6_ERROR, 0x01): "ERROR",
     }
     return names.get((func, value), "UNKNOWN")
@@ -244,6 +250,18 @@ def make_vision_frame(dcx, dcy):
     payload = int(dcx).to_bytes(2, "little", signed=True) + int(dcy).to_bytes(2, "little", signed=True)
     checksum = (JETSON_LEN + JETSON_FUNC_VISION_ERROR + sum(payload)) & 0xFF
     return bytes([JETSON_SOF, JETSON_LEN, JETSON_FUNC_VISION_ERROR]) + payload + bytes([checksum, JETSON_EOF])
+
+
+def make_target_ctrl_frame(enable):
+    return bytes([JETSON_CTRL_SOF, JETSON_FUNC_TARGET_CTRL, 0x01 if enable else 0x00, JETSON_CTRL_EOF])
+
+
+def send_target_ctrl(ser, logger, enable):
+    frame = make_target_ctrl_frame(enable)
+    action = "START" if enable else "STOP"
+    logger.write(f"[JETSON-TX] TARGET_CTRL {action}: {hex_bytes(frame)}\n")
+    ser.write(frame)
+    ser.flush()
 
 
 def send_cmd(ser, logger, cmd):
@@ -269,7 +287,11 @@ def final_soft_reset(args, arm, arm_reader, logger):
 
 
 def run_with_status(args, arm, jetson, arm_reader, status_reader, vision_sender, logger):
-    send_cmd(arm, logger, "target_disable")
+    send_target_ctrl(jetson, logger, False)
+    try:
+        status_reader.wait_for((RA6_TARGET_CTRL, 0x00), 3.0)
+    except TimeoutError:
+        logger.write("[WARN] TARGET_CTRL_OFF not seen during initial cleanup; continuing.\n")
     time.sleep(0.2)
     send_cmd(arm, logger, "laser_off")
     time.sleep(0.2)
@@ -278,22 +300,19 @@ def run_with_status(args, arm, jetson, arm_reader, status_reader, vision_sender,
     try:
         arm_reader.wait_line_contains(["soft reset final verify PASS"], args.soft_reset_timeout)
     except TimeoutError:
-        logger.write("[WARN] soft_reset PASS log not seen before timeout; continuing to target_enable.\n")
+        logger.write("[WARN] soft_reset PASS log not seen before timeout; continuing to Jetson target start.\n")
     except Exception:
         raise
 
-    send_cmd(arm, logger, "target_enable")
-    try:
-        arm_reader.wait_line_exact("target_enable", 3.0)
-    except TimeoutError:
-        pass
+    send_target_ctrl(jetson, logger, True)
+    status_reader.wait_for((RA6_TARGET_CTRL, 0x01), args.target_ctrl_timeout)
 
     logger.write("[STEP] waiting READY from RA6...\n")
     status_reader.wait_for((RA6_READY, 0x01), args.ready_timeout)
 
-    vision_sender.set_error(0, 0)
+    vision_sender.set_error(args.vision_dcx, args.vision_dcy)
     vision_sender.enable()
-    logger.write("[STEP] sending aligned vision frames, waiting ALIGN_DONE...\n")
+    logger.write(f"[STEP] sending vision frames dcx={args.vision_dcx} dcy={args.vision_dcy}, waiting ALIGN_DONE...\n")
     status_reader.wait_for((RA6_ALIGN_DONE, 0x01), args.align_timeout)
 
     logger.write("[PROMPT] 已对准。请按住 P000 KEY，脚本会自动等待 OUTPUT_ON，不需要按 Enter。\n")
@@ -305,7 +324,8 @@ def run_with_status(args, arm, jetson, arm_reader, status_reader, vision_sender,
     status_reader.wait_for((RA6_OUTPUT, 0x00), args.output_timeout)
 
     vision_sender.disable()
-    send_cmd(arm, logger, "target_disable")
+    send_target_ctrl(jetson, logger, False)
+    status_reader.wait_for((RA6_TARGET_CTRL, 0x00), args.target_ctrl_timeout)
     time.sleep(0.2)
     send_cmd(arm, logger, "laser_off")
     time.sleep(0.2)
@@ -314,20 +334,20 @@ def run_with_status(args, arm, jetson, arm_reader, status_reader, vision_sender,
 
 
 def run_without_status(args, arm, jetson, arm_reader, vision_sender, logger):
-    send_cmd(arm, logger, "target_disable")
+    send_target_ctrl(jetson, logger, False)
     time.sleep(0.2)
     send_cmd(arm, logger, "laser_off")
     time.sleep(0.2)
     send_cmd(arm, logger, "soft_reset")
     logger.write(f"[STEP] no-status mode: waiting {args.soft_reset_timeout:.1f}s for soft_reset.\n")
     time.sleep(args.soft_reset_timeout)
-    send_cmd(arm, logger, "target_enable")
+    send_target_ctrl(jetson, logger, True)
     logger.write(f"[STEP] no-status mode: waiting {args.ready_timeout:.1f}s for pre-position.\n")
     time.sleep(args.ready_timeout)
 
-    vision_sender.set_error(0, 0)
+    vision_sender.set_error(args.vision_dcx, args.vision_dcy)
     vision_sender.enable()
-    logger.write(f"[STEP] no-status mode: sending aligned frames for {args.align_timeout:.1f}s.\n")
+    logger.write(f"[STEP] no-status mode: sending vision frames dcx={args.vision_dcx} dcy={args.vision_dcy} for {args.align_timeout:.1f}s.\n")
     time.sleep(args.align_timeout)
 
     wait_manual("请按住 P000 KEY，观察是否进入激光输出。", logger)
@@ -336,7 +356,7 @@ def run_without_status(args, arm, jetson, arm_reader, vision_sender, logger):
     time.sleep(args.output_timeout)
 
     vision_sender.disable()
-    send_cmd(arm, logger, "target_disable")
+    send_target_ctrl(jetson, logger, False)
     time.sleep(0.2)
     send_cmd(arm, logger, "laser_off")
     if args.skip_final_reset:
@@ -350,19 +370,24 @@ def run_without_status(args, arm, jetson, arm_reader, vision_sender, logger):
 
 def parse_args():
     default_debug = pathlib.Path(__file__).resolve().parent
-    parser = argparse.ArgumentParser(description="RA6M5 robot target state demo over COM7 + COM24")
+    parser = argparse.ArgumentParser(description="RA6M5 target demo: COM7 arm control + Jetson UART vision/control")
     parser.add_argument("--arm-port", default=ARM_PORT)
     parser.add_argument("--jetson-port", default=JETSON_PORT)
     parser.add_argument("--baud", type=int, default=BAUD)
     parser.add_argument("--debug-dir", type=pathlib.Path, default=default_debug)
     parser.add_argument("--no-status-wait", action="store_true")
     parser.add_argument("--skip-final-reset", action="store_true",
-                        help="Do not send final soft_reset after target_disable.")
+                        help="Do not send final soft_reset after Jetson target stop.")
     parser.add_argument("--vision-period", type=float, default=0.2,
                         help="Seconds between simulated Jetson vision frames while enabled.")
+    parser.add_argument("--vision-dcx", type=int, default=80,
+                        help="Simulated Jetson dcx pixels. Default is large but inside the current 100px tolerance.")
+    parser.add_argument("--vision-dcy", type=int, default=-80,
+                        help="Simulated Jetson dcy pixels. Default is large but inside the current 100px tolerance.")
     parser.add_argument("--tx-log-every", type=int, default=0,
                         help="Log one JETSON-TX line every N frames; 0 disables per-frame TX logs.")
     parser.add_argument("--soft-reset-timeout", type=float, default=45.0)
+    parser.add_argument("--target-ctrl-timeout", type=float, default=5.0)
     parser.add_argument("--ready-timeout", type=float, default=25.0)
     parser.add_argument("--align-timeout", type=float, default=10.0)
     parser.add_argument("--output-timeout", type=float, default=10.0)
@@ -376,7 +401,9 @@ def main():
 
     logger.write(f"[INFO] log file: {logger.path}\n")
     logger.write(f"[INFO] ARM={args.arm_port} JETSON={args.jetson_port} baud={args.baud}\n")
-    logger.write(f"[INFO] aligned frame: {hex_bytes(make_vision_frame(0, 0))}\n")
+    logger.write(f"[INFO] start frame: {hex_bytes(make_target_ctrl_frame(True))}\n")
+    logger.write(f"[INFO] stop frame: {hex_bytes(make_target_ctrl_frame(False))}\n")
+    logger.write(f"[INFO] vision frame dcx={args.vision_dcx} dcy={args.vision_dcy}: {hex_bytes(make_vision_frame(args.vision_dcx, args.vision_dcy))}\n")
 
     arm = None
     jetson = None
@@ -406,14 +433,18 @@ def main():
     finally:
         stop_event.set()
         time.sleep(0.2)
+        if jetson is not None and jetson.is_open:
+            try:
+                send_target_ctrl(jetson, logger, False)
+            except Exception:
+                pass
+            jetson.close()
         if arm is not None and arm.is_open:
             try:
-                send_cmd(arm, logger, "target_disable")
+                send_cmd(arm, logger, "laser_off")
             except Exception:
                 pass
             arm.close()
-        if jetson is not None and jetson.is_open:
-            jetson.close()
         logger.write("[INFO] ports closed.\n")
         logger.close()
 

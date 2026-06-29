@@ -313,16 +313,30 @@ def run_auto_segment(arm, arm_reader, logger, title, cmd):
     time.sleep(0.5)
 
 
-def run_motion_sequence(arm, arm_reader, logger):
+def run_soft_reset_segment(args, arm, arm_reader, logger, title):
+    wait_manual(f"准备拍摄：{title}\n即将发送：soft_reset", logger)
+    send_cmd(arm, logger, "soft_reset")
+    arm_reader.wait_line_contains(["soft reset final verify PASS"], args.soft_reset_timeout)
+    logger.write(f"[DONE] soft_reset segment finished: {title}\n")
+    time.sleep(0.5)
+
+
+def run_motion_sequence(args, arm, arm_reader, logger):
     segments = [
-        ("短距离 X 方向平滑移动，建议拍末端贴纸和网格纸", "auto 15 0 0"),
-        ("回到中心位，展示终点稳定和回程平滑", "auto 0 0 0"),
-        ("Z 方向升降，建议侧面拍多关节协调", "auto 0 0 60"),
-        ("回到中心位，为下一段长路径做准备", "auto 0 0 0"),
-        ("长一点的前伸/预定位动作，展示加速、匀速、减速", "auto 0 -50 0"),
+        ("前伸到预定位，展示平滑起步和末端稳定", "auto 0 -50 0"),
+        ("回 HOME，作为下一组动作的干净起点", "soft_reset"),
+        ("右前方斜向运动，展示 X/Y 联动", "auto 45 -70 0"),
+        ("左前方斜向运动，展示跨中线平滑移动", "auto -45 -70 0"),
+        ("回 HOME，切换到 Z 方向展示", "soft_reset"),
+        ("前伸并上抬，展示 X/Y/Z 协调", "auto 0 -70 15"),
+        ("前伸并下压，展示 Z 方向反向切换", "auto 0 -70 -15"),
+        ("回 HOME，结束运动展示", "soft_reset"),
     ]
     for title, cmd in segments:
-        run_auto_segment(arm, arm_reader, logger, title, cmd)
+        if cmd == "soft_reset":
+            run_soft_reset_segment(args, arm, arm_reader, logger, title)
+        else:
+            run_auto_segment(arm, arm_reader, logger, title, cmd)
 
 
 def run_target_sequence(args, arm, arm_reader, status_reader, vision_sender, logger):
@@ -359,12 +373,13 @@ def run_demo(args, arm, arm_reader, status_reader, vision_sender, logger):
     initial_soft_reset(args, arm, arm_reader, logger)
 
     if args.mode in ("full", "motion"):
-        run_motion_sequence(arm, arm_reader, logger)
+        run_motion_sequence(args, arm, arm_reader, logger)
 
     if args.mode in ("full", "target"):
         run_target_sequence(args, arm, arm_reader, status_reader, vision_sender, logger)
 
-    final_soft_reset(args, arm, arm_reader, logger)
+    if args.mode != "motion":
+        final_soft_reset(args, arm, arm_reader, logger)
     logger.write(f"[DONE] shooting demo complete: mode={args.mode}.\n")
 
 
