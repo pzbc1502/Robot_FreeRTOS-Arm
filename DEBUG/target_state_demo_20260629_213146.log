@@ -1,0 +1,9 @@
+[21:31:46.084] [INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\target_state_demo_20260629_213146.log
+[21:31:46.084] [INFO] ARM=COM7 JETSON=COM14 baud=115200
+[21:31:46.084] [INFO] start frame: AA 01 01 BB
+[21:31:46.084] [INFO] stop frame: AA 01 00 BB
+[21:31:46.086] [INFO] vision frame dcx=90 dcy=-90: FF 05 03 5A 00 A6 FF 07 FE
+[21:31:46.088] [FATAL] SerialException: could not open port 'COM14': FileNotFoundError(2, '系统找不到指定的文件。', None, 2)
+[21:31:46.088] [ARM-TX] laser_off
+[21:31:46.088] [STEP] cleanup soft_reset to HOME...
+[21:31:46.088] [ARM-TX] soft_reset

@@ -49,6 +49,22 @@ static float clampf_local(float value, float min_value, float max_value)
     return value;
 }
 
+static const char *target_state_name(target_state_t state)
+{
+    switch (state)
+    {
+        case TARGET_INIT:         return "INIT";
+        case TARGET_PRE_POSITION: return "PRE_POSITION";
+        case TARGET_WAIT_DETECT:  return "WAIT_DETECT";
+        case TARGET_ALIGN:        return "ALIGN";
+        case TARGET_CONFIRM:      return "CONFIRM";
+        case TARGET_OUTPUT:       return "OUTPUT";
+        case TARGET_DONE:         return "DONE";
+        case TARGET_RECOVER:      return "RECOVER";
+        default:                  return "UNKNOWN";
+    }
+}
+
 static bool robot_any_limit_triggered(void)
 {
     for (uint32_t i = 0u; i < ROBOT_MAX_JOINT_NUM; i++)
@@ -141,6 +157,12 @@ void robot_target_step(const target_obs_t *obs)
         s_target.dcy = obs->dcy;
         s_target.last_vision_ms = now;
         s_target.has_vision = true;
+        LOG("[TARGET] vision state=%s enabled=%u dcx=%d dcy=%d stable=%u\r\n",
+            target_state_name(s_target.state),
+            ROBOT_TARGET_ENABLED ? 1u : 0u,
+            (int)s_target.dcx,
+            (int)s_target.dcy,
+            (unsigned)s_target.stable_count);
     }
 
     if (!ROBOT_TARGET_ENABLED)
@@ -222,7 +244,14 @@ void robot_target_step(const target_obs_t *obs)
                 s_target.target.z += dz;
                 if (send_target_auto(&s_target.target))
                 {
+                    LOG("[TARGET] align step dx=%.2f dz=%.2f target=<%.2f %.2f %.2f>\r\n",
+                        dx, dz, s_target.target.x, s_target.target.y, s_target.target.z);
                     s_target.last_step_ms = now;
+                }
+                else
+                {
+                    LOG("[TARGET] align auto failed target=<%.2f %.2f %.2f>\r\n",
+                        s_target.target.x, s_target.target.y, s_target.target.z);
                 }
             }
             break;
@@ -232,6 +261,14 @@ void robot_target_step(const target_obs_t *obs)
             if (!vision_fresh(now))
             {
                 enter_state(TARGET_RECOVER, now);
+                break;
+            }
+            if (!align_in_tolerance())
+            {
+                LOG("[TARGET] confirm lost alignment dcx=%d dcy=%d, back to ALIGN\r\n",
+                    (int)s_target.dcx, (int)s_target.dcy);
+                s_target.stable_count = 0u;
+                enter_state(TARGET_ALIGN, now);
                 break;
             }
             if (fire_allowed)
@@ -247,6 +284,16 @@ void robot_target_step(const target_obs_t *obs)
                 force_laser_off();
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
                 enter_state(TARGET_DONE, now);
+                break;
+            }
+            if (!align_in_tolerance())
+            {
+                force_laser_off();
+                (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
+                LOG("[TARGET] output lost alignment dcx=%d dcy=%d, back to ALIGN\r\n",
+                    (int)s_target.dcx, (int)s_target.dcy);
+                s_target.stable_count = 0u;
+                enter_state(TARGET_ALIGN, now);
                 break;
             }
             taskENTER_CRITICAL();

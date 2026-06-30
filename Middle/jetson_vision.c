@@ -68,6 +68,8 @@ static void handle_valid_error_frame(void)
     s_latest_dcy = dcy;
     s_new_error = true;
     __enable_irq();
+
+    LOG("[JETSON_RX] vision dcx=%d dcy=%d\r\n", (int)dcx, (int)dcy);
 }
 
 static void handle_valid_target_control_frame(void)
@@ -76,6 +78,8 @@ static void handle_valid_target_control_frame(void)
     s_target_control_enable = (s_parser.ctrl_value != 0u);
     s_new_target_control = true;
     __enable_irq();
+
+    LOG("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)s_parser.ctrl_value);
 }
 
 static void process_byte(uint8_t byte)

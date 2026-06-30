@@ -22,6 +22,7 @@ static int robot_laser_on_handle(float *param);
 static int robot_laser_off_handle(float *param);
 static int robot_target_enable_handle(float *param);
 static int robot_target_disable_handle(float *param);
+static int robot_time_func_handle(float *param);
 
 
 void robot_mqtt_handle(struct robot_cmd *cmd)
@@ -90,6 +91,14 @@ static int robot_abs_rotate_handle(float *param)
 static int robot_auto_handle(float *param)
 {
 	return robot_send_auto_event((struct position *)param);
+}
+
+static int robot_time_func_handle(float *param)
+{
+	float time_ms = (param[0] > 0.0f) ? param[0] : 6000.0f;
+	float radius_mm = (param[1] > 0.0f) ? param[1] : 15.0f;
+	LOG("time_func %.0f ms radius %.1f mm\r\n", time_ms, radius_mm);
+	return robot_send_time_func_event(time_ms, radius_mm);
 }
 
 static int robot_hard_reset_handle(float *param)
@@ -241,6 +250,8 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"abs_rotate",  robot_abs_rotate_handle},
 	{"rel_rotate",  robot_rel_rotate_handle},
 	{"auto",        robot_auto_handle},
+	{"circle",      robot_time_func_handle},
+	{"time_func",   robot_time_func_handle},
 	{"hard_reset",  robot_hard_reset_handle},
 	{"soft_reset",  robot_soft_reset_handle},
     {"read_all",    robot_read_all_handle},
@@ -257,7 +268,6 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"target_disable", robot_target_disable_handle},
 	{"laser_on",       robot_laser_on_handle},
 	{"laser_off",      robot_laser_off_handle},
-	// {"time_func", NULL},
 	{NULL, NULL},
 };
 

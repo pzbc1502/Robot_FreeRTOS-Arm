@@ -18,7 +18,7 @@
 extern CAN_Context_t g_can_context;
 
 /* 最大插补路径点数：工作空间对角线约 500mm，分辨率 1mm，留 10% 余量 */
-#define ROBOT_MAX_PATH_SIZE   (600)
+#define ROBOT_MAX_PATH_SIZE   (800)
 
 /* 静态路径/逆解缓冲区，robot_control_task 单线程使用，消除运行时 malloc */
 static struct position s_path_buf[ROBOT_MAX_PATH_SIZE];
@@ -103,6 +103,8 @@ static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8
 
 
 static robot_time_func g_robot_time_func = time_func_circle; /* 默认时间函数 */
+static float g_time_func_circle_radius_mm = 15.0f;
+#define ROBOT_CIRCLE_RADIUS_MAX_MM 20.0f
 
 static void robot_set_home_pose_valid(void)
 {
@@ -1456,8 +1458,32 @@ int robot_send_auto_event(struct position *pos)
 	return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
 };
 
-int robot_send_time_func_event(float time_limit_ms)
+int robot_send_time_func_event(float time_limit_ms, float radius_mm)
 {
+	if (g_robot.event_queue == NULL) {
+		return -1;
+	}
+
+	if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID)) {
+		LOG("reject time_func: pose invalid, please do hard_reset/soft_reset first.\r\n");
+		return -1;
+	}
+
+	if (time_limit_ms <= 0.0f) {
+		LOG("reject time_func: invalid time %.1f ms.\r\n", time_limit_ms);
+		return -1;
+	}
+
+	if (radius_mm <= 0.0f) {
+		radius_mm = 15.0f;
+	}
+	if (radius_mm > ROBOT_CIRCLE_RADIUS_MAX_MM) {
+		LOG("circle radius %.1f mm too large, clamp to %.1f mm.\r\n",
+			radius_mm, ROBOT_CIRCLE_RADIUS_MAX_MM);
+		radius_mm = ROBOT_CIRCLE_RADIUS_MAX_MM;
+	}
+	g_time_func_circle_radius_mm = radius_mm;
+
 	struct robot_event event = {0};
 	event.type = ROBOT_TIME_FUNC_EVENT;
 	event.param[0] = time_limit_ms;
@@ -1774,23 +1800,27 @@ static void robot_joint_stop_from_isr(uint8_t joint_id)
 
 static int time_func_circle(uint32_t time_ms, struct position *pos)
 {
-	float angle_vel = 2 * M_PI / 10; // 角速度, 10s转一圈
-	float r = 30.0f;
-	float first_x = 10;
+	float angle_vel = 2 * M_PI / 5; // 角速度，5s转一圈，配合600点路径缓冲
+	float r = g_time_func_circle_radius_mm;
+	const float entry_ms = 1000.0f;
+	const float circle_x = 0.0f;
+	const float circle_y = -70.0f;
+	const float circle_z = 0.0f;
 	
-	if (time_ms < 1000) {	// 前1S移动到10mm
-		pos->x = 0;
-		pos->z = 0;
-		pos->y = (-first_x) * (float)time_ms / 1000.0f;
+	if ((float)time_ms < entry_ms) {	// 前1S移动到画圆起点
+		float k = (float)time_ms / entry_ms;
+		pos->x = g_robot.cur_pos.x + (circle_x - g_robot.cur_pos.x) * k;
+		pos->y = g_robot.cur_pos.y + (circle_y - g_robot.cur_pos.y) * k;
+		pos->z = g_robot.cur_pos.z + (circle_z - g_robot.cur_pos.z) * k;
 		return 0;
 	}
 	
-	pos->z = 0;	// 保持z不变
 	time_ms -= 1000;
-	// 以50mm为半径画圆
+	// 保持 Y=-50，在 X/Z 平面按当前半径画圆
 	float t = (float)time_ms / 1000.0f;
-	pos->x = r * sinf(angle_vel * t);
-	pos->y = (r * cosf(angle_vel * t) - r - first_x);
+	pos->x = circle_x + r * sinf(angle_vel * t);
+	pos->y = circle_y;
+	pos->z = circle_z + r * (1.0f - cosf(angle_vel * t));
 	return 0;
 }
 

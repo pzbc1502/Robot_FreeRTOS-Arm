@@ -28,6 +28,17 @@ RA6_ERROR = 0xFE
 
 AUTO_TIMEOUT_S = 45.0
 
+DEFAULT_MOTION_GROUPS = [
+    ("前伸到预定位，展示平滑起步和末端稳定", ["auto 0 -50 0"]),
+    ("回 HOME，作为下一组动作的干净起点", ["soft_reset"]),
+    ("右前方斜向运动，展示 X/Y 联动", ["auto 45 -70 0"]),
+    ("左前方斜向运动，展示跨中线平滑移动", ["auto -45 -70 0"]),
+    ("回 HOME，切换到 Z 方向展示", ["soft_reset"]),
+    ("前伸并上抬，展示 X/Y/Z 协调", ["auto 0 -70 15"]),
+    ("前伸并下压，展示 Z 方向反向切换", ["auto 0 -70 -15"]),
+    ("回 HOME，结束运动展示", ["soft_reset"]),
+]
+
 
 def now_stamp():
     return dt.datetime.now().strftime("%H:%M:%S.%f")[:-3]
@@ -305,38 +316,69 @@ def final_soft_reset(args, arm, arm_reader, logger):
     logger.write("[DONE] final soft_reset PASS; robot returned HOME.\n")
 
 
-def run_auto_segment(arm, arm_reader, logger, title, cmd):
-    wait_manual(f"准备拍摄：{title}\n即将发送：{cmd}", logger)
+def run_motion_cmd(args, arm, arm_reader, logger, cmd):
+    lower = cmd.lower()
+    if lower.startswith("sleep ") or lower.startswith("wait "):
+        _, value = cmd.split(maxsplit=1)
+        delay_s = float(value)
+        logger.write(f"[STEP] sleep {delay_s:.2f}s\n")
+        time.sleep(delay_s)
+        return
+
     send_cmd(arm, logger, cmd)
-    arm_reader.wait_line_contains(["robot pid run finished!!"], AUTO_TIMEOUT_S)
-    logger.write(f"[DONE] auto segment finished: {title}\n")
+    if lower.startswith("auto ") or lower.startswith("circle") or lower.startswith("time_func"):
+        arm_reader.wait_line_contains(["robot pid run finished!!"], AUTO_TIMEOUT_S)
+    elif lower == "soft_reset":
+        arm_reader.wait_line_contains(["soft reset final verify PASS"], args.soft_reset_timeout)
+    else:
+        time.sleep(0.2)
+
+
+def run_motion_group(args, arm, arm_reader, logger, title, commands):
+    command_text = "\n".join(f"  {cmd}" for cmd in commands)
+    wait_manual(f"准备拍摄：{title}\n即将执行：\n{command_text}", logger)
+    for cmd in commands:
+        run_motion_cmd(args, arm, arm_reader, logger, cmd)
+    logger.write(f"[DONE] command group finished: {title}\n")
     time.sleep(0.5)
 
 
-def run_soft_reset_segment(args, arm, arm_reader, logger, title):
-    wait_manual(f"准备拍摄：{title}\n即将发送：soft_reset", logger)
-    send_cmd(arm, logger, "soft_reset")
-    arm_reader.wait_line_contains(["soft reset final verify PASS"], args.soft_reset_timeout)
-    logger.write(f"[DONE] soft_reset segment finished: {title}\n")
-    time.sleep(0.5)
+def load_motion_groups(sequence_file):
+    groups = []
+    title_lines = []
+    commands = []
+
+    def flush_group():
+        nonlocal title_lines, commands
+        if commands:
+            title = " / ".join(title_lines) if title_lines else commands[0]
+            groups.append((title, commands))
+        title_lines = []
+        commands = []
+
+    with sequence_file.open("r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                flush_group()
+                continue
+            if line.startswith("#"):
+                title = line.lstrip("#").strip()
+                if title:
+                    title_lines.append(title)
+                continue
+            commands.append(line)
+
+    flush_group()
+    if not groups:
+        raise ValueError(f"sequence file has no commands: {sequence_file}")
+    return groups
 
 
 def run_motion_sequence(args, arm, arm_reader, logger):
-    segments = [
-        ("前伸到预定位，展示平滑起步和末端稳定", "auto 0 -50 0"),
-        ("回 HOME，作为下一组动作的干净起点", "soft_reset"),
-        ("右前方斜向运动，展示 X/Y 联动", "auto 45 -70 0"),
-        ("左前方斜向运动，展示跨中线平滑移动", "auto -45 -70 0"),
-        ("回 HOME，切换到 Z 方向展示", "soft_reset"),
-        ("前伸并上抬，展示 X/Y/Z 协调", "auto 0 -70 15"),
-        ("前伸并下压，展示 Z 方向反向切换", "auto 0 -70 -15"),
-        ("回 HOME，结束运动展示", "soft_reset"),
-    ]
-    for title, cmd in segments:
-        if cmd == "soft_reset":
-            run_soft_reset_segment(args, arm, arm_reader, logger, title)
-        else:
-            run_auto_segment(arm, arm_reader, logger, title, cmd)
+    groups = load_motion_groups(args.sequence_file) if args.sequence_file and args.sequence_file.exists() else DEFAULT_MOTION_GROUPS
+    for title, commands in groups:
+        run_motion_group(args, arm, arm_reader, logger, title, commands)
 
 
 def run_target_sequence(args, arm, arm_reader, status_reader, vision_sender, logger):
@@ -385,11 +427,14 @@ def run_demo(args, arm, arm_reader, status_reader, vision_sender, logger):
 
 def parse_args():
     default_debug = pathlib.Path(__file__).resolve().parent
+    default_sequence = default_debug / "shooting_sequence.txt"
     parser = argparse.ArgumentParser(description="RA6M5 robot shooting demo script")
     parser.add_argument("--arm-port", default=ARM_PORT)
     parser.add_argument("--jetson-port", default=JETSON_PORT)
     parser.add_argument("--baud", type=int, default=BAUD)
     parser.add_argument("--mode", choices=("full", "motion", "target"), default="full")
+    parser.add_argument("--sequence-file", type=pathlib.Path, default=default_sequence,
+                        help="UTF-8 text file for motion groups. Blank lines split groups; # lines are group titles.")
     parser.add_argument("--debug-dir", type=pathlib.Path, default=default_debug)
     parser.add_argument("--skip-final-reset", action="store_true",
                         help="Do not send final soft_reset after demo.")

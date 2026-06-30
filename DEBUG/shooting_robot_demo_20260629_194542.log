@@ -1,0 +1,207 @@
+[19:45:42.053] [INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\shooting_robot_demo_20260629_194542.log
+[19:45:42.053] [INFO] ARM=COM7 baud=115200 mode=motion
+[19:45:42.556] [ARM-TX] target_disable
+[19:45:42.610] [ARM] Found handler for 'target_disable', executing...
+[19:45:42.610] [ARM] target_disable
+[19:45:42.757] [ARM-TX] laser_off
+[19:45:42.795] [ARM] Found handler for 'laser_off', executing...
+[19:45:42.795] [ARM] laser_off
+[19:45:42.958] [STEP] initial soft_reset to HOME...
+[19:45:42.958] [ARM-TX] soft_reset
+[19:45:42.979] [ARM] Found handler for 'soft_reset', executing...
+[19:45:42.979] [ARM] ROBOT_SOFT_RESET_EVENT
+[19:45:42.979] [ARM] --- Starting soft reset ---
+[19:45:43.225] [ARM] Soft reset motors enabled (J1~J5, J6 skipped).
+[19:45:43.226] [ARM] Soft resetting joint 4...
+[19:45:43.226] [ARM] robot_update_current_angle 4...
+[19:45:43.226] [ARM] [4] current:90.00, target:90.00, dir:-1
+[19:45:43.348] [ARM] Soft resetting joint 3...
+[19:45:43.409] [ARM] robot_update_current_angle 3...
+[19:45:43.409] [ARM] [3] current:0.00, target:0.00, dir:-1
+[19:45:43.534] [ARM] Soft resetting joint 1...
+[19:45:43.534] [ARM] robot_update_current_angle 1...
+[19:45:43.534] [ARM] [1] current:90.00, target:90.00, dir:-1
+[19:45:43.658] [ARM] Soft resetting joint 2...
+[19:45:43.658] [ARM] robot_update_current_angle 2...
+[19:45:43.658] [ARM] [2] current:-90.00, target:-90.00, dir:1
+[19:45:43.779] [ARM] Soft resetting joint 0...
+[19:45:43.841] [ARM] robot_update_current_angle 0...
+[19:45:43.841] [ARM] [0] current:90.00, target:90.00, dir:1
+[19:45:44.086] [ARM] soft reset final verify PASS (issues:0), pose set HOME.
+[19:45:44.086] [DONE] initial soft_reset PASS; pose valid.
+[19:45:44.086] [PROMPT] 准备拍摄：前伸到预定位，展示平滑起步和末端稳定
+即将发送：auto 0 -50 0
+[19:45:49.837] [ARM-TX] auto 0 -50 0
+[19:45:49.878] [ARM] Found handler for 'auto', executing...
+[19:45:49.878] [ARM] ROBOT_AUTO_EVENT
+[19:45:52.675] [ARM] [jpint 1] ave_error:0.00
+[19:45:52.675] [ARM] [jpint 2] ave_error:3.25
+[19:45:52.675] [ARM] [jpint 3] ave_error:4.76
+[19:45:52.675] [ARM] [jpint 4] ave_error:0.00
+[19:45:52.675] [ARM] [jpint 5] ave_error:7.86
+[19:45:52.675] [ARM] 
+[19:45:52.675] [ARM] robot pid run finished!!
+[19:45:52.675] [DONE] auto segment finished: 前伸到预定位，展示平滑起步和末端稳定
+[19:45:53.176] [PROMPT] 准备拍摄：回 HOME，作为下一组动作的干净起点
+即将发送：soft_reset
+[19:45:53.176] [ARM-TX] soft_reset
+[19:45:53.228] [ARM] Found handler for 'soft_reset', executing...
+[19:45:53.228] [ARM] ROBOT_SOFT_RESET_EVENT
+[19:45:53.228] [ARM] --- Starting soft reset ---
+[19:45:53.413] [ARM] Soft reset motors enabled (J1~J5, J6 skipped).
+[19:45:53.413] [ARM] Soft resetting joint 4...
+[19:45:53.475] [ARM] robot_update_current_angle 4...
+[19:45:53.475] [ARM] [4] current:77.44, target:90.00, dir:1
+[19:45:54.153] [ARM] soft reset joint 4 settle timeout, keep going
+[19:45:54.153] [ARM] Soft resetting joint 3...
+[19:45:54.214] [ARM] robot_update_current_angle 3...
+[19:45:54.214] [ARM] [3] current:0.00, target:0.00, dir:-1
+[19:45:54.338] [ARM] Soft resetting joint 1...
+[19:45:54.338] [ARM] robot_update_current_angle 1...
+[19:45:54.338] [ARM] [1] current:109.04, target:90.00, dir:-1
+[19:45:55.262] [ARM] soft reset joint 1 settle timeout, keep going
+[19:45:55.262] [ARM] Soft resetting joint 2...
+[19:45:55.262] [ARM] robot_update_current_angle 2...
+[19:45:55.262] [ARM] [2] current:-62.30, target:-90.00, dir:-1
+[19:45:56.492] [ARM] soft reset joint 2 settle timeout, keep going
+[19:45:56.492] [ARM] Soft resetting joint 0...
+[19:45:56.492] [ARM] robot_update_current_angle 0...
+[19:45:56.492] [ARM] [0] current:90.00, target:90.00, dir:1
+[19:45:56.616] [ARM] soft reset verify not pass, start refine loop...
+[19:45:56.677] [ARM] soft reset refine joint 1 round 1: cur=92.60 target=90.00 err=2.60 dir=-1
+[19:45:57.291] [ARM] soft reset refine joint 1 round 2: cur=91.40 target=90.00 err=1.40 dir=-1
+[19:45:57.907] [ARM] soft reset refine pass 1 success.
+[19:45:57.907] [ARM] soft reset final verify PASS (issues:3), pose set HOME.
+[19:45:57.907] [DONE] soft_reset segment finished: 回 HOME，作为下一组动作的干净起点
+[19:45:58.408] [PROMPT] 准备拍摄：右前方斜向运动，展示 X/Y 联动
+即将发送：auto 45 -70 0
+[19:46:01.008] [ARM-TX] auto 45 -70 0
+[19:46:01.104] [ARM] Found handler for 'auto', executing...
+[19:46:01.104] [ARM] ROBOT_AUTO_EVENT
+[19:46:04.787] [ARM] [jpint 1] ave_error:5.78
+[19:46:04.787] [ARM] [jpint 2] ave_error:4.80
+[19:46:04.787] [ARM] [jpint 3] ave_error:7.51
+[19:46:04.787] [ARM] [jpint 4] ave_error:6.97
+[19:46:04.787] [ARM] [jpint 5] ave_error:12.93
+[19:46:04.787] [ARM] 
+[19:46:04.787] [ARM] robot pid run finished!!
+[19:46:04.787] [DONE] auto segment finished: 右前方斜向运动，展示 X/Y 联动
+[19:46:05.288] [PROMPT] 准备拍摄：左前方斜向运动，展示跨中线平滑移动
+即将发送：auto -45 -70 0
+[19:46:09.043] [ARM-TX] auto -45 -70 0
+[19:46:09.088] [ARM] Found handler for 'auto', executing...
+[19:46:09.088] [ARM] ROBOT_AUTO_EVENT
+[19:46:12.892] [ARM] [jpint 1] ave_error:16.23
+[19:46:12.892] [ARM] [jpint 2] ave_error:8.60
+[19:46:12.892] [ARM] [jpint 3] ave_error:13.07
+[19:46:12.892] [ARM] [jpint 4] ave_error:19.80
+[19:46:12.892] [ARM] [jpint 5] ave_error:7.80
+[19:46:12.892] [ARM] 
+[19:46:12.892] [ARM] robot pid run finished!!
+[19:46:12.892] [DONE] auto segment finished: 左前方斜向运动，展示跨中线平滑移动
+[19:46:13.393] [PROMPT] 准备拍摄：回 HOME，切换到 Z 方向展示
+即将发送：soft_reset
+[19:46:14.483] [ARM-TX] soft_reset
+[19:46:14.555] [ARM] Found handler for 'soft_reset', executing...
+[19:46:14.555] [ARM] ROBOT_SOFT_RESET_EVENT
+[19:46:14.555] [ARM] --- Starting soft reset ---
+[19:46:14.740] [ARM] Soft reset motors enabled (J1~J5, J6 skipped).
+[19:46:14.740] [ARM] Soft resetting joint 4...
+[19:46:14.802] [ARM] robot_update_current_angle 4...
+[19:46:14.802] [ARM] [4] current:77.86, target:90.00, dir:1
+[19:46:15.478] [ARM] soft reset joint 4 settle timeout, keep going
+[19:46:15.478] [ARM] Soft resetting joint 3...
+[19:46:15.540] [ARM] robot_update_current_angle 3...
+[19:46:15.540] [ARM] [3] current:42.84, target:0.00, dir:-1
+[19:46:17.022] [ARM] soft reset joint 3 settle timeout, keep going
+[19:46:17.022] [ARM] Soft resetting joint 1...
+[19:46:17.082] [ARM] robot_update_current_angle 1...
+[19:46:17.082] [ARM] [1] current:93.54, target:90.00, dir:-1
+[19:46:17.576] [ARM] soft reset joint 1 settle timeout, keep going
+[19:46:17.576] [ARM] Soft resetting joint 2...
+[19:46:17.576] [ARM] robot_update_current_angle 2...
+[19:46:17.576] [ARM] [2] current:-81.54, target:-90.00, dir:-1
+[19:46:18.255] [ARM] soft reset joint 2 settle timeout, keep going
+[19:46:18.255] [ARM] Soft resetting joint 0...
+[19:46:18.255] [ARM] robot_update_current_angle 0...
+[19:46:18.255] [ARM] [0] current:47.37, target:90.00, dir:1
+[19:46:19.792] [ARM] soft reset joint 0 settle timeout, keep going
+[19:46:19.792] [ARM] soft reset verify not pass, start refine loop...
+[19:46:19.913] [ARM] soft reset refine joint 0 round 1: cur=67.58 target=90.00 err=22.42 dir=1
+[19:46:20.528] [ARM] soft reset refine joint 0 round 2: cur=70.08 target=90.00 err=19.92 dir=1
+[19:46:21.143] [ARM] soft reset refine joint 0 round 3: cur=72.39 target=90.00 err=17.61 dir=1
+[19:46:21.819] [ARM] soft reset refine pass 1 not enough, continue...
+[19:46:21.881] [ARM] soft reset refine joint 0 round 1: cur=75.51 target=90.00 err=14.49 dir=1
+[19:46:22.498] [ARM] soft reset refine joint 0 round 2: cur=77.84 target=90.00 err=12.16 dir=1
+[19:46:23.176] [ARM] soft reset refine joint 0 round 3: cur=80.15 target=90.00 err=9.85 dir=1
+[19:46:23.793] [ARM] soft reset refine pass 2 not enough, continue...
+[19:46:23.855] [ARM] soft reset refine joint 0 round 1: cur=83.27 target=90.00 err=6.73 dir=1
+[19:46:24.531] [ARM] soft reset refine joint 0 round 2: cur=85.59 target=90.00 err=4.41 dir=1
+[19:46:25.147] [ARM] soft reset refine joint 0 round 3: cur=87.91 target=90.00 err=2.09 dir=1
+[19:46:25.696] [ARM] soft reset refine pass 3 success.
+[19:46:25.696] [ARM] soft reset final verify PASS (issues:5), pose set HOME.
+[19:46:25.696] [DONE] soft_reset segment finished: 回 HOME，切换到 Z 方向展示
+[19:46:26.197] [PROMPT] 准备拍摄：前伸并上抬，展示 X/Y/Z 协调
+即将发送：auto 0 -70 15
+[19:46:27.452] [ARM-TX] auto 0 -70 15
+[19:46:27.541] [ARM] Found handler for 'auto', executing...
+[19:46:27.541] [ARM] ROBOT_AUTO_EVENT
+[19:46:30.928] [ARM] [jpint 1] ave_error:0.02
+[19:46:30.928] [ARM] [jpint 2] ave_error:2.95
+[19:46:30.928] [ARM] [jpint 3] ave_error:6.75
+[19:46:30.928] [ARM] [jpint 4] ave_error:0.00
+[19:46:30.928] [ARM] [jpint 5] ave_error:17.46
+[19:46:30.928] [ARM] 
+[19:46:30.928] [ARM] robot pid run finished!!
+[19:46:30.928] [DONE] auto segment finished: 前伸并上抬，展示 X/Y/Z 协调
+[19:46:31.429] [PROMPT] 准备拍摄：前伸并下压，展示 Z 方向反向切换
+即将发送：auto 0 -70 -15
+[19:46:33.325] [ARM-TX] auto 0 -70 -15
+[19:46:33.447] [ARM] Found handler for 'auto', executing...
+[19:46:33.447] [ARM] ROBOT_AUTO_EVENT
+[19:46:35.727] [ARM] [jpint 1] ave_error:0.02
+[19:46:35.729] [ARM] [jpint 2] ave_error:5.20
+[19:46:35.729] [ARM] [jpint 3] ave_error:11.31
+[19:46:35.729] [ARM] [jpint 4] ave_error:0.00
+[19:46:35.729] [ARM] [jpint 5] ave_error:24.28
+[19:46:35.729] [ARM] 
+[19:46:35.729] [ARM] robot pid run finished!!
+[19:46:35.729] [DONE] auto segment finished: 前伸并下压，展示 Z 方向反向切换
+[19:46:36.230] [PROMPT] 准备拍摄：回 HOME，结束运动展示
+即将发送：soft_reset
+[19:46:37.073] [ARM-TX] soft_reset
+[19:46:37.140] [ARM] Found handler for 'soft_reset', executing...
+[19:46:37.140] [ARM] ROBOT_SOFT_RESET_EVENT
+[19:46:37.140] [ARM] --- Starting soft reset ---
+[19:46:37.385] [ARM] Soft reset motors enabled (J1~J5, J6 skipped).
+[19:46:37.385] [ARM] Soft resetting joint 4...
+[19:46:37.385] [ARM] robot_update_current_angle 4...
+[19:46:37.385] [ARM] soft reset skip joint 4: angle map failed, current:100.16 range:[0.00, 92.00]
+[19:46:37.385] [ARM] Soft resetting joint 3...
+[19:46:37.385] [ARM] robot_update_current_angle 3...
+[19:46:37.447] [ARM] [3] current:-0.00, target:0.00, dir:1
+[19:46:37.507] [ARM] Soft resetting joint 1...
+[19:46:37.568] [ARM] robot_update_current_angle 1...
+[19:46:37.568] [ARM] [1] current:110.28, target:90.00, dir:-1
+[19:46:38.490] [ARM] soft reset joint 1 settle timeout, keep going
+[19:46:38.490] [ARM] Soft resetting joint 2...
+[19:46:38.491] [ARM] robot_update_current_angle 2...
+[19:46:38.491] [ARM] [2] current:-77.80, target:-90.00, dir:-1
+[19:46:39.229] [ARM] soft reset joint 2 settle timeout, keep going
+[19:46:39.229] [ARM] Soft resetting joint 0...
+[19:46:39.229] [ARM] robot_update_current_angle 0...
+[19:46:39.229] [ARM] [0] current:90.02, target:90.00, dir:-1
+[19:46:39.415] [ARM] soft reset verify not pass, start refine loop...
+[19:46:39.536] [ARM] soft reset refine joint 1 round 1: cur=96.54 target=90.00 err=6.54 dir=-1
+[19:46:40.149] [ARM] soft reset refine joint 1 round 2: cur=95.29 target=90.00 err=5.29 dir=-1
+[19:46:40.765] [ARM] soft reset refine joint 1 round 3: cur=94.14 target=90.00 err=4.14 dir=-1
+[19:46:41.445] [ARM] soft reset refine pass 1 not enough, continue...
+[19:46:41.569] [ARM] soft reset refine joint 1 round 1: cur=92.32 target=90.00 err=2.32 dir=-1
+[19:46:42.183] [ARM] soft reset refine joint 1 round 2: cur=91.15 target=90.00 err=1.15 dir=-1
+[19:46:42.611] [ARM] soft reset refine pass 2 not enough, continue...
+[19:46:42.859] [ARM] soft reset refine pass 3 not enough, continue...
+[19:46:42.859] [ARM] soft reset final FAIL: joint 4 angle map failed after refine, pose invalid.
+[19:46:42.859] [FATAL] RuntimeError: soft reset final FAIL: joint 4 angle map failed after refine, pose invalid.
+[19:46:43.060] [ARM-TX] target_disable
+[19:46:43.260] [ARM-TX] laser_off
+[19:46:43.265] [INFO] ports closed.

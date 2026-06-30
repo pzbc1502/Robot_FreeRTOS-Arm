@@ -1,5 +1,0 @@
-[15:53:11.241] [INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\target_state_demo_20260629_155311.log
-[15:53:11.241] [INFO] ARM=COM7 JETSON=COM14 baud=115200
-[15:53:11.241] [INFO] aligned frame: FF 05 03 00 00 00 00 08 FE
-[15:53:11.242] [FATAL] SerialException: could not open port 'COM7': PermissionError(13, '拒绝访问。', None, 5)
-[15:53:11.442] [INFO] ports closed.

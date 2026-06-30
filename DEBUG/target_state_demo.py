@@ -283,6 +283,7 @@ def final_soft_reset(args, arm, arm_reader, logger):
     logger.write("[STEP] final soft_reset to HOME...\n")
     send_cmd(arm, logger, "soft_reset")
     arm_reader.wait_line_contains(["soft reset final verify PASS"], args.soft_reset_timeout)
+    args.final_soft_reset_done = True
     logger.write("[DONE] final soft_reset PASS; robot returned HOME.\n")
 
 
@@ -365,6 +366,7 @@ def run_without_status(args, arm, jetson, arm_reader, vision_sender, logger):
         send_cmd(arm, logger, "soft_reset")
         logger.write(f"[STEP] no-status mode: waiting {args.soft_reset_timeout:.1f}s for final soft_reset.\n")
         time.sleep(args.soft_reset_timeout)
+        args.final_soft_reset_done = True
     logger.write("[DONE] no-status demo sequence complete.\n")
 
 
@@ -396,6 +398,7 @@ def parse_args():
 
 def main():
     args = parse_args()
+    args.final_soft_reset_done = False
     logger = Logger(args.debug_dir)
     stop_event = threading.Event()
 
@@ -407,6 +410,8 @@ def main():
 
     arm = None
     jetson = None
+    arm_reader = None
+    vision_sender = None
     try:
         arm = serial.Serial(args.arm_port, args.baud, timeout=0.05)
         jetson = serial.Serial(args.jetson_port, args.baud, timeout=0.05)
@@ -431,19 +436,35 @@ def main():
     except Exception as exc:
         logger.write(f"[FATAL] {type(exc).__name__}: {exc}\n")
     finally:
-        stop_event.set()
-        time.sleep(0.2)
+        if vision_sender is not None:
+            vision_sender.disable()
         if jetson is not None and jetson.is_open:
             try:
                 send_target_ctrl(jetson, logger, False)
             except Exception:
                 pass
-            jetson.close()
         if arm is not None and arm.is_open:
             try:
                 send_cmd(arm, logger, "laser_off")
             except Exception:
                 pass
+            if not args.skip_final_reset and not args.final_soft_reset_done:
+                try:
+                    logger.write("[STEP] cleanup soft_reset to HOME...\n")
+                    send_cmd(arm, logger, "soft_reset")
+                    if arm_reader is not None:
+                        arm_reader.wait_line_contains(["soft reset final verify PASS"], args.soft_reset_timeout)
+                        logger.write("[DONE] cleanup soft_reset PASS; robot returned HOME.\n")
+                    else:
+                        time.sleep(args.soft_reset_timeout)
+                    args.final_soft_reset_done = True
+                except Exception as exc:
+                    logger.write(f"[WARN] cleanup soft_reset failed: {exc}\n")
+        stop_event.set()
+        time.sleep(0.2)
+        if jetson is not None and jetson.is_open:
+            jetson.close()
+        if arm is not None and arm.is_open:
             arm.close()
         logger.write("[INFO] ports closed.\n")
         logger.close()
