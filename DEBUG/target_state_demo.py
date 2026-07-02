@@ -12,6 +12,7 @@ import serial
 ARM_PORT = "COM7"
 JETSON_PORT = "COM14"
 BAUD = 115200
+DEFAULT_VISION_SEQUENCE = "9,-10:2;4,-6:1;0,0:0"
 
 JETSON_SOF = 0xFF
 JETSON_EOF = 0xFE
@@ -45,14 +46,20 @@ class Logger:
         self.path = debug_dir / f"target_state_demo_{ts}.log"
         self._lock = threading.Lock()
         self._file = self.path.open("w", encoding="utf-8", newline="")
+        self._console_muted = False
 
-    def write(self, msg):
+    def set_console_muted(self, muted):
+        with self._lock:
+            self._console_muted = bool(muted)
+
+    def write(self, msg, force_console=False):
         line = f"[{now_stamp()}] {msg}"
         with self._lock:
             self._file.write(line)
             self._file.flush()
-            sys.stdout.write(line)
-            sys.stdout.flush()
+            if force_console or not self._console_muted:
+                sys.stdout.write(line)
+                sys.stdout.flush()
 
     def close(self):
         with self._lock:
@@ -187,6 +194,10 @@ class VisionSender:
         self.enabled = threading.Event()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.frame = make_vision_frame(0, 0)
+        self.sequence = [(0, 0, 0.0)]
+        self.sequence_index = 0
+        self.sequence_step_started_at = time.monotonic()
+        self.sequence_logged_index = None
         self.tx_count = 0
         self._lock = threading.Lock()
 
@@ -196,11 +207,30 @@ class VisionSender:
     def set_error(self, dcx, dcy):
         with self._lock:
             self.frame = make_vision_frame(dcx, dcy)
+            self.sequence = [(int(dcx), int(dcy), 0.0)]
+            self.sequence_index = 0
+            self.sequence_step_started_at = time.monotonic()
+            self.sequence_logged_index = None
+
+    def set_sequence(self, sequence):
+        if not sequence:
+            raise ValueError("vision sequence must not be empty")
+        with self._lock:
+            self.sequence = [(int(dcx), int(dcy), max(0.0, float(duration_s)))
+                             for dcx, dcy, duration_s in sequence]
+            self.sequence_index = 0
+            self.sequence_step_started_at = time.monotonic()
+            self.sequence_logged_index = None
+            dcx, dcy, _ = self.sequence[0]
+            self.frame = make_vision_frame(dcx, dcy)
 
     def enable(self):
         if not self.enabled.is_set():
             with self._lock:
                 self.tx_count = 0
+                self.sequence_index = 0
+                self.sequence_step_started_at = time.monotonic()
+                self.sequence_logged_index = None
             self.logger.write(f"[JETSON-TX] vision sender enabled: period={self.period_s:.3f}s.\n")
         self.enabled.set()
 
@@ -214,6 +244,7 @@ class VisionSender:
 
     def send_once(self):
         with self._lock:
+            self._update_sequence_locked()
             frame = self.frame
             self.tx_count += 1
             tx_count = self.tx_count
@@ -221,6 +252,25 @@ class VisionSender:
         self.ser.flush()
         if self.tx_log_every != 0 and (tx_count == 1 or (tx_count % self.tx_log_every) == 0):
             self.logger.write(f"[JETSON-TX] #{tx_count} {hex_bytes(frame)}\n")
+
+    def _update_sequence_locked(self):
+        now = time.monotonic()
+        while self.sequence_index < len(self.sequence) - 1:
+            _, _, duration_s = self.sequence[self.sequence_index]
+            if duration_s <= 0.0 or (now - self.sequence_step_started_at) < duration_s:
+                break
+            self.sequence_index += 1
+            self.sequence_step_started_at = now
+
+        dcx, dcy, duration_s = self.sequence[self.sequence_index]
+        self.frame = make_vision_frame(dcx, dcy)
+        if self.sequence_logged_index != self.sequence_index:
+            self.sequence_logged_index = self.sequence_index
+            self.logger.write(
+                f"[JETSON-TX] vision step {self.sequence_index + 1}/{len(self.sequence)}: "
+                f"dcx={dcx} dcy={dcy} hold={duration_s:.1f}s "
+                f"frame={hex_bytes(self.frame)}\n"
+            )
 
     def _run(self):
         while not self.stop_event.is_set():
@@ -270,9 +320,46 @@ def send_cmd(ser, logger, cmd):
     ser.flush()
 
 
+def parse_vision_sequence(text, default_hold_s, fallback_dcx, fallback_dcy):
+    if text is None or text.strip() == "":
+        return [(fallback_dcx, fallback_dcy, 0.0)]
+
+    sequence = []
+    for raw_item in text.split(";"):
+        item = raw_item.strip()
+        if not item:
+            continue
+
+        if ":" in item:
+            pair_text, duration_text = item.split(":", 1)
+            duration_s = float(duration_text.strip())
+        else:
+            pair_text = item
+            duration_s = default_hold_s
+
+        parts = [part.strip() for part in pair_text.split(",")]
+        if len(parts) != 2:
+            raise ValueError(f"invalid vision sequence item '{item}', expected dcx,dcy[:seconds]")
+
+        sequence.append((int(parts[0]), int(parts[1]), duration_s))
+
+    if not sequence:
+        raise ValueError("vision sequence is empty")
+    return sequence
+
+
+def format_vision_sequence(sequence):
+    return " -> ".join(f"({dcx},{dcy})/{duration_s:.1f}s" for dcx, dcy, duration_s in sequence)
+
+
 def wait_manual(prompt, logger):
-    logger.write(f"[PROMPT] {prompt}\n")
-    input(prompt + "\n按 Enter 继续...")
+    logger.write(f"[PROMPT] {prompt}\n", force_console=True)
+    logger.set_console_muted(True)
+    try:
+        input("按 Enter 继续...")
+    finally:
+        logger.set_console_muted(False)
+    logger.write("[PROMPT] Enter received; console logging resumed.\n")
 
 
 def final_soft_reset(args, arm, arm_reader, logger):
@@ -311,12 +398,14 @@ def run_with_status(args, arm, jetson, arm_reader, status_reader, vision_sender,
     logger.write("[STEP] waiting READY from RA6...\n")
     status_reader.wait_for((RA6_READY, 0x01), args.ready_timeout)
 
-    vision_sender.set_error(args.vision_dcx, args.vision_dcy)
+    wait_manual("target_enable 已完成，RA6M5 已到预定位 READY。确认后按 Enter 开始发送视觉误差校准。", logger)
+    vision_sender.set_sequence(args.vision_sequence_steps)
     vision_sender.enable()
-    logger.write(f"[STEP] sending vision frames dcx={args.vision_dcx} dcy={args.vision_dcy}, waiting ALIGN_DONE...\n")
+    logger.write(f"[STEP] sending vision sequence {format_vision_sequence(args.vision_sequence_steps)}, waiting ALIGN_DONE...\n")
     status_reader.wait_for((RA6_ALIGN_DONE, 0x01), args.align_timeout)
 
-    logger.write("[PROMPT] 已对准。请按住 P000 KEY，脚本会自动等待 OUTPUT_ON，不需要按 Enter。\n")
+    wait_manual("已收到 ALIGN_DONE。确认画面和机械臂位置安全后，按 Enter 进入 P000 发射许可步骤。", logger)
+    logger.write("[PROMPT] 请按住 P000 KEY，脚本会自动等待 OUTPUT_ON，不需要再按 Enter。\n")
     logger.write("[STEP] waiting OUTPUT_ON from RA6...\n")
     status_reader.wait_for((RA6_OUTPUT, 0x01), args.output_timeout)
 
@@ -346,9 +435,9 @@ def run_without_status(args, arm, jetson, arm_reader, vision_sender, logger):
     logger.write(f"[STEP] no-status mode: waiting {args.ready_timeout:.1f}s for pre-position.\n")
     time.sleep(args.ready_timeout)
 
-    vision_sender.set_error(args.vision_dcx, args.vision_dcy)
+    vision_sender.set_sequence(args.vision_sequence_steps)
     vision_sender.enable()
-    logger.write(f"[STEP] no-status mode: sending vision frames dcx={args.vision_dcx} dcy={args.vision_dcy} for {args.align_timeout:.1f}s.\n")
+    logger.write(f"[STEP] no-status mode: sending vision sequence {format_vision_sequence(args.vision_sequence_steps)} for {args.align_timeout:.1f}s.\n")
     time.sleep(args.align_timeout)
 
     wait_manual("请按住 P000 KEY，观察是否进入激光输出。", logger)
@@ -383,17 +472,28 @@ def parse_args():
     parser.add_argument("--vision-period", type=float, default=0.2,
                         help="Seconds between simulated Jetson vision frames while enabled.")
     parser.add_argument("--vision-dcx", type=int, default=80,
-                        help="Simulated Jetson dcx pixels. Default is large but inside the current 100px tolerance.")
+                        help="Fallback simulated Jetson dcx pixels when --vision-sequence is empty.")
     parser.add_argument("--vision-dcy", type=int, default=-80,
-                        help="Simulated Jetson dcy pixels. Default is large but inside the current 100px tolerance.")
+                        help="Fallback simulated Jetson dcy pixels when --vision-sequence is empty.")
+    parser.add_argument("--vision-sequence", default=DEFAULT_VISION_SEQUENCE,
+                        help=("Semicolon-separated simulated vision errors, format "
+                              "'dcx,dcy[:seconds];...'. The last step repeats until ALIGN_DONE. "
+                              "Use an empty string to fall back to --vision-dcx/--vision-dcy."))
+    parser.add_argument("--vision-step-hold", type=float, default=1.5,
+                        help="Default hold seconds for --vision-sequence items without ':seconds'.")
     parser.add_argument("--tx-log-every", type=int, default=0,
                         help="Log one JETSON-TX line every N frames; 0 disables per-frame TX logs.")
     parser.add_argument("--soft-reset-timeout", type=float, default=45.0)
     parser.add_argument("--target-ctrl-timeout", type=float, default=5.0)
     parser.add_argument("--ready-timeout", type=float, default=25.0)
-    parser.add_argument("--align-timeout", type=float, default=10.0)
+    parser.add_argument("--align-timeout", type=float, default=20.0)
     parser.add_argument("--output-timeout", type=float, default=10.0)
-    return parser.parse_args()
+    args = parser.parse_args()
+    args.vision_sequence_steps = parse_vision_sequence(args.vision_sequence,
+                                                       args.vision_step_hold,
+                                                       args.vision_dcx,
+                                                       args.vision_dcy)
+    return args
 
 
 def main():
@@ -406,7 +506,7 @@ def main():
     logger.write(f"[INFO] ARM={args.arm_port} JETSON={args.jetson_port} baud={args.baud}\n")
     logger.write(f"[INFO] start frame: {hex_bytes(make_target_ctrl_frame(True))}\n")
     logger.write(f"[INFO] stop frame: {hex_bytes(make_target_ctrl_frame(False))}\n")
-    logger.write(f"[INFO] vision frame dcx={args.vision_dcx} dcy={args.vision_dcy}: {hex_bytes(make_vision_frame(args.vision_dcx, args.vision_dcy))}\n")
+    logger.write(f"[INFO] vision sequence: {format_vision_sequence(args.vision_sequence_steps)}\n")
 
     arm = None
     jetson = None

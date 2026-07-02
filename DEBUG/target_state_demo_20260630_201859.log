@@ -1,0 +1,7 @@
+[20:18:59.671] [INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\target_state_demo_20260630_201859.log
+[20:18:59.671] [INFO] ARM=COM7 JETSON=COM14 baud=115200
+[20:18:59.671] [INFO] start frame: AA 01 01 BB
+[20:18:59.671] [INFO] stop frame: AA 01 00 BB
+[20:18:59.672] [INFO] vision sequence: (220,-120)/1.8s -> (170,-95)/1.8s -> (120,-70)/1.8s -> (80,-45)/1.8s -> (45,-25)/1.4s -> (20,-10)/1.0s -> (0,0)/0.0s
+[20:18:59.672] [FATAL] SerialException: could not open port 'COM7': PermissionError(13, '拒绝访问。', None, 5)
+[20:18:59.874] [INFO] ports closed.

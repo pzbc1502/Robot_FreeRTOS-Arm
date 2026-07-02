@@ -75,7 +75,7 @@ extern "C" {
 #define SCURVE_S_ACCEL  (SCURVE_VMAX * SCURVE_T_ACCEL / 2.0f)/* 加速段位移 mm ≈ 141.76 */
 
 #define ROBOT_RESET_DEFAULT_ANGLE           360     /* 复位默认搜索角度范围 */
-#define ROBOT_RESET_DEFAULT_VELOCITY        (10.0f) /* 复位默认速度，单位 rpm */
+#define ROBOT_RESET_DEFAULT_VELOCITY        (15.0f) /* 复位默认速度，单位 rpm */
 #define ROBOT_RESET_DEFAULT_ACCELERATION    100     /* 复位默认加速度 */
 
 /* ROBOT 状态标志位定义 */

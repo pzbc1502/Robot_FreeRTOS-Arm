@@ -679,8 +679,8 @@ static int robot_joint_compare_error(uint8_t joint_id, float raw_angle, float re
 #define ROBOT_SOFT_RESET_REFINE_PASSES            (3U)
 #define ROBOT_SOFT_RESET_REFINE_ROUNDS_PER_JOINT  (3U)
 #define ROBOT_SOFT_RESET_REFINE_TOL_DEG           (1.0f)
-#define ROBOT_SOFT_RESET_REFINE_SETTLE_LOOPS      (10)
-#define ROBOT_SOFT_RESET_REFINE_VELOCITY          (4.0f)
+#define ROBOT_SOFT_RESET_REFINE_SETTLE_LOOPS      (20)
+#define ROBOT_SOFT_RESET_REFINE_VELOCITY          (6.0f)
 
 static bool robot_soft_reset_refine_joint(uint8_t joint_id, uint8_t rounds, float tol_deg)
 {
@@ -808,13 +808,13 @@ static void robot_joint_soft_reset(void)
 			continue;
 		}
 
-		/* 自适应等待：按偏差角度估算行进时间 + 300ms 余量，每 40ms 轮询一次
+		/* 自适应等待：按偏差角度估算行进时间，额外留出加减速和机械负载余量，每 40ms 轮询一次
 		 * ROBOT_RESET_DEFAULT_VELOCITY(rpm) * 6.0 = deg/s */
 		float err_deg_init = fabsf(g_joints_init[i].current_angle - angle);
 		float travel_ms = err_deg_init * 1000.0f / (ROBOT_RESET_DEFAULT_VELOCITY * 6.0f);
-		int max_settle_loops = (int)((travel_ms + 300.0f) / 40.0f);
-		if (max_settle_loops < 8)  max_settle_loops = 8;   /* 最少 320ms */
-		if (max_settle_loops > 75) max_settle_loops = 75;  /* 最多 3s */
+		int max_settle_loops = (int)((travel_ms * 1.5f + 800.0f) / 40.0f);
+		if (max_settle_loops < 15)  max_settle_loops = 15;   /* 最少 600ms */
+		if (max_settle_loops > 125) max_settle_loops = 125;  /* 最多 5s */
 
 		int settle_ok = 0;
 		int stable_hit = 0;

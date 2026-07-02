@@ -19,12 +19,12 @@ extern "C" {
 #define TARGET_PRE_Z                 (-1.5f)      /* 定靶预定位 Z 方向偏移，单位 mm */
 #endif
 
-#define TARGET_KX_MM_PER_PX          (-0.38f)    /* 视觉 dcx 到机械臂 X 小步修正的比例，单位 mm/px */
+#define TARGET_KX_MM_PER_PX          (0.38f)    /* 视觉 dcx 到机械臂 X 小步修正的比例，单位 mm/px */
 #define TARGET_KY_MM_PER_PX          (0.35f)     /* 视觉 dcy 到机械臂 Z 小步修正的比例，单位 mm/px */
-#define TARGET_MAX_STEP_MM           (1.5f)      /* 单次视觉对准最大修正步长，单位 mm */
-#define TARGET_ALIGN_TOL_PX          (20.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
+#define TARGET_MAX_STEP_MM           (2.5f)      /* 单次视觉对准最大修正步长，单位 mm */
+#define TARGET_ALIGN_TOL_PX          (5.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
 #define TARGET_ALIGN_STABLE_COUNT    (3u)        /* 连续满足对准阈值的帧数，达到后进入确认状态 */
-#define TARGET_ALIGN_PERIOD_MS       (200u)      /* 视觉闭环小步修正周期，单位 ms */
+#define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */
 #define TARGET_VISION_VALID_MS       (500u)      /* 视觉数据有效期，超时后退出对准/输出 */
 
 typedef struct
