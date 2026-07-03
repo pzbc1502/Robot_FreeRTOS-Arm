@@ -849,8 +849,8 @@
       <configSetting altId="p506.gpio_mode.gpio_mode_peripheral" configurationId="p506.gpio_mode"/>
       <configSetting altId="p601.input" configurationId="p601"/>
       <configSetting altId="p601.gpio_mode.gpio_mode_in" configurationId="p601.gpio_mode"/>
-      <configSetting altId="p801.output.low" configurationId="p801"/>
-      <configSetting altId="p801.gpio_mode.gpio_mode_out.low" configurationId="p801.gpio_mode"/>
+      <configSetting altId="p801.input" configurationId="p801"/>
+      <configSetting altId="p801.gpio_mode.gpio_mode_in" configurationId="p801.gpio_mode"/>
       <configSetting altId="p802.irq0.irq03" configurationId="p802"/>
       <configSetting altId="p802.gpio_irq.gpio_irq_enabled" configurationId="p802.gpio_irq"/>
       <configSetting altId="p802.gpio_mode.gpio_mode_irq" configurationId="p802.gpio_mode"/>

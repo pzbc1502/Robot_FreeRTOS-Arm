@@ -264,7 +264,7 @@ FSP Configuration
       P707 L15 - - - - Disabled - - "ICU0: IRQ08; SCI3: SDA3; SCI3: TXD3; USB_HS0: USBHS_OVRCURA" - None - - 
       P708 E15 - - - - Disabled - - "CAC0: CACREF; CEC0: CECIO; CTSU0: TS12; ETHERC_MII0: ET0_ETXD3; ICU0: IRQ11; SCI1: RXD1; SCI1: SCL1; SPI1: SSLB3; SSI_COMMON0: AUDIO_CLK" - None - - 
       P800 N3 - - - - Disabled - - "ADC1: AN125; AGT4: AGTOA4; BUS_ASYNCH0: D14; SCI0: CTS0" - None - - 
-      P801 R1 GPIO - Low - "Output mode (Initial Low)" CMOS - "ADC1: AN126; AGT4: AGTOB4; BUS_ASYNCH0: D15; SCI8: CTS8" - IO - - 
+      P801 R1 GPIO - - - "Input mode" - None "ADC1: AN126; AGT4: AGTOB4; BUS_ASYNCH0: D15; SCI8: CTS8" - IO - - 
       P802 P2 ICU0_IRQ03 - - IRQ03 "IRQ mode" - "input pull-up" "ADC1: AN127; ICU0: IRQ03" - IO - - 
       P803 R2 ICU0_IRQ02 - - IRQ02 "IRQ mode" - "input pull-up" "ADC1: AN128; ICU0: IRQ02" - IO - - 
       P804 P3 ICU0_IRQ01 - - IRQ01 "IRQ mode" - "input pull-up" "ICU0: IRQ01" - IO - - 

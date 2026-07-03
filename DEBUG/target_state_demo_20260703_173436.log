@@ -1,0 +1,10 @@
+[17:34:36.203] [INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\target_state_demo_20260703_173436.log
+[17:34:36.203] [INFO] ARM=COM7 JETSON=COM14 baud=115200
+[17:34:36.203] [INFO] start frame: AA 01 01 BB
+[17:34:36.203] [INFO] stop frame: AA 01 00 BB
+[17:34:36.203] [INFO] vision sequence: (9,-10)/2.0s -> (4,-6)/1.0s -> (0,0)/0.0s
+[17:34:36.708] [JETSON-TX] TARGET_CTRL STOP: AA 01 00 BB
+[17:34:36.762] [ARM] [JETSON_RX] target_ctrl=0
+[17:34:36.778] [JETSON-RX] CC 04 00 DD
+[17:34:36.778] [JETSON-STATUS] TARGET_CTRL_OFF func=0x04 value=0x00
+[17:34:36.979] [ARM-TX] laser_off

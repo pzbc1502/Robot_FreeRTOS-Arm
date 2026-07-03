@@ -89,6 +89,8 @@ static int robot_joint_stop(uint8_t joint_id);
 static void robot_joint_stop_all(uint8_t joint_num);
 static int time_func_circle(uint32_t time_ms, struct position *pos);
 static int robot_pid_run(struct position *path, int path_size, float *result);
+static bool robot_joint_wait_target(uint8_t joint_id, float target, float tol_deg, uint32_t timeout_ms);
+static bool robot_auto_final_confirm(float *result, int path_size, float tol_deg);
 static void robot_pid_one_period(float *target_angle, float *feedforward, float *total_error, int joint_num);
 static int robot_pid_remote(void);
 static int robot_mqtt_joints_sync(void);
@@ -683,6 +685,11 @@ static int robot_joint_compare_error(uint8_t joint_id, float raw_angle, float re
 #define ROBOT_SOFT_RESET_REFINE_TOL_DEG           (1.0f)
 #define ROBOT_SOFT_RESET_REFINE_SETTLE_LOOPS      (20)
 #define ROBOT_SOFT_RESET_REFINE_VELOCITY          (6.0f)
+#define ROBOT_JOINT_POS_CONFIRM_TOL_DEG           (3.0f)
+#define ROBOT_JOINT_POS_CONFIRM_STABLE_HITS       (2U)
+#define ROBOT_JOINT_POS_CONFIRM_PERIOD_MS         (40U)
+#define ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS        (3000U)
+#define ROBOT_AUTO_FINAL_CONFIRM_TIMEOUT_MS       (800U)
 
 static bool robot_soft_reset_refine_joint(uint8_t joint_id, uint8_t rounds, float tol_deg)
 {
@@ -745,6 +752,104 @@ static bool robot_soft_reset_refine_joint(uint8_t joint_id, uint8_t rounds, floa
         }
     }
 
+    return false;
+}
+
+static bool robot_joint_wait_target(uint8_t joint_id, float target, float tol_deg, uint32_t timeout_ms)
+{
+    uint32_t start_ms = HAL_GetTick();
+    uint8_t stable_hit = 0u;
+    float last_cur = 0.0f;
+    float last_err = 9999.0f;
+
+    while ((HAL_GetTick() - start_ms) <= timeout_ms) {
+        vTaskDelay(pdMS_TO_TICKS(ROBOT_JOINT_POS_CONFIRM_PERIOD_MS));
+
+        if (robot_update_current_angle_retry(joint_id, 1u) != 0) {
+            stable_hit = 0u;
+            continue;
+        }
+
+        if (robot_joint_compare_error(joint_id, g_robot.joints[joint_id].current_angle,
+                target, &last_err, &last_cur) != 0) {
+            stable_hit = 0u;
+            continue;
+        }
+
+        g_robot.joints[joint_id].current_angle = last_cur;
+        if (last_err <= tol_deg) {
+            stable_hit++;
+            if (stable_hit >= ROBOT_JOINT_POS_CONFIRM_STABLE_HITS) {
+                ROBOT_STATUS_SET(g_robot.joints[joint_id].status, ROBOT_STATUS_READY);
+                return true;
+            }
+        } else {
+            stable_hit = 0u;
+        }
+    }
+
+    ROBOT_STATUS_CLEAR(g_robot.joints[joint_id].status, ROBOT_STATUS_READY);
+    LOG("joint %u position confirm timeout: cur=%.2f target=%.2f err=%.2f tol=%.2f\r\n",
+        (unsigned)joint_id, last_cur, target, last_err, tol_deg);
+    return false;
+}
+
+static bool robot_auto_final_confirm(float *result, int path_size, float tol_deg)
+{
+    uint32_t start_ms = HAL_GetTick();
+    uint8_t stable_hit = 0u;
+    int worst_joint = -1;
+    float worst_err = 0.0f;
+
+    if ((result == NULL) || (path_size <= 0)) {
+        return false;
+    }
+
+    float *target = &result[(path_size - 1) * ROBOT_MAX_JOINT_NUM];
+
+    while ((HAL_GetTick() - start_ms) <= ROBOT_AUTO_FINAL_CONFIRM_TIMEOUT_MS) {
+        uint32_t missing_mask = 0u;
+        (void)robot_update_all_angles(ROBOT_ARM_JOINT_NUM, &missing_mask, NULL);
+
+        bool all_ok = (missing_mask == 0u);
+        worst_joint = -1;
+        worst_err = 0.0f;
+
+        for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
+            float cur = 0.0f;
+            float err = 0.0f;
+            if (robot_joint_compare_error(j, g_robot.joints[j].current_angle,
+                    target[j], &err, &cur) != 0) {
+                all_ok = false;
+                worst_joint = (int)j;
+                worst_err = -1.0f;
+                continue;
+            }
+
+            g_robot.joints[j].current_angle = cur;
+            if (err > worst_err) {
+                worst_err = err;
+                worst_joint = (int)j;
+            }
+            if (err > tol_deg) {
+                all_ok = false;
+            }
+        }
+
+        if (all_ok) {
+            stable_hit++;
+            if (stable_hit >= ROBOT_JOINT_POS_CONFIRM_STABLE_HITS) {
+                return true;
+            }
+        } else {
+            stable_hit = 0u;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(ROBOT_JOINT_POS_CONFIRM_PERIOD_MS));
+    }
+
+    LOG("AUTO final confirm failed: joint %d err=%.2fdeg tol=%.2f, pose invalid.\r\n",
+        worst_joint, worst_err, tol_deg);
     return false;
 }
 
@@ -998,10 +1103,16 @@ static void robot_time_func_move(uint32_t time_limit_ms)
 
 	ret = robot_pid_run(path, path_size, result);
 	if (ret == 0) {
-		g_robot.cur_pos.x = path[path_size -1].x;
-		g_robot.cur_pos.y = path[path_size -1].y;
-		g_robot.cur_pos.z = path[path_size -1].z;
-        robot_try_refresh_joints_feedback(1u);
+        if (robot_auto_final_confirm(result, path_size, ROBOT_JOINT_POS_CONFIRM_TOL_DEG)) {
+		    g_robot.cur_pos.x = path[path_size -1].x;
+		    g_robot.cur_pos.y = path[path_size -1].y;
+		    g_robot.cur_pos.z = path[path_size -1].z;
+            ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_VALID);
+            ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+        } else {
+            ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+            ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+        }
 	}
 }
 
@@ -1077,10 +1188,16 @@ static void robot_auto_move_interpolation(struct robot_event *event)
 
 	ret = robot_pid_run(path, path_size, result);
 	if (ret == 0) {
-		g_robot.cur_pos.x = target_pos->x;
-		g_robot.cur_pos.y = target_pos->y;
-		g_robot.cur_pos.z = target_pos->z;
-        robot_try_refresh_joints_feedback(1u);
+        if (robot_auto_final_confirm(result, path_size, ROBOT_JOINT_POS_CONFIRM_TOL_DEG)) {
+		    g_robot.cur_pos.x = target_pos->x;
+		    g_robot.cur_pos.y = target_pos->y;
+		    g_robot.cur_pos.z = target_pos->z;
+            ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_VALID);
+            ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+        } else {
+            ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+            ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+        }
 	}
     robot_auto_busy_clear();
 }
@@ -1208,13 +1325,25 @@ static void robot_control_task(void *arg)
         switch (event.type) {
             case ROBOT_JOINT_REL_ROTATE:
 				LOG("[joint_id: %d] ROBOT_JOINT_REL_ROTATE %f\n", event.joint_id, event.param[0]);
-                robot_joint_rotate_to((uint32_t)event.joint_id, DIR_POSITIVE,event.param[0],
-						ROBOT_JOINT_DEFAULT_VELOCITY, ROBOT_JOINT_DEFAULT_ACCELERATION, false);
+                if (robot_joint_rotate_to((uint32_t)event.joint_id, DIR_POSITIVE,event.param[0],
+						ROBOT_JOINT_DEFAULT_VELOCITY, ROBOT_JOINT_DEFAULT_ACCELERATION, false) == 0) {
+                    float target = g_robot.joints[event.joint_id].current_angle;
+                    if (!robot_joint_wait_target((uint8_t)event.joint_id, target,
+                            ROBOT_JOINT_POS_CONFIRM_TOL_DEG, ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS)) {
+                        (void)robot_joint_stop((uint8_t)event.joint_id);
+                    }
+                }
                 break; 
 			case ROBOT_JOINT_ABS_ROTATE:
 				LOG("[joint_id: %d] ROBOT_JOINT_ABS_ROTATE %f\n", event.joint_id, event.param[0]);
-				robot_joint_rotate_to((uint32_t)event.joint_id, DIR_POSITIVE, event.param[0],
-					ROBOT_JOINT_DEFAULT_VELOCITY, ROBOT_JOINT_DEFAULT_ACCELERATION, true);
+				if (robot_joint_rotate_to((uint32_t)event.joint_id, DIR_POSITIVE, event.param[0],
+					ROBOT_JOINT_DEFAULT_VELOCITY, ROBOT_JOINT_DEFAULT_ACCELERATION, true) == 0) {
+                    float target = g_robot.joints[event.joint_id].current_angle;
+                    if (!robot_joint_wait_target((uint8_t)event.joint_id, target,
+                            ROBOT_JOINT_POS_CONFIRM_TOL_DEG, ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS)) {
+                        (void)robot_joint_stop((uint8_t)event.joint_id);
+                    }
+                }
 				break;
 			case ROBOT_LIMIT_SWITCH_EVENT:
 				LOG("[joint_id: %d] ROBOT_LIMIT_SWITCH_EVENT\n", event.joint_id);

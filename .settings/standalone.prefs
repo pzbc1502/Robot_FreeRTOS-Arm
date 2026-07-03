@@ -1,4 +1,4 @@
-#Mon Jun 29 12:47:04 GMT+08:00 2026
+#Fri Jul 03 17:42:31 GMT+08:00 2026
 com.renesas.cdt.ddsc.content/com.renesas.cdt.ddsc.content.defaultlinkerscript=script/fsp.scat
 com.renesas.cdt.ddsc.contentgen.options/options/suppresswarningspaths=ra/arm,ra/aws
 com.renesas.cdt.ddsc.packs.componentfiles/AWS\#\#Heaps\#\#FreeRTOS\#\#heap_4\#\#\#\#11.1.0+fsp.6.4.0/all=271572837,ra/aws/FreeRTOS/FreeRTOS/Source/portable/MemMang/heap_4.c
@@ -36,7 +36,7 @@ com.renesas.cdt.ddsc.packs.componentfiles/Renesas\#\#HAL\ Drivers\#\#all\#\#r_sc
 com.renesas.cdt.ddsc.packs.componentfiles/Renesas\#\#Middleware\#\#all\#\#rm_freertos_port\#\#\#\#6.4.0/all=1041992296,ra/fsp/src/rm_freertos_port/port.c|4290761558,ra/fsp/src/rm_freertos_port/portmacro.h
 com.renesas.cdt.ddsc.packs.componentfiles/Renesas\#\#Middleware\#\#all\#\#rm_freertos_port\#\#\#\#6.4.0/libraries=
 com.renesas.cdt.ddsc.project.standalone.projectgenerationoptions/isCpp=false
-com.renesas.cdt.ddsc.settingseditor/com.renesas.cdt.ddsc.settingseditor.active_page=SWPConfigurator
+com.renesas.cdt.ddsc.settingseditor/com.renesas.cdt.ddsc.settingseditor.active_page=PinConfiguration
 com.renesas.cdt.ddsc.threads.configurator/collapse/module.driver.uart_on_sci_uart.1067039595=false
 com.renesas.cdt.ddsc.threads.configurator/collapse/module.driver.uart_on_sci_uart.1246705956=false
 com.renesas.cdt.ddsc.threads.configurator/collapse/module.driver.uart_on_sci_uart.1482277942=false

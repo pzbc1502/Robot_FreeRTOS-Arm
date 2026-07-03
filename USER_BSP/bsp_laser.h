@@ -5,7 +5,7 @@
 #include "hal_data.h"
 
 #ifndef LASER_PIN
-#define LASER_PIN BSP_IO_PORT_00_PIN_15
+#define LASER_PIN BSP_IO_PORT_08_PIN_01
 #endif
 
 #ifndef LASER_FIRE_KEY_PIN
