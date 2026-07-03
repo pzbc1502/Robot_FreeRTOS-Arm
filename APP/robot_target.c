@@ -26,6 +26,7 @@ typedef struct
     int16_t dcx;
     int16_t dcy;
     uint8_t stable_count;
+    uint8_t confirm_stable_count;
     bool has_vision;
     struct position pre;
     struct position target;
@@ -95,8 +96,18 @@ static bool align_in_tolerance(void)
            (fabsf((float)s_target.dcy) <= TARGET_ALIGN_TOL_PX);
 }
 
+static void reset_alignment_counts(void)
+{
+    s_target.stable_count = 0u;
+    s_target.confirm_stable_count = 0u;
+}
+
 static void enter_state(target_state_t state, uint32_t now_ms)
 {
+    if (s_target.state != state)
+    {
+        reset_alignment_counts();
+    }
     s_target.state = state;
     s_target.enter_ms = now_ms;
 }
@@ -184,7 +195,7 @@ void robot_target_step(const target_obs_t *obs)
         case TARGET_INIT:
             force_laser_off();
             s_target.target = s_target.pre;
-            s_target.stable_count = 0u;
+            reset_alignment_counts();
             if (send_target_auto(&s_target.target))
             {
                 enter_state(TARGET_PRE_POSITION, now);
@@ -212,7 +223,7 @@ void robot_target_step(const target_obs_t *obs)
             force_laser_off();
             if (!vision_fresh(now))
             {
-                s_target.stable_count = 0u;
+                reset_alignment_counts();
                 enter_state(TARGET_RECOVER, now);
                 break;
             }
@@ -231,13 +242,21 @@ void robot_target_step(const target_obs_t *obs)
                 break;
             }
 
-            s_target.stable_count = 0u;
+            reset_alignment_counts();
             if ((now - s_target.last_step_ms) >= TARGET_ALIGN_PERIOD_MS)
             {
+                if (robot_is_auto_busy())
+                {
+                    break;
+                }
+
+                float err_px = fmaxf(fabsf((float)s_target.dcx), fabsf((float)s_target.dcy));
+                float step_limit = (err_px <= TARGET_ALIGN_TOL_PX_COARSE) ?
+                                   TARGET_MAX_STEP_MM_FINE : TARGET_MAX_STEP_MM;
                 float dx = clampf_local((float)s_target.dcx * TARGET_KX_MM_PER_PX,
-                                        -TARGET_MAX_STEP_MM, TARGET_MAX_STEP_MM);
+                                        -step_limit, step_limit);
                 float dz = clampf_local((float)s_target.dcy * TARGET_KY_MM_PER_PX,
-                                        -TARGET_MAX_STEP_MM, TARGET_MAX_STEP_MM);
+                                        -step_limit, step_limit);
 
                 s_target.target = g_robot.cur_pos;
                 s_target.target.x += dx;
@@ -267,11 +286,15 @@ void robot_target_step(const target_obs_t *obs)
             {
                 LOG("[TARGET] confirm lost alignment dcx=%d dcy=%d, back to ALIGN\r\n",
                     (int)s_target.dcx, (int)s_target.dcy);
-                s_target.stable_count = 0u;
+                reset_alignment_counts();
                 enter_state(TARGET_ALIGN, now);
                 break;
             }
-            if (fire_allowed)
+            if (new_vision && (s_target.confirm_stable_count < TARGET_CONFIRM_STABLE_COUNT))
+            {
+                s_target.confirm_stable_count++;
+            }
+            if ((s_target.confirm_stable_count >= TARGET_CONFIRM_STABLE_COUNT) && fire_allowed)
             {
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 1u);
                 enter_state(TARGET_OUTPUT, now);
@@ -292,7 +315,7 @@ void robot_target_step(const target_obs_t *obs)
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
                 LOG("[TARGET] output lost alignment dcx=%d dcy=%d, back to ALIGN\r\n",
                     (int)s_target.dcx, (int)s_target.dcy);
-                s_target.stable_count = 0u;
+                reset_alignment_counts();
                 enter_state(TARGET_ALIGN, now);
                 break;
             }
@@ -314,7 +337,7 @@ void robot_target_step(const target_obs_t *obs)
             force_laser_off();
             if (!fire_allowed)
             {
-                s_target.stable_count = 0u;
+                reset_alignment_counts();
                 enter_state(TARGET_WAIT_DETECT, now);
             }
             break;
@@ -324,7 +347,7 @@ void robot_target_step(const target_obs_t *obs)
             force_laser_off();
             if ((now - s_target.enter_ms) >= TARGET_ALIGN_PERIOD_MS)
             {
-                s_target.stable_count = 0u;
+                reset_alignment_counts();
                 enter_state(TARGET_WAIT_DETECT, now);
             }
             break;

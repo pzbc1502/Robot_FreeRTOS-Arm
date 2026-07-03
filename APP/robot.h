@@ -86,6 +86,7 @@ extern "C" {
 #define ROBOT_STATUS_MQTT_CONNECTED         4U      /* MQTT 连接状态标志 */
 #define ROBOT_STATUS_POSE_VALID             5U      /* 当前末端位姿是否可信 */
 #define ROBOT_STATUS_POSE_DEGRADED          6U      /* 位姿进入退化模式(反馈异常但可继续作业) */
+#define ROBOT_STATUS_AUTO_BUSY              7U      /* ROBOT_AUTO_EVENT 已入队或正在执行 */
 
 #define ROBOT_STATUS_MASK(status)           (1u << (uint32_t)(status))
 #define ROBOT_STATUS_IS(x, status)          (((x) & ROBOT_STATUS_MASK(status)) != 0u)     /* 判断状态位是否置位 */
@@ -257,6 +258,7 @@ int robot_send_auto_event(struct position *pos);
 int robot_send_reset_event(bool hard_reset);
 bool robot_is_soft_reset_done(void);
 bool robot_is_hard_reset_done(void);
+bool robot_is_auto_busy(void);
 int robot_send_abs_rotate_event(uint8_t joint_id, float angle);
 int robot_send_remote_event(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);

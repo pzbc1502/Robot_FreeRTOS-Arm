@@ -100,6 +100,8 @@ static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
 static float robot_angle_normalize(float angle);
 static float robot_angle_diff(float cur_angle, float target_angle);
 static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration);
+static void robot_auto_busy_set(void);
+static void robot_auto_busy_clear(void);
 
 
 static robot_time_func g_robot_time_func = time_func_circle; /* 默认时间函数 */
@@ -1003,6 +1005,25 @@ static void robot_time_func_move(uint32_t time_limit_ms)
 	}
 }
 
+static void robot_auto_busy_set(void)
+{
+    taskENTER_CRITICAL();
+    ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    taskEXIT_CRITICAL();
+}
+
+static void robot_auto_busy_clear(void)
+{
+    taskENTER_CRITICAL();
+    ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    taskEXIT_CRITICAL();
+}
+
+bool robot_is_auto_busy(void)
+{
+    return ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+}
+
 static void robot_auto_move_interpolation(struct robot_event *event)
 {
     int ret;
@@ -1012,9 +1033,12 @@ static void robot_auto_move_interpolation(struct robot_event *event)
     struct position *path   = s_path_buf;
     float           *result = s_result_buf;
 
+    robot_auto_busy_set();
+
     /* 生成 S 曲线路径（写入 s_path_buf），返回点数已受 ROBOT_MAX_PATH_SIZE 限制 */
     if (robot_path_interpolation_scurve(target_pos, &path_size) <= 0) {
         LOG("[WARN] scurve path generation failed\r\n");
+        robot_auto_busy_clear();
         return;
     }
 
@@ -1034,6 +1058,7 @@ static void robot_auto_move_interpolation(struct robot_event *event)
 
         if (ret != 0) {
             LOG("robot_auto_move_interpolation robot kinematics inverse failed\n");
+            robot_auto_busy_clear();
             return;
         }
 
@@ -1057,6 +1082,7 @@ static void robot_auto_move_interpolation(struct robot_event *event)
 		g_robot.cur_pos.z = target_pos->z;
         robot_try_refresh_joints_feedback(1u);
 	}
+    robot_auto_busy_clear();
 }
 
 static float robot_angle_normalize(float angle)
@@ -1439,6 +1465,8 @@ int robot_send_abs_rotate_event(uint8_t joint_id, float angle)
 
 int robot_send_auto_event(struct position *pos)
 {
+    BaseType_t queued;
+
     if ((pos == NULL) || (g_robot.event_queue == NULL)) {
         return -1;
     }
@@ -1452,10 +1480,26 @@ int robot_send_auto_event(struct position *pos)
         LOG("AUTO in degraded mode: continue with estimated pose + online compensation.\r\n");
     }
 
+    taskENTER_CRITICAL();
+    bool busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    if (!busy) {
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    }
+    taskEXIT_CRITICAL();
+
+    if (busy) {
+        LOG("reject AUTO: previous ROBOT_AUTO_EVENT still busy.\r\n");
+        return -1;
+    }
+
 	struct robot_event event = {0};
 	event.type = ROBOT_AUTO_EVENT;
 	memcpy(event.param, pos, sizeof(struct position));
-	return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+	queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    if (queued != pdPASS) {
+        robot_auto_busy_clear();
+    }
+	return (int)queued;
 };
 
 int robot_send_time_func_event(float time_limit_ms, float radius_mm)
