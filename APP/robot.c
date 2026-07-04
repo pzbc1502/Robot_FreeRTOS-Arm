@@ -1113,7 +1113,11 @@ static void robot_time_func_move(uint32_t time_limit_ms)
             ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
             ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
         }
-	}
+	} else {
+        /* PID aborted before the final target; old Cartesian pose is no longer trustworthy. */
+        ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+    }
 }
 
 static void robot_auto_busy_set(void)
@@ -1198,7 +1202,11 @@ static void robot_auto_move_interpolation(struct robot_event *event)
             ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
             ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
         }
-	}
+	} else {
+        /* PID aborted before the final target; old Cartesian pose is no longer trustworthy. */
+        ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+    }
     robot_auto_busy_clear();
 }
 
@@ -1238,8 +1246,9 @@ static float robot_angle_diff(float cur_angle, float target_angle)
 
 /* 各关节独立比例系数（单位: 1/s）
  * J2(Kp=4.0): 减速比99.99，已调好
- * J3(Kp=2.5): 承载前臂重量，稳态滞后1.7°，上调至2.5 */
-static const float ROBOT_JOINT_KP[ROBOT_MAX_JOINT_NUM] = {0.65f, 4.0f, 2.50f, 1.00f, 1.00f, 10.0f};
+ * J3(Kp=2.5): 承载前臂重量，稳态滞后1.7°，上调至2.5
+ * J4/J5(Kp=2.0): 小步提高末端跟随力度，避免 3.5/4.5 对运动手感影响过大 */
+static const float ROBOT_JOINT_KP[ROBOT_MAX_JOINT_NUM] = {0.65f, 4.0f, 2.50f, 2.00f, 2.00f, 10.0f};
 
 static int robot_pid_run(struct position *path, int path_size, float *result)
 {
@@ -1288,7 +1297,7 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 	robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
 	if (sample_count > 0) {
 		for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
-			LOG("[jpint %d] ave_error:%.2f\n", j + 1, total_error[j] / (float)sample_count);
+			LOG("[joint %d] ave_error:%.2f\n", j + 1, total_error[j] / (float)sample_count);
 		}
 	}
 

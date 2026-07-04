@@ -43,6 +43,42 @@ def test_document_marks_49_done() -> None:
     require(DOC, "robot_auto_final_confirm", "document auto final confirm")
 
 
+def test_settle_tail_remains_fixed_short_window() -> None:
+    """当前可用版本保留固定 10 周期末端稳定段，不引入自适应稳定逻辑。"""
+    pid_run = ROBOT_C.split("static int robot_pid_run(", 1)[1].split("static void robot_joints_sync_to", 1)[0]
+    settle_tail = pid_run.split("前馈清零", 1)[1].split("robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);", 1)[0]
+
+    require(settle_tail, "for (int k = 0; k < ROBOT_PID_SETTLE_PERIODS; k++)",
+            "fixed settle loop")
+    require(settle_tail, "robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);",
+            "settle loop keeps final target")
+    assert "ROBOT_JOINT_POS_CONFIRM_TOL_DEG" not in settle_tail, \
+        "settle tail must not reintroduce adaptive confirm logic"
+
+
+def test_settle_periods_is_documented_as_timeout_upper_bound() -> None:
+    require(DOC, "ROBOT_PID_SETTLE_PERIODS", "settle periods constant documented")
+    require(DOC, "100ms", "settle periods documented as fixed 100ms window")
+
+
+def test_pid_run_failure_also_degrades_pose() -> None:
+    """robot_pid_run() 中途异常返回(ret!=0)时也要清 POSE_VALID/置 POSE_DEGRADED，
+    否则半路中止会让软件位姿保留上一次成功的旧状态。"""
+    for anchor, end in (
+        ("static void robot_auto_move_interpolation", "static float robot_angle_normalize"),
+        ("static void robot_time_func_move", "static void robot_auto_busy_set"),
+    ):
+        func = ROBOT_C.split(anchor, 1)[1].split(end, 1)[0]
+        call_index = func.index("robot_pid_run(")
+        if_index = func.index("if (ret == 0)", call_index)
+        else_head = func.rsplit("} else {", 1)[1]
+        require(else_head, "ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID)",
+                f"{anchor}: else branch clears POSE_VALID")
+        require(else_head, "ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED)",
+                f"{anchor}: else branch sets POSE_DEGRADED")
+        assert if_index < func.index(else_head), "else branch must follow the ret==0 check"
+
+
 if __name__ == "__main__":
     tests = [
         test_joint_position_wait_helper_exists,
@@ -50,6 +86,9 @@ if __name__ == "__main__":
         test_auto_updates_pose_only_after_final_confirm,
         test_time_func_updates_pose_only_after_final_confirm,
         test_document_marks_49_done,
+        test_settle_tail_remains_fixed_short_window,
+        test_settle_periods_is_documented_as_timeout_upper_bound,
+        test_pid_run_failure_also_degrades_pose,
     ]
     for test in tests:
         test()

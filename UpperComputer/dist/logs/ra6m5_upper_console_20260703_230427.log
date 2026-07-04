@@ -1,0 +1,244 @@
+[23:04:28.039] [APP-INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\dist\logs\ra6m5_upper_console_20260703_230427.log
+[23:04:41.938] [ARM-INFO] opened COM7 @ 115200
+[23:04:42.658] [JETSON-INFO] opened COM14 @ 115200
+[23:04:58.247] [JETSON-INFO] periodic vision stopped
+[23:04:58.247] [ARM-TX] target_disable: target_disable
+[23:04:58.248] [ARM-TX] laser_off: laser_off
+[23:04:58.248] [APP-SAFETY] stopped vision; sent target_disable and laser_off
+[23:04:58.348] [ARM-RX] Found handler for 'target_disable', executing...
+[23:04:58.348] [ARM-RX] target_disable
+[23:04:58.348] [ARM-RX] Found handler for 'laser_off', executing...
+[23:04:58.350] [ARM-RX] laser_off
+[23:05:00.795] [JETSON-INFO] periodic vision stopped
+[23:05:00.796] [ARM-TX] target_disable: target_disable
+[23:05:00.796] [ARM-TX] laser_off: laser_off
+[23:05:00.796] [APP-SAFETY] stopped vision; sent target_disable and laser_off
+[23:05:00.835] [ARM-RX] Found handler for 'target_disable', executing...
+[23:05:00.835] [ARM-RX] target_disable
+[23:05:00.835] [ARM-RX] Found handler for 'laser_off', executing...
+[23:05:00.835] [ARM-RX] laser_off
+[23:05:02.496] [JETSON-INFO] periodic vision stopped
+[23:05:02.496] [ARM-TX] target_disable: target_disable
+[23:05:02.497] [ARM-TX] laser_off: laser_off
+[23:05:02.497] [APP-SAFETY] stopped vision; sent target_disable and laser_off
+[23:05:02.561] [ARM-RX] Found handler for 'target_disable', executing...
+[23:05:02.561] [ARM-RX] target_disable
+[23:05:02.561] [ARM-RX] Found handler for 'laser_off', executing...
+[23:05:02.561] [ARM-RX] laser_off
+[23:05:51.086] [JETSON-INFO] vision sequence started: 15,-10:2;8,-5:1;0,0:0
+[23:05:51.086] [JETSON-TX] VISION dcx=15 dcy=-10: FF 05 03 0F 00 F6 FF 0C FE
+[23:05:51.216] [ARM-RX] [JETSON_RX] vision dcx=15 dcy=-10
+[23:05:51.216] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=15 dcy=-10 stable=0
+[23:05:51.288] [JETSON-TX] VISION dcx=15 dcy=-10: FF 05 03 0F 00 F6 FF 0C FE
+[23:05:51.340] [ARM-RX] [JETSON_RX] vision dcx=15 dcy=-10
+[23:05:51.340] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=15 dcy=-10 stable=0
+[23:05:51.489] [JETSON-TX] VISION dcx=8 dcy=-5: FF 05 03 08 00 FB FF 0A FE
+[23:05:51.526] [ARM-RX] [JETSON_RX] vision dcx=8 dcy=-5
+[23:05:51.526] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=8 dcy=-5 stable=0
+[23:05:51.690] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:51.713] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:51.713] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:51.891] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:51.963] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:51.963] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:52.093] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:52.149] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:52.149] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:52.294] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:52.336] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:52.336] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:52.495] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:52.525] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:52.525] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:52.696] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:52.711] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:52.711] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:52.896] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:52.960] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:52.960] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:53.097] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:53.147] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:53.147] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:53.298] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:53.333] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:53.335] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:53.499] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:53.520] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:53.521] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:53.700] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:53.772] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:53.772] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:53.901] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:53.959] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:53.959] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:54.101] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:54.144] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:54.144] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:54.302] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:54.330] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:54.330] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:54.503] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:54.516] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:54.516] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:54.704] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:54.767] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:54.767] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:54.905] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:54.952] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:54.952] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:55.105] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:55.135] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:55.135] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:55.306] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:55.322] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:55.322] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:55.507] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:55.572] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:55.572] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:55.708] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:55.760] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:55.760] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:55.909] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:55.948] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:55.948] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:56.110] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:56.136] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:56.136] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:56.311] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:56.386] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:56.386] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:56.512] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:56.572] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:56.572] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:56.713] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:56.757] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:56.757] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:56.914] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:56.944] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:56.945] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:57.114] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:57.132] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:57.132] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:57.315] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:57.382] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:57.382] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:57.516] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:57.569] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:57.570] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:57.716] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:57.756] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:57.756] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:57.917] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:57.944] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:57.944] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:58.118] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:58.131] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:58.131] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:58.319] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:58.379] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:58.380] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:58.519] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:58.566] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:58.566] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:58.720] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:58.751] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:58.751] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:58.922] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:58.940] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:58.940] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:59.122] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:59.188] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:59.190] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:59.323] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:59.374] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:59.374] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:59.524] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:59.562] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:59.562] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:59.725] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:59.749] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:59.749] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:05:59.926] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:05:59.996] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:05:59.996] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:00.127] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:00.183] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:00.183] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:00.328] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:00.373] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:00.373] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:00.528] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:00.558] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:00.558] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:00.729] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:00.746] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:00.746] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:00.930] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:00.994] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:00.996] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:01.131] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:01.180] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:01.180] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:01.332] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:01.368] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:01.368] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:01.532] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:01.553] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:01.553] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:01.733] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:01.801] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:01.801] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:01.934] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:01.990] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:01.990] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:02.135] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:02.181] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:02.181] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:02.336] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:02.368] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:02.368] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:02.537] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:02.555] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:02.555] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:02.738] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:02.804] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:02.804] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:02.938] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:02.990] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:02.990] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:03.139] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:03.178] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:03.178] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:03.340] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:03.364] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:03.364] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:03.428] [JETSON-INFO] periodic vision stopped
+[23:06:06.095] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:06.168] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:06.168] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:07.057] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:07.104] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:07.105] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:06:07.878] [JETSON-TX] VISION dcx=0 dcy=0: FF 05 03 00 00 00 00 08 FE
+[23:06:07.913] [ARM-RX] [JETSON_RX] vision dcx=0 dcy=0
+[23:06:07.913] [ARM-RX] [TARGET] vision state=INIT enabled=0 dcx=0 dcy=0 stable=0
+[23:07:40.441] [ARM-RX] BSP_UART_Init Success!!!
+[23:07:40.442] [ARM-RX] BSP_CAN_Init Success!!!
+[23:07:40.442] [ARM-RX] robot control task runing!!!
+[23:07:40.442] [ARM-RX] robot cmd service task ready and running!
+[23:07:41.560] [ARM-RX] BSP_UART_Init Success!!!
+[23:07:41.560] [ARM-RX] BSP_CAN_Init Success!!!
+[23:07:41.561] [ARM-RX] robot control task runing!!!
+[23:07:41.561] [ARM-RX] robot cmd service task ready and running!
+[23:08:40.256] [JETSON-INFO] periodic vision stopped
+[23:08:40.257] [JETSON-INFO] closed
+[23:08:41.440] [ARM-INFO] closed
+[23:08:43.636] [JETSON-INFO] periodic vision stopped
+[23:08:43.636] [ARM-ERROR] ARM serial is not open
+[23:08:43.636] [ARM-ERROR] ARM serial is not open
+[23:08:43.636] [APP-SAFETY] stopped vision; sent target_disable and laser_off
+[23:08:44.257] [JETSON-INFO] periodic vision stopped
+[23:08:44.257] [ARM-ERROR] ARM serial is not open
+[23:08:44.257] [ARM-ERROR] ARM serial is not open
+[23:08:44.257] [APP-SAFETY] stopped vision; sent target_disable and laser_off
+[23:09:03.550] [JETSON-INFO] periodic vision stopped

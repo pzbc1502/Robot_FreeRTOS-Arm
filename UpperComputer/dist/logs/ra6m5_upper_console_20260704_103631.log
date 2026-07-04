@@ -1,0 +1,4 @@
+[10:36:31.890] [APP-INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\dist\logs\ra6m5_upper_console_20260704_103631.log
+[10:41:36.179] [ARM-INFO] opened COM7 @ 115200
+[10:41:42.111] [ARM-INFO] closed
+[10:41:43.397] [JETSON-INFO] periodic vision stopped

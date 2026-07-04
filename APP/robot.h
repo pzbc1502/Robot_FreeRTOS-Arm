@@ -96,7 +96,7 @@ extern "C" {
 #define ROBOT_CAN_DELAY                     5       /* CAN 发送/接收等待延时，单位 ms */
 
 #define ROBOT_PID_PERIOD                    (10)    /* 控制周期，单位 ms (100Hz) */
-#define ROBOT_PID_SETTLE_PERIODS            (10)     /* 末端稳定段：前馈清零后额外执行的周期数(50ms) */
+#define ROBOT_PID_SETTLE_PERIODS            (10)     /* 末端稳定段：前馈清零后额外执行的周期数(100ms) */
 #define ROBOT_FF_OUTPUT_LIMIT               (200.0f)/* 前馈+P 输出限幅，单位 °/s */
 
 #define ROBOT_CAN_TIMEOUT                   (15)    /* CAN 通信超时时间，单位 ms */
