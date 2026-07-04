@@ -10,9 +10,10 @@ from pathlib import Path
 
 import serial
 from serial.tools import list_ports
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QGridLayout,
     QGroupBox,
@@ -30,6 +31,10 @@ from PySide6.QtWidgets import (
 APP_TITLE = "RA6M5 Robot Serial Console"
 DEFAULT_BAUD = 115200
 ARM_HISTORY_LIMIT = 15
+SETTINGS_ORG = "RA6M5Robot"
+SETTINGS_APP = "UpperConsole"
+DEFAULT_DEMO_SEQUENCE = "30,-20:5;15,-10:5;8,-5:5;0,0:0"
+DEFAULT_DEMO_PERIOD_MS = "200"
 JETSON_SOF = 0xFF
 JETSON_EOF = 0xFE
 JETSON_LEN = 0x05
@@ -194,12 +199,16 @@ class QtUpperConsole(QMainWindow):
         super().__init__()
         self.setWindowTitle(APP_TITLE)
         self.resize(1180, 760)
+        self.settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
         self.logger = SessionLogger(log_dir or (Path.cwd() / "logs"))
         self.log_queue: queue.Queue[str] = queue.Queue()
         self.arm = SerialChannel("ARM", self)
         self.jetson = SerialChannel("JETSON", self)
         self.vision_stop = threading.Event()
+        self.demo_stop = threading.Event()
+        self.ra6_events = {name: threading.Event() for name in STATUS_NAMES.values()}
         self.status_labels: dict[str, QLabel] = {}
+        self.status_dots: dict[str, QLabel] = {}
         self._build_ui()
         self.refresh_ports()
         self.timer = QTimer(self)
@@ -335,18 +344,72 @@ class QtUpperConsole(QMainWindow):
         row.addWidget(self.sequence)
         row.addWidget(self._button("运行序列", self.run_vision_sequence))
         layout.addLayout(row)
+        layout.addWidget(self._target_demo_group())
+        return group
+
+    def _target_demo_group(self) -> QGroupBox:
+        group = QGroupBox("一键定靶演示")
+        layout = QVBoxLayout(group)
+        self.demo_sequence = QLineEdit(self._settings_text("demo/sequence", DEFAULT_DEMO_SEQUENCE))
+        self.demo_period_ms = QLineEdit(self._settings_text("demo/period_ms", DEFAULT_DEMO_PERIOD_MS))
+        row = QHBoxLayout()
+        row.addWidget(QLabel("序列"))
+        row.addWidget(self.demo_sequence, 1)
+        row.addWidget(QLabel("ms"))
+        row.addWidget(self.demo_period_ms)
+        layout.addLayout(row)
+
+        self.demo_send_enable = QCheckBox("先启动状态机")
+        self.demo_wait_ready = QCheckBox("等待READY")
+        self.demo_prompt_p000 = QCheckBox("对准后提示按P000")
+        self.demo_auto_stop = QCheckBox("输出关闭后自动停止")
+        for checkbox, key, default in (
+            (self.demo_send_enable, "demo/send_enable", True),
+            (self.demo_wait_ready, "demo/wait_ready", True),
+            (self.demo_prompt_p000, "demo/prompt_p000", True),
+            (self.demo_auto_stop, "demo/auto_stop", True),
+        ):
+            checkbox.setChecked(self._settings_bool(key, default))
+        row = QHBoxLayout()
+        for checkbox in (self.demo_send_enable, self.demo_wait_ready, self.demo_prompt_p000, self.demo_auto_stop):
+            row.addWidget(checkbox)
+        layout.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(self._button("一键定靶演示", self.start_target_demo))
+        row.addWidget(self._button("停止演示", self.stop_target_demo))
+        row.addWidget(self._button("保存演示配置", self.save_demo_settings))
+        layout.addLayout(row)
         return group
 
     def _status_group(self) -> QGroupBox:
         group = QGroupBox("状态")
         grid = QGridLayout(group)
-        keys = ["ARM_PORT", "JETSON_PORT", "POSE_VALID", "TARGET_CTRL", "READY", "ALIGN_DONE", "OUTPUT", "ERROR"]
+        keys = ["ARM_PORT", "JETSON_PORT", "POSE_VALID", "TARGET_CTRL", "READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"]
         for idx, key in enumerate(keys):
+            dot = QLabel()
+            dot.setFixedSize(14, 14)
+            self.status_dots[key] = dot
+            self._set_status_dot(key, "gray")
             label = QLabel(f"{key}: -")
             label.setMinimumWidth(190)
             self.status_labels[key] = label
-            grid.addWidget(label, idx // 4, idx % 4)
+            cell = QHBoxLayout()
+            cell.addWidget(dot)
+            cell.addWidget(label)
+            wrapper = QWidget()
+            wrapper.setLayout(cell)
+            grid.addWidget(wrapper, idx // 3, idx % 3)
         return group
+
+    def _settings_text(self, key: str, default: str) -> str:
+        return str(self.settings.value(key, default))
+
+    def _settings_bool(self, key: str, default: bool) -> bool:
+        value = self.settings.value(key, default)
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in {"1", "true", "yes", "on"}
 
     def _button(self, text: str, callback) -> QPushButton:
         button = QPushButton(text)
@@ -489,6 +552,68 @@ class QtUpperConsole(QMainWindow):
         threading.Thread(target=self._sequence_loop, args=(sequence, period), daemon=True).start()
         self.emit_log("JETSON", "INFO", f"vision sequence started: {self.sequence.text()}")
 
+    def save_demo_settings(self) -> None:
+        self.settings.setValue("demo/sequence", self.demo_sequence.text())
+        self.settings.setValue("demo/period_ms", self.demo_period_ms.text())
+        self.settings.setValue("demo/send_enable", self.demo_send_enable.isChecked())
+        self.settings.setValue("demo/wait_ready", self.demo_wait_ready.isChecked())
+        self.settings.setValue("demo/prompt_p000", self.demo_prompt_p000.isChecked())
+        self.settings.setValue("demo/auto_stop", self.demo_auto_stop.isChecked())
+        self.settings.sync()
+        self.emit_log("DEMO", "INFO", "演示配置已保存")
+
+    def start_target_demo(self) -> None:
+        try:
+            sequence = parse_vision_sequence(self.demo_sequence.text())
+            period = max(20, int(self.demo_period_ms.text()))
+        except Exception as exc:
+            self.emit_log("DEMO", "ERROR", str(exc))
+            return
+        if not self.jetson.is_open():
+            self.emit_log("DEMO", "ERROR", "Jetson模拟串口未打开，无法开始一键定靶演示。")
+            return
+        self.save_demo_settings()
+        self._clear_ra6_events()
+        self.demo_stop.clear()
+        self.vision_stop.set()
+        options = (
+            self.demo_send_enable.isChecked(),
+            self.demo_wait_ready.isChecked(),
+            self.demo_prompt_p000.isChecked(),
+            self.demo_auto_stop.isChecked(),
+        )
+        threading.Thread(target=self._target_demo_loop, args=(sequence, period, options), daemon=True).start()
+        self.emit_log("DEMO", "INFO", "一键定靶演示开始")
+
+    def stop_target_demo(self) -> None:
+        self.demo_stop.set()
+        self.stop_periodic_vision()
+        if self.jetson.is_open():
+            self.send_target_ctrl(False)
+        self.send_arm_command("laser_off")
+        self.emit_log("DEMO", "INFO", "演示已停止，已关闭视觉发送和激光输出")
+
+    def _target_demo_loop(self, sequence: list[tuple[int, int, int]], period_ms: int, options: tuple[bool, bool, bool, bool]) -> None:
+        send_enable, wait_ready, prompt_p000, auto_stop = options
+        if send_enable:
+            self.send_target_ctrl(True)
+        if wait_ready and not self._wait_ra6_event("READY", 12.0):
+            self.emit_log("DEMO", "ERROR", "未收到 READY，演示停止。请先确认 soft_reset 和状态机启动。")
+            return
+
+        self.vision_stop.clear()
+        threading.Thread(target=self._sequence_loop, args=(sequence, period_ms), daemon=True).start()
+        self.emit_log("DEMO", "INFO", f"开始发送视觉序列: {self.demo_sequence.text()}")
+
+        if prompt_p000 and self._wait_ra6_event("ALIGN_DONE", 30.0):
+            self.emit_log("DEMO", "ACTION", "已对准：请按住 P000 KEY 允许激光输出。")
+        if prompt_p000 and self._wait_ra6_event("OUTPUT_ON", 30.0):
+            self.emit_log("DEMO", "ACTION", "激光已输出：需要关闭时松开 P000 KEY。")
+        if auto_stop and self._wait_ra6_event("OUTPUT_OFF", 60.0):
+            self.stop_periodic_vision()
+            self.send_target_ctrl(False)
+            self.emit_log("DEMO", "INFO", "检测到 OUTPUT_OFF，演示流程结束。")
+
     def _sequence_loop(self, sequence: list[tuple[int, int, int]], period_ms: int) -> None:
         for dcx, dcy, count in sequence:
             if self.vision_stop.is_set():
@@ -531,12 +656,21 @@ class QtUpperConsole(QMainWindow):
             self._set_status("POSE_VALID", "YES")
         elif "pose invalid" in lower or "final fail" in lower:
             self._set_status("POSE_VALID", "NO")
+        if "state=confirm" in lower:
+            self._set_status("CONFIRMING", "YES", "yellow")
+        elif "state=output" in lower or "state=done" in lower or "state=recover" in lower:
+            self._set_status("CONFIRMING", "NO")
 
     def _update_ra6_status(self, name: str) -> None:
+        if name in self.ra6_events:
+            self.ra6_events[name].set()
         if name == "TARGET_CTRL_ON":
             self._set_status("TARGET_CTRL", "ON")
         elif name == "TARGET_CTRL_OFF":
             self._set_status("TARGET_CTRL", "OFF")
+            self._set_status("READY", "-")
+            self._set_status("ALIGN_DONE", "-")
+            self._set_status("CONFIRMING", "-")
             self._set_status("OUTPUT", "OFF")
         elif name == "READY":
             self._set_status("READY", "YES")
@@ -549,8 +683,41 @@ class QtUpperConsole(QMainWindow):
         elif name == "ERROR":
             self._set_status("ERROR", "YES")
 
-    def _set_status(self, key: str, value: str) -> None:
+    def _set_status(self, key: str, value: str, color: str | None = None) -> None:
         self.status_labels[key].setText(f"{key}: {value}")
+        self._set_status_dot(key, color or self._status_color(key, value))
+
+    def _status_color(self, key: str, value: str) -> str:
+        if key == "ERROR" and value == "YES":
+            return "red"
+        if value in {"YES", "ON"} or value.startswith("已打开"):
+            return "green"
+        return "gray"
+
+    def _set_status_dot(self, key: str, color: str) -> None:
+        colors = {
+            "green": "#22c55e",
+            "gray": "#9ca3af",
+            "red": "#ef4444",
+            "yellow": "#f59e0b",
+        }
+        self.status_dots[key].setStyleSheet(
+            f"background-color: {colors[color]}; border-radius: 7px; border: 1px solid #6b7280;"
+        )
+
+    def _clear_ra6_events(self) -> None:
+        for event in self.ra6_events.values():
+            event.clear()
+
+    def _wait_ra6_event(self, name: str, timeout_s: float) -> bool:
+        deadline = time.monotonic() + timeout_s
+        event = self.ra6_events[name]
+        while time.monotonic() < deadline and not self.demo_stop.is_set():
+            if self.ra6_events["ERROR"].is_set():
+                return False
+            if event.wait(0.1):
+                return True
+        return False
 
     def clear_visible_log(self) -> None:
         self.log_text.clear()
@@ -569,6 +736,7 @@ class QtUpperConsole(QMainWindow):
             self.log_text.append(line)
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        self.demo_stop.set()
         self.stop_periodic_vision()
         self.arm.close()
         self.jetson.close()

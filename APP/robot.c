@@ -190,7 +190,7 @@ uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acc
 
 	// 将速度值转换为电机所需的 RPM 单位并记录到关节状态
 	joint->velocity = velocity;
-	uint16_t _velocity = (uint16_t)fabsf(velocity * 600.0f * joint->reduction_ratio / 360.0f);
+	uint16_t _velocity = (uint16_t)fabsf(velocity * 60.0f * joint->reduction_ratio / 360.0f);
 	
 	// 发送速度控制命令（请求-应答需要串行化，否则会和夹爪/读角度互抢回包）
     if (!BSP_CAN_Lock(200)) {
@@ -227,7 +227,7 @@ static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8
 
     ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_LIMIT_ENABLE);
     joint->velocity = velocity;
-    uint16_t rpm = (uint16_t)fabsf(velocity * 600.0f * joint->reduction_ratio / 360.0f);
+    uint16_t rpm = (uint16_t)fabsf(velocity * 60.0f * joint->reduction_ratio / 360.0f);
 
     /* 与并行读角度共用总线，加锁但不等回包，发完立即释放 */
     if (!BSP_CAN_Lock(20u)) {
@@ -850,6 +850,12 @@ static bool robot_auto_final_confirm(float *result, int path_size, float tol_deg
 
     LOG("AUTO final confirm failed: joint %d err=%.2fdeg tol=%.2f, pose invalid.\r\n",
         worst_joint, worst_err, tol_deg);
+    /* 逐关节 cur/target/err，供前馈系数(ROBOT_JOINT_FF_GAIN)下一轮调参 */
+    for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
+        LOG("  J%u cur=%.2f target=%.2f err=%.2f\r\n",
+            (unsigned int)(j + 1u), g_robot.joints[j].current_angle,
+            target[j], robot_angle_diff(g_robot.joints[j].current_angle, target[j]));
+    }
     return false;
 }
 
@@ -1248,7 +1254,14 @@ static float robot_angle_diff(float cur_angle, float target_angle)
  * J2(Kp=4.0): 减速比99.99，已调好
  * J3(Kp=2.5): 承载前臂重量，稳态滞后1.7°，上调至2.5
  * J4/J5(Kp=2.0): 小步提高末端跟随力度，避免 3.5/4.5 对运动手感影响过大 */
-static const float ROBOT_JOINT_KP[ROBOT_MAX_JOINT_NUM] = {0.65f, 4.0f, 2.50f, 2.00f, 2.00f, 10.0f};
+static const float ROBOT_JOINT_KP[ROBOT_MAX_JOINT_NUM] = {0.65f, 3.00f, 3.00f, 2.00f, 2.30f, 10.0f};
+
+/* 各关节独立前馈系数（无量纲，1.0 = 全量前馈）
+ * AUTO 速度环 = FF_GAIN[j]*前馈 + Kp[j]*误差。前馈过大时实际电机跑得比 S 曲线
+ * 规划更远，误差随移位比例放大（实测 auto 0 -30/-50 时 J3 偏差 7.7°/13°，呈比例）。
+ * 这是比例型跟踪偏差，不是单点 Kp 问题，故对偏差最大的 J2/J3/J5 降前馈系数，
+ * 其余保持 1.0。数值为首版起点，需按实测 cur/target/err 逐轮细调。 */
+static const float ROBOT_JOINT_FF_GAIN[ROBOT_MAX_JOINT_NUM] = {1.0f, 0.65f, 0.55f, 1.0f, 0.60f, 1.0f};
 
 static int robot_pid_run(struct position *path, int path_size, float *result)
 {
@@ -1258,7 +1271,7 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 	float feedforward[ROBOT_MAX_JOINT_NUM] = {0};
 	float total_error[ROBOT_MAX_JOINT_NUM] = {0};
 	int sample_count = 0;
-
+  
 	for (p = 1; p < path_size; p++) {
 		for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
 			float angle = result[p * ROBOT_MAX_JOINT_NUM + j];
@@ -1420,7 +1433,7 @@ static void robot_pid_one_period(float *target_angle, float *feedforward, float 
 		if (total_error != NULL) {
 			total_error[j] += fabsf(error);
 		}
-		float v = feedforward[j] + ROBOT_JOINT_KP[j] * error;
+		float v = ROBOT_JOINT_FF_GAIN[j] * feedforward[j] + ROBOT_JOINT_KP[j] * error;
 		if (v >  ROBOT_FF_OUTPUT_LIMIT) v =  ROBOT_FF_OUTPUT_LIMIT;
 		if (v < -ROBOT_FF_OUTPUT_LIMIT) v = -ROBOT_FF_OUTPUT_LIMIT;
 		robot_joint_velocity_nowait((uint32_t)j, v, ROBOT_JOINT_DEFAULT_ACCELERATION);

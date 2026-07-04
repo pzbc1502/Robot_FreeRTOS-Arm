@@ -61,6 +61,19 @@ def test_settle_periods_is_documented_as_timeout_upper_bound() -> None:
     require(DOC, "100ms", "settle periods documented as fixed 100ms window")
 
 
+def test_per_joint_feedforward_gain_applied() -> None:
+    """AUTO 速度环用 ROBOT_JOINT_FF_GAIN[j] 缩放前馈，修比例型跟踪偏差(非单点Kp)。"""
+    require(ROBOT_C, "ROBOT_JOINT_FF_GAIN[ROBOT_MAX_JOINT_NUM]", "per-joint FF gain array")
+    require(ROBOT_C, "ROBOT_JOINT_FF_GAIN[j] * feedforward[j] + ROBOT_JOINT_KP[j] * error",
+            "FF gain applied in velocity law")
+
+
+def test_final_confirm_dumps_per_joint_error() -> None:
+    """确认失败时逐关节打印 cur/target/err，供下一轮前馈调参。"""
+    confirm = ROBOT_C.split("static bool robot_auto_final_confirm", 1)[1].split("static void robot_joint_soft_reset", 1)[0]
+    require(confirm, "cur=%.2f target=%.2f err=%.2f", "per-joint cur/target/err dump")
+
+
 def test_pid_run_failure_also_degrades_pose() -> None:
     """robot_pid_run() 中途异常返回(ret!=0)时也要清 POSE_VALID/置 POSE_DEGRADED，
     否则半路中止会让软件位姿保留上一次成功的旧状态。"""
@@ -88,6 +101,8 @@ if __name__ == "__main__":
         test_document_marks_49_done,
         test_settle_tail_remains_fixed_short_window,
         test_settle_periods_is_documented_as_timeout_upper_bound,
+        test_per_joint_feedforward_gain_applied,
+        test_final_confirm_dumps_per_joint_error,
         test_pid_run_failure_also_degrades_pose,
     ]
     for test in tests:

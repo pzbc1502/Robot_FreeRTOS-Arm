@@ -1,0 +1,10 @@
+[18:02:06.006] [ARM-ERROR] could not open port 'COM7': PermissionError(13, '拒绝访问。', None, 5)
+[18:02:12.567] [ARM-INFO] opened COM7 @ 115200
+[18:02:14.838] [ARM-TX] 发送命令 soft_reset: soft_reset
+[18:02:18.463] [ARM-TX] 发送命令 soft_reset: soft_reset
+[18:02:18.973] [ARM-TX] 发送命令 soft_reset: soft_reset
+[18:02:21.174] [JETSON-INFO] 已停止周期视觉发送
+[18:02:21.175] [ARM-TX] 发送命令 target_disable: target_disable
+[18:02:21.176] [ARM-TX] 发送命令 laser_off: laser_off
+[18:02:21.177] [APP-SAFETY] 已停止视觉发送，并发送 target_disable / laser_off
+[18:02:33.120] [JETSON-INFO] 已停止周期视觉发送
