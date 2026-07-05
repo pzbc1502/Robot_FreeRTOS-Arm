@@ -1,0 +1,4 @@
+[22:41:47.134] [APP-INFO] 已刷新串口: COM7, COM16, COM14
+[22:41:47.134] [APP-INFO] log file: logs\ra6m5_upper_console_20260704_224146.log
+[22:41:47.142] [ARM-ERROR] ARM串口未打开，命令未发送: soft_reset
+[22:41:47.145] [JETSON-INFO] 已停止周期视觉发送

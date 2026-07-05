@@ -154,6 +154,46 @@ def test_status_lights_follow_ra6_status() -> None:
         window.close()
 
 
+def test_closing_ports_clears_unknown_runtime_status_lights() -> None:
+    window = _new_window()
+    try:
+        window._set_status("POSE_VALID", "YES")
+        window.close_channel(window.arm)
+        assert window.status_labels["POSE_VALID"].text() == "POSE_VALID: -"
+        assert "background-color: #9ca3af" in window.status_dots["POSE_VALID"].styleSheet()
+
+        for name in ("TARGET_CTRL_ON", "READY", "ALIGN_DONE", "OUTPUT_ON", "ERROR"):
+            window._update_ra6_status(name)
+        window.close_channel(window.jetson)
+        for key in ("TARGET_CTRL", "READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"):
+            assert window.status_labels[key].text() == f"{key}: -"
+            assert "background-color: #9ca3af" in window.status_dots[key].styleSheet()
+    finally:
+        window.close()
+
+
+def test_target_restart_and_stop_clear_stale_target_lights() -> None:
+    window = _new_window()
+    try:
+        for name in ("TARGET_CTRL_ON", "READY", "ALIGN_DONE", "OUTPUT_ON", "ERROR"):
+            window._update_ra6_status(name)
+
+        window._update_ra6_status("TARGET_CTRL_ON")
+        for key in ("READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"):
+            assert window.status_labels[key].text() == f"{key}: -"
+            assert "background-color: #9ca3af" in window.status_dots[key].styleSheet()
+
+        window._update_ra6_status("READY")
+        window._update_ra6_status("TARGET_CTRL_OFF")
+        assert window.status_labels["TARGET_CTRL"].text() == "TARGET_CTRL: OFF"
+        assert window.status_labels["OUTPUT"].text() == "OUTPUT: OFF"
+        for key in ("READY", "ALIGN_DONE", "CONFIRMING", "ERROR"):
+            assert window.status_labels[key].text() == f"{key}: -"
+            assert "background-color: #9ca3af" in window.status_dots[key].styleSheet()
+    finally:
+        window.close()
+
+
 if __name__ == "__main__":
     test_log_clear_and_refresh_controls_are_visible()
     test_arm_command_without_open_port_has_chinese_log_feedback()
@@ -163,4 +203,6 @@ if __name__ == "__main__":
     test_target_demo_controls_are_visible_with_safe_defaults()
     test_target_demo_settings_persist()
     test_status_lights_follow_ra6_status()
+    test_closing_ports_clears_unknown_runtime_status_lights()
+    test_target_restart_and_stop_clear_stale_target_lights()
     print("upper console gui feature checks passed")

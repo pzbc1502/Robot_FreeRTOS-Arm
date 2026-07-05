@@ -446,6 +446,10 @@ class QtUpperConsole(QMainWindow):
         try:
             channel.open(port, int(self.baud_edit.text()))
             self._set_status(key, f"已打开 {port}")
+            if channel is self.arm:
+                self._clear_arm_runtime_status()
+            elif channel is self.jetson:
+                self._clear_target_runtime_status(clear_target=True)
         except Exception as exc:
             self.emit_log(channel.name, "ERROR", str(exc))
             QMessageBox.warning(self, "串口打开失败", str(exc))
@@ -455,6 +459,10 @@ class QtUpperConsole(QMainWindow):
             self.stop_periodic_vision()
         channel.close()
         self._set_status("ARM_PORT" if channel is self.arm else "JETSON_PORT", "已关闭")
+        if channel is self.arm:
+            self._clear_arm_runtime_status()
+        elif channel is self.jetson:
+            self._clear_target_runtime_status(clear_target=True)
         self.emit_log(channel.name, "INFO", "已关闭串口")
 
     def send_arm_command(self, command: str) -> None:
@@ -665,6 +673,7 @@ class QtUpperConsole(QMainWindow):
         if name in self.ra6_events:
             self.ra6_events[name].set()
         if name == "TARGET_CTRL_ON":
+            self._clear_target_runtime_status(clear_target=False)
             self._set_status("TARGET_CTRL", "ON")
         elif name == "TARGET_CTRL_OFF":
             self._set_status("TARGET_CTRL", "OFF")
@@ -672,6 +681,7 @@ class QtUpperConsole(QMainWindow):
             self._set_status("ALIGN_DONE", "-")
             self._set_status("CONFIRMING", "-")
             self._set_status("OUTPUT", "OFF")
+            self._set_status("ERROR", "-")
         elif name == "READY":
             self._set_status("READY", "YES")
         elif name == "ALIGN_DONE":
@@ -704,6 +714,15 @@ class QtUpperConsole(QMainWindow):
         self.status_dots[key].setStyleSheet(
             f"background-color: {colors[color]}; border-radius: 7px; border: 1px solid #6b7280;"
         )
+
+    def _clear_arm_runtime_status(self) -> None:
+        self._set_status("POSE_VALID", "-")
+
+    def _clear_target_runtime_status(self, clear_target: bool) -> None:
+        if clear_target:
+            self._set_status("TARGET_CTRL", "-")
+        for key in ("READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"):
+            self._set_status(key, "-")
 
     def _clear_ra6_events(self) -> None:
         for event in self.ra6_events.values():
