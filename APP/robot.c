@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "robot_cmd.h"
+#include "robot_target.h"
 #include "W800_mqtt.h"
 #include "common_data.h"
 #include "bsp_can.h"
@@ -19,10 +20,20 @@ extern CAN_Context_t g_can_context;
 
 /* 最大插补路径点数：工作空间对角线约 500mm，分辨率 1mm，留 10% 余量 */
 #define ROBOT_MAX_PATH_SIZE   (800)
+#define ROBOT_VISUAL_SERVO_PERIOD_MS        (20U)
+#define ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT    (3U)
 
 /* 静态路径/逆解缓冲区，robot_control_task 单线程使用，消除运行时 malloc */
 static struct position s_path_buf[ROBOT_MAX_PATH_SIZE];
 static float           s_result_buf[ROBOT_MAX_PATH_SIZE * ROBOT_MAX_JOINT_NUM];
+
+typedef struct
+{
+    float vx;
+    float vz;
+    uint32_t last_update_ms;
+    bool stop_requested;
+} robot_visual_servo_ctrl_t;
 
 /* FreeRTOS 安全钩子 ---------------------------------------------------- */
 void vApplicationMallocFailedHook(void)
@@ -72,6 +83,7 @@ static struct joint g_joints_init[ROBOT_MAX_JOINT_NUM] = {
 
 
 volatile struct robot_remote_control g_remote_control = {0};
+static volatile robot_visual_servo_ctrl_t g_visual_servo = {0};
 static volatile bool g_soft_reset_done = false;
 static volatile bool g_hard_reset_done = false;
 
@@ -97,6 +109,7 @@ static int robot_mqtt_joints_sync(void);
 static void robot_read_all_debug(void);
 static void robot_joint_stop_from_isr(uint8_t joint_id);
 static void robot_set_home_pose_valid(void);
+static int robot_visual_servo_run(void);
 static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_joint, float *bad_err);
 static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
 static float robot_angle_normalize(float angle);
@@ -1393,6 +1406,10 @@ static void robot_control_task(void *arg)
 				LOG("ROBOT_REMOTE_CONTROL_EVENT\n");
 				robot_pid_remote();
 				break;
+			case ROBOT_VISUAL_SERVO_EVENT:
+				LOG("ROBOT_VISUAL_SERVO_EVENT\n");
+				robot_visual_servo_run();
+				break;
 			case ROBOT_JOINTS_SYNC_EVENT:
 				LOG("ROBOT_JOINTS_SYNC_EVENT\n");
 				robot_joints_sync_to(&event);
@@ -1440,6 +1457,193 @@ static void robot_pid_one_period(float *target_angle, float *feedforward, float 
 	if (now < pid_end_time) {
 		vTaskDelay(pid_end_time - now);
 	}
+}
+
+static float robot_visual_servo_clip_velocity(float velocity)
+{
+    if (velocity > ROBOT_REMOTE_MAX_VELOCITY) {
+        return ROBOT_REMOTE_MAX_VELOCITY;
+    }
+    if (velocity < -ROBOT_REMOTE_MAX_VELOCITY) {
+        return -ROBOT_REMOTE_MAX_VELOCITY;
+    }
+    return velocity;
+}
+
+bool robot_is_visual_servo_active(void)
+{
+    return ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+}
+
+void robot_visual_servo_set_velocity(float vx, float vz)
+{
+    uint32_t now_ms = HAL_GetTick();
+
+    taskENTER_CRITICAL();
+    if (ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE)) {
+        g_visual_servo.vx = robot_visual_servo_clip_velocity(vx);
+        g_visual_servo.vz = robot_visual_servo_clip_velocity(vz);
+        g_visual_servo.last_update_ms = now_ms;
+    }
+    taskEXIT_CRITICAL();
+}
+
+void robot_visual_servo_stop(void)
+{
+    taskENTER_CRITICAL();
+    g_visual_servo.vx = 0.0f;
+    g_visual_servo.vz = 0.0f;
+    g_visual_servo.stop_requested = true;
+    taskEXIT_CRITICAL();
+}
+
+int robot_visual_servo_start(void)
+{
+    BaseType_t queued;
+    bool should_queue = false;
+    uint32_t now_ms = HAL_GetTick();
+
+    if (g_robot.event_queue == NULL) {
+        return -1;
+    }
+    if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID)) {
+        LOG("reject visual servo: pose invalid, please do hard_reset/soft_reset first.\r\n");
+        return -1;
+    }
+
+    taskENTER_CRITICAL();
+    bool active = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+    bool busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    if (active) {
+        g_visual_servo.vx = 0.0f;
+        g_visual_servo.vz = 0.0f;
+        g_visual_servo.last_update_ms = now_ms;
+        g_visual_servo.stop_requested = false;
+    } else if (!busy) {
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+        g_visual_servo.vx = 0.0f;
+        g_visual_servo.vz = 0.0f;
+        g_visual_servo.last_update_ms = now_ms;
+        g_visual_servo.stop_requested = false;
+        should_queue = true;
+    }
+    taskEXIT_CRITICAL();
+
+    if (active) {
+        return pdPASS;
+    }
+    if (busy) {
+        LOG("reject visual servo: robot motion still busy.\r\n");
+        return -1;
+    }
+
+    struct robot_event event = {0};
+    event.type = ROBOT_VISUAL_SERVO_EVENT;
+    queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    if ((queued != pdPASS) && should_queue) {
+        taskENTER_CRITICAL();
+        ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+        ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+        taskEXIT_CRITICAL();
+    }
+    return (int)queued;
+}
+
+static int robot_visual_servo_run(void)
+{
+    float target_angle[ROBOT_MAX_JOINT_NUM] = {0};
+    float last_target[ROBOT_MAX_JOINT_NUM] = {0};
+    float feedforward[ROBOT_MAX_JOINT_NUM] = {0};
+    float result[ROBOT_MAX_JOINT_NUM] = {0};
+    float T[4][4] = {0};
+    bool first_update = true;
+    uint8_t ik_fail_count = 0u;
+    struct position pos = g_robot.cur_pos;
+
+    LOG("robot visual servo start\r\n");
+    (void)robot_update_all_angles(ROBOT_ARM_JOINT_NUM, NULL, NULL);
+    for (int i = 0; i < ROBOT_MAX_JOINT_NUM; i++) {
+        robot_kinematics_joint_angle_update_by_id((uint32_t)i, g_robot.joints[i].current_angle);
+    }
+    robot_kinematics_reset_branch_lock();
+
+    float j6_hold_angle = g_robot.joints[ROBOT_JOINT_6].current_angle;
+    uint32_t next_tick = xTaskGetTickCount();
+
+    while (robot_is_visual_servo_active()) {
+        float vx = 0.0f;
+        float vz = 0.0f;
+        uint32_t last_update_ms = 0u;
+        bool stop_requested = false;
+
+        next_tick += pdMS_TO_TICKS(ROBOT_VISUAL_SERVO_PERIOD_MS);
+
+        taskENTER_CRITICAL();
+        vx = g_visual_servo.vx;
+        vz = g_visual_servo.vz;
+        last_update_ms = g_visual_servo.last_update_ms;
+        stop_requested = g_visual_servo.stop_requested;
+        taskEXIT_CRITICAL();
+
+        if (stop_requested) {
+            break;
+        }
+        if ((HAL_GetTick() - last_update_ms) > TARGET_VS_CMD_TIMEOUT_MS) {
+            vx = 0.0f;
+            vz = 0.0f;
+        }
+
+        struct position next_pos = pos;
+        float dt = (float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f;
+        next_pos.x += vx * dt;
+        next_pos.z += vz * dt;
+
+        robot_kinematics_cal_T(T_0_6_reset, T, &next_pos);
+        int ret = robot_kinematics_inverse((float *)T, result, false);
+        if (ret != 0) {
+            ik_fail_count++;
+            if (ik_fail_count >= ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT) {
+                LOG("robot visual servo inverse failed, stop.\r\n");
+                break;
+            }
+        } else {
+            ik_fail_count = 0u;
+            result[ROBOT_JOINT_6] = j6_hold_angle;
+            robot_kinematics_joint_angle_update(result);
+            pos = next_pos;
+            g_robot.cur_pos = pos;
+
+            for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
+                target_angle[j] = robot_angle_normalize(result[j]);
+                if (first_update) {
+                    feedforward[j] = 0.0f;
+                } else {
+                    feedforward[j] = robot_angle_diff(last_target[j], target_angle[j])
+                                     / ((float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f);
+                }
+                last_target[j] = target_angle[j];
+            }
+            first_update = false;
+            robot_pid_one_period(target_angle, feedforward, NULL, ROBOT_ARM_JOINT_NUM);
+        }
+
+        uint32_t now_tick = xTaskGetTickCount();
+        if (now_tick < next_tick) {
+            vTaskDelay(next_tick - now_tick);
+        }
+    }
+
+    robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+    taskENTER_CRITICAL();
+    g_visual_servo.vx = 0.0f;
+    g_visual_servo.vz = 0.0f;
+    g_visual_servo.stop_requested = false;
+    ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+    ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    taskEXIT_CRITICAL();
+    LOG("robot visual servo stopped\r\n");
+    return 0;
 }
 
 struct position g_pos = {0};	// debug

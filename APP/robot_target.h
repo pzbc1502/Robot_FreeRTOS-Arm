@@ -9,6 +9,7 @@
 extern "C" {
 #endif
 
+//预开始位置
 #ifndef TARGET_PRE_X
 #define TARGET_PRE_X                 (0.0f)      /* 定靶预定位 X 方向偏移，单位 mm */
 #endif
@@ -19,6 +20,23 @@ extern "C" {
 #define TARGET_PRE_Z                 (-1.5f)      /* 定靶预定位 Z 方向偏移，单位 mm */
 #endif
 
+
+
+//视觉伺服开关
+#ifndef TARGET_USE_VISUAL_SERVO
+#define TARGET_USE_VISUAL_SERVO      (1)        /* 1=使用视觉伺服闭环，0=不使用视觉伺服闭环 */
+#endif
+
+//视觉伺服参数
+#define TARGET_VS_KX_MM_S_PER_PX     (0.35f)
+#define TARGET_VS_KZ_MM_S_PER_PX     (0.35f)
+#define TARGET_VS_MAX_SPEED_MM_S     (8.0f)
+#define TARGET_VS_FINE_MAX_SPEED_MM_S (3.0f)
+#define TARGET_VS_CMD_TIMEOUT_MS     (250u)
+
+
+
+//末端auto修正参数
 #define TARGET_KX_MM_PER_PX          (0.38f)    /* 视觉 dcx 到机械臂 X 小步修正的比例，单位 mm/px */
 #define TARGET_KY_MM_PER_PX          (0.35f)     /* 视觉 dcy 到机械臂 Z 小步修正的比例，单位 mm/px */
 #define TARGET_MAX_STEP_MM           (2.5f)      /* 单次视觉对准最大修正步长，单位 mm */
@@ -29,6 +47,7 @@ extern "C" {
 #define TARGET_CONFIRM_STABLE_COUNT  (4u)        /* 输出前二次确认所需连续新视觉帧数 */
 #define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */
 #define TARGET_VISION_VALID_MS       (500u)      /* 视觉数据有效期，超时后退出对准/输出 */
+
 
 typedef struct
 {

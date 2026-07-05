@@ -87,6 +87,7 @@ extern "C" {
 #define ROBOT_STATUS_POSE_VALID             5U      /* 当前末端位姿是否可信 */
 #define ROBOT_STATUS_POSE_DEGRADED          6U      /* 位姿进入退化模式(反馈异常但可继续作业) */
 #define ROBOT_STATUS_AUTO_BUSY              7U      /* ROBOT_AUTO_EVENT 已入队或正在执行 */
+#define ROBOT_STATUS_VISUAL_SERVO_ACTIVE    8U      /* visual servo is running */
 
 #define ROBOT_STATUS_MASK(status)           (1u << (uint32_t)(status))
 #define ROBOT_STATUS_IS(x, status)          (((x) & ROBOT_STATUS_MASK(status)) != 0u)     /* 判断状态位是否置位 */
@@ -202,6 +203,7 @@ enum robot_event_type
     ROBOT_SOFT_RESET_EVENT,         /* 软件复位事件：直接控制各关节回到设定零位 */
     ROBOT_TEST_EVENT,               /* 测试事件：用于验证系统功能的专用事件 */
     ROBOT_REMOTE_CONTROL_EVENT,     /* 远程控制事件：根据上位机/遥控器的速度指令实时控制 */
+    ROBOT_VISUAL_SERVO_EVENT,       /* visual servo event for target alignment */
     ROBOT_JOINTS_SYNC_EVENT,        /* 关节同步事件：强制同步所有关节状态 */
     ROBOT_READ_ALL_EVENT,           /* 批量读取 J1~J5 当前角度 */
 };
@@ -261,6 +263,10 @@ bool robot_is_hard_reset_done(void);
 bool robot_is_auto_busy(void);
 int robot_send_abs_rotate_event(uint8_t joint_id, float angle);
 int robot_send_remote_event(void);
+int robot_visual_servo_start(void);
+void robot_visual_servo_stop(void);
+void robot_visual_servo_set_velocity(float vx, float vz);
+bool robot_is_visual_servo_active(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
 int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);

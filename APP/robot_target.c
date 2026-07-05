@@ -120,6 +120,38 @@ static void force_laser_off(void)
     BLUE_LED_OFF;
 }
 
+static void target_stop_visual_servo(void)
+{
+#if TARGET_USE_VISUAL_SERVO
+    robot_visual_servo_stop();
+#endif
+}
+
+static void target_hold_visual_servo(void)
+{
+#if TARGET_USE_VISUAL_SERVO
+    robot_visual_servo_set_velocity(0.0f, 0.0f);
+#endif
+}
+
+#if TARGET_USE_VISUAL_SERVO
+static void target_update_visual_servo_velocity(uint32_t now_ms)
+{
+    float err_px = fmaxf(fabsf((float)s_target.dcx), fabsf((float)s_target.dcy));
+    float speed_limit = (err_px <= TARGET_ALIGN_TOL_PX_COARSE) ?
+                        TARGET_VS_FINE_MAX_SPEED_MM_S : TARGET_VS_MAX_SPEED_MM_S;
+    float vx = clampf_local((float)s_target.dcx * TARGET_VS_KX_MM_S_PER_PX,
+                            -speed_limit, speed_limit);
+    float vz = clampf_local((float)s_target.dcy * TARGET_VS_KZ_MM_S_PER_PX,
+                            -speed_limit, speed_limit);
+
+    robot_visual_servo_set_velocity(vx, vz);
+    s_target.last_step_ms = now_ms;
+    LOG("[TARGET] visual servo vx=%.2f vz=%.2f dcx=%d dcy=%d\r\n",
+        vx, vz, (int)s_target.dcx, (int)s_target.dcy);
+}
+#endif
+
 static bool send_target_auto(const struct position *pos)
 {
     struct position local = *pos;
@@ -134,11 +166,13 @@ void robot_target_init(void)
     s_target.pre.z = TARGET_PRE_Z;
     s_target.target = s_target.pre;
     s_target.state = TARGET_INIT;
+    target_stop_visual_servo();
     force_laser_off();
 }
 
 bool robot_target_enable_request(void)
 {
+    target_stop_visual_servo();
     force_laser_off();
     if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID))
     {
@@ -154,6 +188,7 @@ void robot_target_disable_request(void)
 {
     ROBOT_TARGET_ENABLED = false;
     ROBOT_TARGET_FIRE_ENABLE = false;
+    target_stop_visual_servo();
     force_laser_off();
     (void)robot_send_reset_event(false);
 }
@@ -182,12 +217,15 @@ void robot_target_step(const target_obs_t *obs)
 
     if (!ROBOT_TARGET_ENABLED)
     {
+        target_stop_visual_servo();
+        force_laser_off();
         enter_state(TARGET_INIT, now);
         return;
     }
 
     if (estop || limit)
     {
+        target_stop_visual_servo();
         force_laser_off();
         (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, 1u);
         enter_state(TARGET_RECOVER, now);
@@ -197,6 +235,7 @@ void robot_target_step(const target_obs_t *obs)
     switch (s_target.state)
     {
         case TARGET_INIT:
+            target_stop_visual_servo();
             force_laser_off();
             s_target.target = s_target.pre;
             reset_alignment_counts();
@@ -207,6 +246,7 @@ void robot_target_step(const target_obs_t *obs)
             break;
 
         case TARGET_PRE_POSITION:
+            target_stop_visual_servo();
             force_laser_off();
             if (position_near(&g_robot.cur_pos, &s_target.target))
             {
@@ -219,7 +259,23 @@ void robot_target_step(const target_obs_t *obs)
             force_laser_off();
             if (vision_fresh(now))
             {
+#if TARGET_USE_VISUAL_SERVO
+                if (robot_visual_servo_start() == pdPASS)
+                {
+                    enter_state(TARGET_ALIGN, now);
+                }
+                else
+                {
+                    LOG("[TARGET] visual servo start failed\r\n");
+                    enter_state(TARGET_RECOVER, now);
+                }
+#else
                 enter_state(TARGET_ALIGN, now);
+#endif
+            }
+            else
+            {
+                target_stop_visual_servo();
             }
             break;
 
@@ -227,13 +283,27 @@ void robot_target_step(const target_obs_t *obs)
             force_laser_off();
             if (!vision_fresh(now))
             {
+                target_stop_visual_servo();
                 reset_alignment_counts();
                 enter_state(TARGET_RECOVER, now);
                 break;
             }
 
+#if TARGET_USE_VISUAL_SERVO
+            if (!robot_is_visual_servo_active())
+            {
+                if (robot_visual_servo_start() != pdPASS)
+                {
+                    LOG("[TARGET] visual servo restart failed\r\n");
+                    enter_state(TARGET_RECOVER, now);
+                    break;
+                }
+            }
+#endif
+
             if (align_in_tolerance())
             {
+                target_hold_visual_servo();
                 if (new_vision && (s_target.stable_count < TARGET_ALIGN_STABLE_COUNT))
                 {
                     s_target.stable_count++;
@@ -247,6 +317,12 @@ void robot_target_step(const target_obs_t *obs)
             }
 
             reset_alignment_counts();
+#if TARGET_USE_VISUAL_SERVO
+            if (new_vision)
+            {
+                target_update_visual_servo_velocity(now);
+            }
+#else
             if ((now - s_target.last_step_ms) >= TARGET_ALIGN_PERIOD_MS)
             {
                 if (robot_is_auto_busy())
@@ -277,12 +353,14 @@ void robot_target_step(const target_obs_t *obs)
                         s_target.target.x, s_target.target.y, s_target.target.z);
                 }
             }
+#endif
             break;
 
         case TARGET_CONFIRM:
             force_laser_off();
             if (!vision_fresh(now))
             {
+                target_stop_visual_servo();
                 enter_state(TARGET_RECOVER, now);
                 break;
             }
@@ -294,6 +372,7 @@ void robot_target_step(const target_obs_t *obs)
                 enter_state(TARGET_ALIGN, now);
                 break;
             }
+            target_hold_visual_servo();
             RED_LED_ON;
             BLUE_LED_OFF;
             if (new_vision && (s_target.confirm_stable_count < TARGET_CONFIRM_STABLE_COUNT))
@@ -302,12 +381,14 @@ void robot_target_step(const target_obs_t *obs)
             }
             if ((s_target.confirm_stable_count >= TARGET_CONFIRM_STABLE_COUNT) && fire_allowed)
             {
+                target_stop_visual_servo();
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 1u);
                 enter_state(TARGET_OUTPUT, now);
             }
             break;
 
         case TARGET_OUTPUT:
+            target_stop_visual_servo();
             if (!fire_allowed || !vision_fresh(now))
             {
                 force_laser_off();
@@ -319,10 +400,10 @@ void robot_target_step(const target_obs_t *obs)
             {
                 force_laser_off();
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
-                LOG("[TARGET] output lost alignment dcx=%d dcy=%d, back to ALIGN\r\n",
+                LOG("[TARGET] output lost alignment dcx=%d dcy=%d, done\r\n",
                     (int)s_target.dcx, (int)s_target.dcy);
                 reset_alignment_counts();
-                enter_state(TARGET_ALIGN, now);
+                enter_state(TARGET_DONE, now);
                 break;
             }
             taskENTER_CRITICAL();
@@ -342,16 +423,13 @@ void robot_target_step(const target_obs_t *obs)
             break;
 
         case TARGET_DONE:
+            target_stop_visual_servo();
             force_laser_off();
-            if (!fire_allowed)
-            {
-                reset_alignment_counts();
-                enter_state(TARGET_WAIT_DETECT, now);
-            }
             break;
 
         case TARGET_RECOVER:
         default:
+            target_stop_visual_servo();
             force_laser_off();
             if ((now - s_target.enter_ms) >= TARGET_ALIGN_PERIOD_MS)
             {
