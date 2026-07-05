@@ -153,7 +153,7 @@ FSP Configuration
       P000 R12 GPIO - - None "Input mode" - None "ADC0: AN000; ADC1: AN100; ICU0: IRQ06" - IO - - 
       P001 N11 - - - - Disabled - - "ADC0: AN001; ADC1: AN101; ICU0: IRQ07" - None - - 
       P002 R11 GPIO - - None "Output mode (Initial Low)" CMOS - "ADC0: AN002; ADC1: AN102; ICU0: IRQ08" - IO - - 
-      P003 M5 - - - - Disabled - - "ADC0: AN003" - None - - 
+      P003 M5 GPIO - - - "Output mode (Initial High)" CMOS - "ADC0: AN003" - IO - - 
       P004 P11 - - - - Disabled - - "ADC0: AN004; ICU0: IRQ09" - None - - 
       P005 R10 - - - - Disabled - - "ADC0: AN005; ICU0: IRQ10" - None - - 
       P006 N10 - - - - Disabled - - "ADC0: AN006; ICU0: IRQ11" - None - - 
@@ -229,7 +229,7 @@ FSP Configuration
       P500 R3 GPIO - Low - "Output mode (Initial High)" CMOS - "ADC1: AN116; AGT0: AGTOA0; CAC0: CACREF; GPT_OPS0: GTIU; QSPI0: QSPCLK; SCI5: CTS5; USB_FS0: USB_VBUSEN" - IO - - 
       P501 P4 SCI5_TXD5 - Low None "Peripheral mode" CMOS None "ADC1: AN117; AGT0: AGTOB0; GPT_OPS0: GTIV; ICU0: IRQ11; QSPI0: QSSL; SCI5: SDA5; SCI5: TXD5; USB_FS0: USB_OVRCURA" - IO - - 
       P502 R4 SCI5_RXD5 - Low None "Peripheral mode" CMOS None "ADC1: AN118; AGT2: AGTOA2; GPT_OPS0: GTIW; ICU0: IRQ12; QSPI0: QIO0; SCI5: RXD5; SCI5: SCL5; SCI6: CTS6; USB_FS0: USB_OVRCURB" - IO - - 
-      P503 N5 - - - - Disabled - - "ADC1: AN119; AGT2: AGTOB2; GPT_POEG2: GTETRGC; QSPI0: QIO1; SCI5: SCK5; SCI6: CTSRTS6; USB_FS0: USB_EXICEN" - None - - 
+      P503 N5 GPIO - Low - "Output mode (Initial High)" CMOS - "ADC1: AN119; AGT2: AGTOB2; GPT_POEG2: GTETRGC; QSPI0: QIO1; SCI5: SCK5; SCI6: CTSRTS6; USB_FS0: USB_EXICEN" - IO - - 
       P504 P5 - - - - Disabled - - "ADC1: AN120; AGT3: AGTOA3; BUS_ASYNCH0: ALE; GPT_POEG3: GTETRGD; QSPI0: QIO2; SCI5: CTSRTS5; SCI6: SCK6; USB_FS0: USB_ID" - None - - 
       P505 P6 SCI6_RXD6 - Low None "Peripheral mode" CMOS None "ADC1: AN121; AGT3: AGTOB3; ICU0: IRQ14; QSPI0: QIO3; SCI6: RXD6; SCI6: SCL6" - IO - - 
       P506 R5 SCI6_TXD6 - Low None "Peripheral mode" CMOS None "ADC1: AN122; ICU0: IRQ15; SCI6: SDA6; SCI6: TXD6" - IO - - 

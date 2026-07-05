@@ -1,6 +1,7 @@
 #include "robot_target.h"
 #include "jetson_vision.h"
 #include "bsp_laser.h"
+#include "bsp_led.h"
 #include "bsp_uart.h"
 #include <math.h>
 #include <string.h>
@@ -115,6 +116,8 @@ static void enter_state(target_state_t state, uint32_t now_ms)
 static void force_laser_off(void)
 {
     BSP_Laser_Off();
+    RED_LED_OFF;
+    BLUE_LED_OFF;
 }
 
 static bool send_target_auto(const struct position *pos)
@@ -291,6 +294,8 @@ void robot_target_step(const target_obs_t *obs)
                 enter_state(TARGET_ALIGN, now);
                 break;
             }
+            RED_LED_ON;
+            BLUE_LED_OFF;
             if (new_vision && (s_target.confirm_stable_count < TARGET_CONFIRM_STABLE_COUNT))
             {
                 s_target.confirm_stable_count++;
@@ -325,6 +330,8 @@ void robot_target_step(const target_obs_t *obs)
             if (enabled_now)
             {
                 BSP_Laser_On();
+                RED_LED_ON;
+                BLUE_LED_ON;
             }
             taskEXIT_CRITICAL();
             if (!enabled_now)

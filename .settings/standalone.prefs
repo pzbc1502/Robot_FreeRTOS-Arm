@@ -1,4 +1,4 @@
-#Fri Jul 03 17:42:31 GMT+08:00 2026
+#Sun Jul 05 16:51:40 GMT+08:00 2026
 com.renesas.cdt.ddsc.content/com.renesas.cdt.ddsc.content.defaultlinkerscript=script/fsp.scat
 com.renesas.cdt.ddsc.contentgen.options/options/suppresswarningspaths=ra/arm,ra/aws
 com.renesas.cdt.ddsc.packs.componentfiles/AWS\#\#Heaps\#\#FreeRTOS\#\#heap_4\#\#\#\#11.1.0+fsp.6.4.0/all=271572837,ra/aws/FreeRTOS/FreeRTOS/Source/portable/MemMang/heap_4.c

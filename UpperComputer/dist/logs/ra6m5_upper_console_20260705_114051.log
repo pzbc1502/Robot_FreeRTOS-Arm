@@ -1,7 +1,0 @@
-[11:40:51.671] [APP-INFO] 已刷新串口: COM7, COM16, COM22, COM21, COM14
-[11:40:51.672] [APP-INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\dist\logs\ra6m5_upper_console_20260705_114051.log
-[11:40:55.269] [ARM-INFO] opened COM7 @ 115200
-[11:40:56.260] [ARM-INFO] 已关闭串口
-[11:40:56.677] [ARM-INFO] opened COM7 @ 115200
-[11:40:57.220] [ARM-INFO] 已关闭串口
-[11:40:57.547] [ARM-INFO] opened COM7 @ 115200
