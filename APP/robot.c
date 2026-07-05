@@ -1258,9 +1258,7 @@ static const float ROBOT_JOINT_KP[ROBOT_MAX_JOINT_NUM] = {0.65f, 3.00f, 3.00f, 2
 
 /* 各关节独立前馈系数（无量纲，1.0 = 全量前馈）
  * AUTO 速度环 = FF_GAIN[j]*前馈 + Kp[j]*误差。前馈过大时实际电机跑得比 S 曲线
- * 规划更远，误差随移位比例放大（实测 auto 0 -30/-50 时 J3 偏差 7.7°/13°，呈比例）。
- * 这是比例型跟踪偏差，不是单点 Kp 问题，故对偏差最大的 J2/J3/J5 降前馈系数，
- * 其余保持 1.0。数值为首版起点，需按实测 cur/target/err 逐轮细调。 */
+*/
 static const float ROBOT_JOINT_FF_GAIN[ROBOT_MAX_JOINT_NUM] = {1.0f, 0.65f, 0.55f, 1.0f, 0.60f, 1.0f};
 
 static int robot_pid_run(struct position *path, int path_size, float *result)

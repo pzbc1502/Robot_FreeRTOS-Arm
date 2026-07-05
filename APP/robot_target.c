@@ -152,6 +152,7 @@ void robot_target_disable_request(void)
     ROBOT_TARGET_ENABLED = false;
     ROBOT_TARGET_FIRE_ENABLE = false;
     force_laser_off();
+    (void)robot_send_reset_event(false);
 }
 
 void robot_target_step(const target_obs_t *obs)

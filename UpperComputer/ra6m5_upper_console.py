@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -35,6 +36,12 @@ SETTINGS_ORG = "RA6M5Robot"
 SETTINGS_APP = "UpperConsole"
 DEFAULT_DEMO_SEQUENCE = "30,-20:5;15,-10:5;8,-5:5;0,0:0"
 DEFAULT_DEMO_PERIOD_MS = "200"
+DEFAULT_CAPTURE_RECIPES = {
+    "左视图": "# 左视图\nsoft_reset\nauto 45 -130 -15\nabs_rotate 0 85\nread_all",
+    "正视图": "# 正视图\nsoft_reset\nauto 0 -130 -15\nabs_rotate 0 90\nread_all",
+    "右视图": "# 右视图\nsoft_reset\nauto -45 -130 -15\nabs_rotate 0 105\nread_all",
+}
+CAPTURE_RECIPE_KEYS = {"左视图": "left", "正视图": "front", "右视图": "right"}
 JETSON_SOF = 0xFF
 JETSON_EOF = 0xFE
 JETSON_LEN = 0x05
@@ -157,7 +164,7 @@ class SerialChannel:
 
     def open(self, port: str, baud: int) -> None:
         self.close()
-        self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05)
+        self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05, write_timeout=0.2)
         self.stop_event.clear()
         threading.Thread(target=self._reader, daemon=True).start()
         self.app.emit_log(self.name, "INFO", f"opened {port} @ {baud}")
@@ -198,7 +205,7 @@ class QtUpperConsole(QMainWindow):
     def __init__(self, log_dir: Path | None = None) -> None:
         super().__init__()
         self.setWindowTitle(APP_TITLE)
-        self.resize(1180, 760)
+        self.resize(1500, 900)
         self.settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
         self.logger = SessionLogger(log_dir or (Path.cwd() / "logs"))
         self.log_queue: queue.Queue[str] = queue.Queue()
@@ -207,6 +214,7 @@ class QtUpperConsole(QMainWindow):
         self.vision_stop = threading.Event()
         self.demo_stop = threading.Event()
         self.ra6_events = {name: threading.Event() for name in STATUS_NAMES.values()}
+        self.capture_step_index = {name: 0 for name in DEFAULT_CAPTURE_RECIPES}
         self.status_labels: dict[str, QLabel] = {}
         self.status_dots: dict[str, QLabel] = {}
         self._build_ui()
@@ -225,8 +233,11 @@ class QtUpperConsole(QMainWindow):
         main.addLayout(left, 0)
         main.addLayout(right, 1)
         left.addWidget(self._serial_group())
-        left.addWidget(self._arm_group())
-        left.addWidget(self._jetson_group())
+        self.left_tabs = QTabWidget()
+        self.left_tabs.addTab(self._arm_group(), "机械臂控制")
+        self.left_tabs.addTab(self._jetson_group(), "Jetson/定靶")
+        self.left_tabs.addTab(self._capture_group(), "拍摄点位")
+        left.addWidget(self.left_tabs, 1)
         left.addStretch(1)
         right.addWidget(self._status_group())
         log_bar = QHBoxLayout()
@@ -321,7 +332,7 @@ class QtUpperConsole(QMainWindow):
         layout = QVBoxLayout(group)
         row = QHBoxLayout()
         row.addWidget(self._button("启动状态机 AA 01 01 BB", lambda: self.send_target_ctrl(True)))
-        row.addWidget(self._button("关闭状态机 AA 01 00 BB", lambda: self.send_target_ctrl(False)))
+        row.addWidget(self._button("关闭状态机 AA 01 00 BB", self.stop_target_ctrl_with_reset))
         layout.addLayout(row)
         self.dcx = QLineEdit("0")
         self.dcy = QLineEdit("0")
@@ -382,6 +393,32 @@ class QtUpperConsole(QMainWindow):
         layout.addLayout(row)
         return group
 
+    def _capture_group(self) -> QGroupBox:
+        group = QGroupBox("人脸三视图拍摄点位")
+        layout = QVBoxLayout(group)
+
+        self.capture_view = QComboBox()
+        self.capture_view.addItems(DEFAULT_CAPTURE_RECIPES.keys())
+        self.capture_view.currentTextChanged.connect(self.load_capture_recipe)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("视图"))
+        row.addWidget(self.capture_view, 1)
+        layout.addLayout(row)
+
+        self.capture_recipe = QTextEdit()
+        self.capture_recipe.setMinimumHeight(180)
+        layout.addWidget(self.capture_recipe, 1)
+
+        row = QHBoxLayout()
+        row.addWidget(self._button("保存配方", self.save_capture_recipe))
+        row.addWidget(self._button("重置默认", self.reset_capture_recipe))
+        row.addWidget(self._button("从头开始", self.reset_capture_steps))
+        row.addWidget(self._button("发送下一条", self.send_next_capture_command))
+        layout.addLayout(row)
+
+        self.load_capture_recipe(self.capture_view.currentText())
+        return group
+
     def _status_group(self) -> QGroupBox:
         group = QGroupBox("状态")
         grid = QGridLayout(group)
@@ -410,6 +447,9 @@ class QtUpperConsole(QMainWindow):
         if isinstance(value, bool):
             return value
         return str(value).lower() in {"1", "true", "yes", "on"}
+
+    def _capture_settings_key(self, view: str) -> str:
+        return f"capture/{CAPTURE_RECIPE_KEYS.get(view, 'left')}"
 
     def _button(self, text: str, callback) -> QPushButton:
         button = QPushButton(text)
@@ -506,14 +546,20 @@ class QtUpperConsole(QMainWindow):
             self.arm_history.setEditText(command)
         self.arm_history.blockSignals(False)
 
-    def send_target_ctrl(self, enable: bool) -> None:
+    def send_target_ctrl(self, enable: bool) -> bool:
         if not self.jetson.is_open():
             self.emit_log("JETSON", "ERROR", "Jetson模拟串口未打开，控制帧未发送。")
-            return
+            return False
         try:
             self.jetson.write(build_target_control_frame(enable), "TARGET_CTRL_START" if enable else "TARGET_CTRL_STOP")
         except Exception as exc:
             self.emit_log("JETSON", "ERROR", str(exc))
+            return False
+        return True
+
+    def stop_target_ctrl_with_reset(self) -> None:
+        if not self.send_target_ctrl(False):
+            self.send_arm_command("soft_reset")
 
     def send_vision_once(self) -> None:
         try:
@@ -570,6 +616,49 @@ class QtUpperConsole(QMainWindow):
         self.settings.sync()
         self.emit_log("DEMO", "INFO", "演示配置已保存")
 
+    def load_capture_recipe(self, view: str) -> None:
+        text = self._settings_text(self._capture_settings_key(view), DEFAULT_CAPTURE_RECIPES.get(view, ""))
+        self.capture_recipe.setPlainText(text)
+        self.capture_step_index[view] = 0
+
+    def save_capture_recipe(self) -> None:
+        view = self.capture_view.currentText()
+        self.settings.setValue(self._capture_settings_key(view), self.capture_recipe.toPlainText())
+        self.settings.sync()
+        self.capture_step_index[view] = 0
+        self.emit_log("APP", "INFO", f"{view} 拍摄配方已保存")
+
+    def reset_capture_recipe(self) -> None:
+        view = self.capture_view.currentText()
+        self.capture_recipe.setPlainText(DEFAULT_CAPTURE_RECIPES.get(view, ""))
+        self.capture_step_index[view] = 0
+        self.emit_log("APP", "INFO", f"{view} 拍摄配方已重置为默认")
+
+    def _capture_commands(self) -> list[str]:
+        commands: list[str] = []
+        for line in self.capture_recipe.toPlainText().splitlines():
+            command = line.strip()
+            if command and not command.startswith("#"):
+                commands.append(command)
+        return commands
+
+    def reset_capture_steps(self) -> None:
+        view = self.capture_view.currentText()
+        self.capture_step_index[view] = 0
+        self.emit_log("APP", "INFO", f"{view} 拍摄配方已从头开始")
+
+    def send_next_capture_command(self) -> None:
+        view = self.capture_view.currentText()
+        commands = self._capture_commands()
+        index = self.capture_step_index.get(view, 0)
+        if index >= len(commands):
+            self.emit_log("APP", "INFO", f"{view} 拍摄配方已执行完")
+            return
+        command = commands[index]
+        self.capture_step_index[view] = index + 1
+        self.emit_log("APP", "INFO", f"{view} 第 {index + 1}/{len(commands)} 条: {command}")
+        self.send_arm_command(command)
+
     def start_target_demo(self) -> None:
         try:
             sequence = parse_vision_sequence(self.demo_sequence.text())
@@ -596,10 +685,11 @@ class QtUpperConsole(QMainWindow):
     def stop_target_demo(self) -> None:
         self.demo_stop.set()
         self.stop_periodic_vision()
-        if self.jetson.is_open():
-            self.send_target_ctrl(False)
+        stop_sent = self.send_target_ctrl(False)
         self.send_arm_command("laser_off")
-        self.emit_log("DEMO", "INFO", "演示已停止，已关闭视觉发送和激光输出")
+        if not stop_sent:
+            self.send_arm_command("soft_reset")
+        self.emit_log("DEMO", "INFO", "演示已停止，已关闭视觉发送、激光输出，并请求回 HOME")
 
     def _target_demo_loop(self, sequence: list[tuple[int, int, int]], period_ms: int, options: tuple[bool, bool, bool, bool]) -> None:
         send_enable, wait_ready, prompt_p000, auto_stop = options
@@ -619,7 +709,7 @@ class QtUpperConsole(QMainWindow):
             self.emit_log("DEMO", "ACTION", "激光已输出：需要关闭时松开 P000 KEY。")
         if auto_stop and self._wait_ra6_event("OUTPUT_OFF", 60.0):
             self.stop_periodic_vision()
-            self.send_target_ctrl(False)
+            self.stop_target_ctrl_with_reset()
             self.emit_log("DEMO", "INFO", "检测到 OUTPUT_OFF，演示流程结束。")
 
     def _sequence_loop(self, sequence: list[tuple[int, int, int]], period_ms: int) -> None:
