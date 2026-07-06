@@ -49,6 +49,16 @@ JETSON_FUNC_VISION_ERROR = 0x03
 JETSON_CTRL_SOF = 0xAA
 JETSON_CTRL_EOF = 0xBB
 JETSON_FUNC_TARGET_CTRL = 0x01
+JETSON_PROTOCOL_OLD = "old"
+JETSON_PROTOCOL_NEW = "new"
+JETSON_UNIFIED_SOF0 = 0xA5
+JETSON_UNIFIED_SOF1 = 0x5A
+JETSON_UNIFIED_VERSION = 0x01
+JETSON_MSG_HEARTBEAT = 0x01
+JETSON_MSG_TARGET_CTRL = 0x02
+JETSON_MSG_VISION_ERROR = 0x03
+JETSON_MSG_STATUS = 0x81
+JETSON_MSG_ERROR = 0xFE
 RA6_SOF = 0xCC
 RA6_EOF = 0xDD
 STATUS_NAMES = {
@@ -94,22 +104,94 @@ def build_target_control_frame(enable: bool) -> bytes:
     return bytes([JETSON_CTRL_SOF, JETSON_FUNC_TARGET_CTRL, 0x01 if enable else 0x00, JETSON_CTRL_EOF])
 
 
-def parse_ra6_status_frames(data: bytes) -> list[Ra6Status]:
+def crc16_modbus(data: bytes) -> int:
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            if crc & 0x0001:
+                crc = (crc >> 1) ^ 0xA001
+            else:
+                crc >>= 1
+    return crc & 0xFFFF
+
+
+def build_unified_frame(msg_type: int, seq: int, payload: bytes) -> bytes:
+    if len(payload) > 255:
+        raise ValueError("unified payload too large")
+    body = bytes([JETSON_UNIFIED_VERSION, msg_type & 0xFF, seq & 0xFF, len(payload)]) + payload
+    crc = crc16_modbus(body)
+    return bytes([JETSON_UNIFIED_SOF0, JETSON_UNIFIED_SOF1]) + body + crc.to_bytes(2, "little")
+
+
+def build_unified_heartbeat_frame(seq: int, tick_ms: int) -> bytes:
+    return build_unified_frame(JETSON_MSG_HEARTBEAT, seq, int(tick_ms & 0xFFFFFFFF).to_bytes(4, "little"))
+
+
+def build_unified_target_control_frame(enable: bool, seq: int) -> bytes:
+    return build_unified_frame(JETSON_MSG_TARGET_CTRL, seq, bytes([0x01 if enable else 0x00]))
+
+
+def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
+    return build_unified_frame(JETSON_MSG_VISION_ERROR, seq, _int16_le(dcx) + _int16_le(dcy) + b"\x01")
+
+
+def should_log_serial_tx(label: str) -> bool:
+    return not label.startswith("HEARTBEAT")
+
+
+def should_display_arm_line(line: str) -> bool:
+    return "[JETSON_RX] heartbeat seq=" not in line
+
+
+def _status_from_func_value(raw: bytes, func: int, value: int) -> Ra6Status:
+    return Ra6Status(raw=raw, func=func, value=value, name=STATUS_NAMES.get((func, value), "UNKNOWN"))
+
+
+def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
     frames: list[Ra6Status] = []
     idx = 0
-    while idx + 3 < len(data):
-        if data[idx] != RA6_SOF:
-            idx += 1
+    consumed = 0
+    while idx < len(data):
+        if idx + 3 < len(data) and data[idx] == RA6_SOF:
+            raw = data[idx:idx + 4]
+            if raw[3] == RA6_EOF:
+                frames.append(_status_from_func_value(raw, raw[1], raw[2]))
+                idx += 4
+                consumed = idx
+                continue
+        if idx + 7 < len(data) and data[idx] == JETSON_UNIFIED_SOF0 and data[idx + 1] == JETSON_UNIFIED_SOF1:
+            if data[idx + 2] != JETSON_UNIFIED_VERSION:
+                idx += 1
+                consumed = idx
+                continue
+            payload_len = data[idx + 5]
+            total_len = 8 + payload_len
+            if idx + total_len > len(data):
+                break
+            raw = data[idx:idx + total_len]
+            body = raw[2:6 + payload_len]
+            rx_crc = int.from_bytes(raw[6 + payload_len:8 + payload_len], "little")
+            if crc16_modbus(body) != rx_crc:
+                idx += 1
+                consumed = idx
+                continue
+            msg_type = raw[3]
+            payload = raw[6:6 + payload_len]
+            if msg_type == JETSON_MSG_STATUS and len(payload) >= 3:
+                frames.append(_status_from_func_value(raw, payload[0], payload[1]))
+            elif msg_type == JETSON_MSG_ERROR and len(payload) >= 1:
+                frames.append(Ra6Status(raw=raw, func=0xFE, value=payload[0], name="ERROR"))
+            idx += total_len
+            consumed = idx
             continue
-        raw = data[idx:idx + 4]
-        if len(raw) == 4 and raw[3] == RA6_EOF:
-            func = raw[1]
-            value = raw[2]
-            frames.append(Ra6Status(raw=raw, func=func, value=value, name=STATUS_NAMES.get((func, value), "UNKNOWN")))
-            idx += 4
-        else:
-            idx += 1
-    return frames
+        idx += 1
+        consumed = idx
+    return frames, data[consumed:]
+
+
+def parse_ra6_status_frames(data: bytes) -> list[Ra6Status]:
+    return parse_ra6_status_stream(data)[0]
 
 
 def parse_vision_sequence(text: str) -> list[tuple[int, int, int]]:
@@ -133,13 +215,27 @@ def protocol_self_test() -> None:
     assert build_vision_error_frame(-7, -50) == bytes.fromhex("FF 05 03 F9 FF CE FF CD FE")
     assert build_target_control_frame(True) == bytes.fromhex("AA 01 01 BB")
     assert build_target_control_frame(False) == bytes.fromhex("AA 01 00 BB")
+    assert build_unified_heartbeat_frame(1, 1234) == bytes.fromhex("A5 5A 01 01 01 04 D2 04 00 00 19 AF")
+    assert build_unified_target_control_frame(True, 2) == bytes.fromhex("A5 5A 01 02 02 01 01 79 E8")
+    assert build_unified_vision_error_frame(-7, -50, 3) == bytes.fromhex("A5 5A 01 03 03 05 F9 FF CE FF 01 39 EF")
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
     assert [(item.func, item.value, item.name) for item in frames] == [
         (0x04, 0x01, "TARGET_CTRL_ON"),
         (0x03, 0x00, "OUTPUT_OFF"),
     ]
+    unified = build_unified_frame(0x81, 7, bytes([0x02, 0x01, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(unified)] == [
+        (0x02, 0x01, "ALIGN_DONE"),
+    ]
+    bad_crc = bytearray(unified)
+    bad_crc[-1] ^= 0xFF
+    assert parse_ra6_status_frames(bytes(bad_crc)) == []
     assert parse_vision_sequence("15,-10:2;8,-5:1;0,0:0") == [(15, -10, 2), (8, -5, 1), (0, 0, 0)]
+    assert should_log_serial_tx("HEARTBEAT") is False
+    assert should_log_serial_tx("TARGET_CTRL_START_NEW") is True
+    assert should_display_arm_line("[JETSON_RX] heartbeat seq=84") is False
+    assert should_display_arm_line("[JETSON_RX] target_ctrl=1") is True
 
 
 class SessionLogger:
@@ -161,10 +257,11 @@ class SerialChannel:
         self.app = app
         self.ser: serial.Serial | None = None
         self.stop_event = threading.Event()
+        self.write_lock = threading.Lock()
 
     def open(self, port: str, baud: int) -> None:
         self.close()
-        self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05, write_timeout=0.2)
+        self.ser = serial.Serial(port=port, baudrate=baud, timeout=0.05, write_timeout=1.0)
         self.stop_event.clear()
         threading.Thread(target=self._reader, daemon=True).start()
         self.app.emit_log(self.name, "INFO", f"opened {port} @ {baud}")
@@ -184,9 +281,11 @@ class SerialChannel:
     def write(self, data: bytes, label: str) -> None:
         if self.ser is None or not self.ser.is_open:
             raise RuntimeError(f"{self.name} serial is not open")
-        self.ser.write(data)
-        display = data.decode("ascii", errors="ignore").strip() if self.name == "ARM" else bytes_to_hex(data)
-        self.app.emit_log(self.name, "TX", f"{label}: {display}")
+        with self.write_lock:
+            self.ser.write(data)
+        if should_log_serial_tx(label):
+            display = data.decode("ascii", errors="ignore").strip() if self.name == "ARM" else bytes_to_hex(data)
+            self.app.emit_log(self.name, "TX", f"{label}: {display}")
 
     def _reader(self) -> None:
         while not self.stop_event.is_set():
@@ -212,12 +311,20 @@ class QtUpperConsole(QMainWindow):
         self.arm = SerialChannel("ARM", self)
         self.jetson = SerialChannel("JETSON", self)
         self.vision_stop = threading.Event()
+        self.heartbeat_stop = threading.Event()
+        self.heartbeat_stop.set()
+        self.heartbeat_thread: threading.Thread | None = None
         self.demo_stop = threading.Event()
         self.ra6_events = {name: threading.Event() for name in STATUS_NAMES.values()}
         self.capture_step_index = {name: 0 for name in DEFAULT_CAPTURE_RECIPES}
         self.status_labels: dict[str, QLabel] = {}
         self.status_dots: dict[str, QLabel] = {}
+        self.unified_seq = 0
+        self.jetson_rx_buffer = bytearray()
         self._build_ui()
+        self._set_status("PROTO", self.current_protocol_label())
+        self._set_status("HEARTBEAT", "OFF")
+        self._update_protocol_widgets()
         self.refresh_ports()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._flush_logs)
@@ -330,6 +437,26 @@ class QtUpperConsole(QMainWindow):
     def _jetson_group(self) -> QGroupBox:
         group = QGroupBox("Jetson 模拟器")
         layout = QVBoxLayout(group)
+        self.protocol_mode = QComboBox()
+        self.protocol_mode.addItem("OLD AA/FF/CC", JETSON_PROTOCOL_OLD)
+        self.protocol_mode.addItem("NEW A5 5A + CRC16", JETSON_PROTOCOL_NEW)
+        saved_protocol = self._settings_text("jetson/protocol", JETSON_PROTOCOL_OLD)
+        protocol_index = self.protocol_mode.findData(saved_protocol)
+        self.protocol_mode.setCurrentIndex(protocol_index if protocol_index >= 0 else 0)
+        self.protocol_mode.currentIndexChanged.connect(self.on_protocol_changed)
+
+        self.heartbeat_enable = QCheckBox("Heartbeat keep")
+        self.heartbeat_enable.setChecked(self._settings_bool("jetson/heartbeat_enable", False))
+        self.heartbeat_enable.toggled.connect(self.on_heartbeat_toggled)
+        self.heartbeat_period_ms = QLineEdit(self._settings_text("jetson/heartbeat_ms", "200"))
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Protocol"))
+        row.addWidget(self.protocol_mode, 1)
+        row.addWidget(self.heartbeat_enable)
+        row.addWidget(QLabel("HB ms"))
+        row.addWidget(self.heartbeat_period_ms)
+        layout.addLayout(row)
         row = QHBoxLayout()
         row.addWidget(self._button("启动状态机 AA 01 01 BB", lambda: self.send_target_ctrl(True)))
         row.addWidget(self._button("关闭状态机 AA 01 00 BB", self.stop_target_ctrl_with_reset))
@@ -422,7 +549,7 @@ class QtUpperConsole(QMainWindow):
     def _status_group(self) -> QGroupBox:
         group = QGroupBox("状态")
         grid = QGridLayout(group)
-        keys = ["ARM_PORT", "JETSON_PORT", "POSE_VALID", "TARGET_CTRL", "READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"]
+        keys = ["ARM_PORT", "JETSON_PORT", "PROTO", "HEARTBEAT", "POSE_VALID", "TARGET_CTRL", "READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"]
         for idx, key in enumerate(keys):
             dot = QLabel()
             dot.setFixedSize(14, 14)
@@ -455,6 +582,96 @@ class QtUpperConsole(QMainWindow):
         button = QPushButton(text)
         button.clicked.connect(lambda _checked=False, cb=callback: cb())
         return button
+
+    def current_jetson_protocol(self) -> str:
+        if not hasattr(self, "protocol_mode"):
+            return JETSON_PROTOCOL_OLD
+        return str(self.protocol_mode.currentData() or JETSON_PROTOCOL_OLD)
+
+    def current_protocol_label(self) -> str:
+        return "NEW" if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW else "OLD"
+
+    def _update_protocol_widgets(self) -> None:
+        enabled = self.current_jetson_protocol() == JETSON_PROTOCOL_NEW
+        self.heartbeat_enable.setEnabled(enabled)
+        self.heartbeat_period_ms.setEnabled(enabled)
+
+    def _next_unified_seq(self) -> int:
+        self.unified_seq = (self.unified_seq + 1) & 0xFF
+        return self.unified_seq
+
+    def on_protocol_changed(self) -> None:
+        protocol = self.current_jetson_protocol()
+        self.settings.setValue("jetson/protocol", protocol)
+        self.settings.sync()
+        self._set_status("PROTO", self.current_protocol_label())
+        self._update_protocol_widgets()
+        if protocol == JETSON_PROTOCOL_NEW:
+            self.emit_log("JETSON", "INFO", "protocol switched to NEW A5 5A + CRC16")
+            if self.heartbeat_enable.isChecked():
+                self.start_heartbeat()
+        else:
+            self.stop_heartbeat()
+            self.emit_log("JETSON", "INFO", "protocol switched to OLD AA/FF/CC; heartbeat is disabled")
+
+    def on_heartbeat_toggled(self, checked: bool) -> None:
+        self.settings.setValue("jetson/heartbeat_enable", checked)
+        self.settings.setValue("jetson/heartbeat_ms", self.heartbeat_period_ms.text())
+        self.settings.sync()
+        if checked:
+            self.start_heartbeat()
+        else:
+            self.stop_heartbeat()
+
+    def start_heartbeat(self) -> None:
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self._set_status("HEARTBEAT", "OFF")
+            self.emit_log("JETSON", "INFO", "OLD protocol has no heartbeat")
+            return
+        if not self.jetson.is_open():
+            self._set_status("HEARTBEAT", "OFF")
+            self.emit_log("JETSON", "WARN", "Jetson serial is not open; heartbeat not started")
+            return
+        try:
+            period_ms = max(50, int(self.heartbeat_period_ms.text()))
+        except ValueError:
+            period_ms = 200
+            self.heartbeat_period_ms.setText(str(period_ms))
+        self.settings.setValue("jetson/heartbeat_ms", str(period_ms))
+        self.settings.sync()
+
+        if self.heartbeat_thread is not None and self.heartbeat_thread.is_alive() and not self.heartbeat_stop.is_set():
+            self._set_status("HEARTBEAT", "ON")
+            return
+
+        self.heartbeat_stop.set()
+        stop_event = threading.Event()
+        self.heartbeat_stop = stop_event
+        self.heartbeat_thread = threading.Thread(target=self._heartbeat_loop, args=(period_ms, stop_event), daemon=True)
+        self.heartbeat_thread.start()
+        self._set_status("HEARTBEAT", "ON")
+        self.emit_log("JETSON", "INFO", f"heartbeat started: {period_ms} ms")
+
+    def stop_heartbeat(self) -> None:
+        self.heartbeat_stop.set()
+        self._set_status("HEARTBEAT", "OFF")
+        self.emit_log("JETSON", "INFO", "heartbeat stopped")
+
+    def _heartbeat_loop(self, period_ms: int, stop_event: threading.Event) -> None:
+        while not stop_event.is_set():
+            if not self.jetson.is_open() or self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+                stop_event.set()
+                break
+            tick_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
+            try:
+                self.jetson.write(build_unified_heartbeat_frame(self._next_unified_seq(), tick_ms), "HEARTBEAT")
+            except Exception as exc:
+                self.emit_log("JETSON", "ERROR", str(exc))
+                stop_event.set()
+                break
+            time.sleep(period_ms / 1000.0)
+        if self.heartbeat_stop is stop_event:
+            self._set_status("HEARTBEAT", "OFF")
 
     def refresh_ports(self) -> None:
         ports = [item.device for item in list_ports.comports()]
@@ -490,6 +707,8 @@ class QtUpperConsole(QMainWindow):
                 self._clear_arm_runtime_status()
             elif channel is self.jetson:
                 self._clear_target_runtime_status(clear_target=True)
+                if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW and self.heartbeat_enable.isChecked():
+                    self.start_heartbeat()
         except Exception as exc:
             self.emit_log(channel.name, "ERROR", str(exc))
             QMessageBox.warning(self, "串口打开失败", str(exc))
@@ -497,6 +716,7 @@ class QtUpperConsole(QMainWindow):
     def close_channel(self, channel: SerialChannel) -> None:
         if channel is self.jetson:
             self.stop_periodic_vision()
+            self.stop_heartbeat()
         channel.close()
         self._set_status("ARM_PORT" if channel is self.arm else "JETSON_PORT", "已关闭")
         if channel is self.arm:
@@ -551,13 +771,22 @@ class QtUpperConsole(QMainWindow):
             self.emit_log("JETSON", "ERROR", "Jetson模拟串口未打开，控制帧未发送。")
             return False
         try:
-            self.jetson.write(build_target_control_frame(enable), "TARGET_CTRL_START" if enable else "TARGET_CTRL_STOP")
+            if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
+                if enable and self.heartbeat_enable.isChecked():
+                    self.start_heartbeat()
+                frame = build_unified_target_control_frame(enable, self._next_unified_seq())
+                label = "TARGET_CTRL_START_NEW" if enable else "TARGET_CTRL_STOP_NEW"
+            else:
+                frame = build_target_control_frame(enable)
+                label = "TARGET_CTRL_START" if enable else "TARGET_CTRL_STOP"
+            self.jetson.write(frame, label)
         except Exception as exc:
             self.emit_log("JETSON", "ERROR", str(exc))
             return False
         return True
 
     def stop_target_ctrl_with_reset(self) -> None:
+        self.stop_heartbeat()
         if not self.send_target_ctrl(False):
             self.send_arm_command("soft_reset")
 
@@ -571,7 +800,13 @@ class QtUpperConsole(QMainWindow):
         if not self.jetson.is_open():
             self.emit_log("JETSON", "ERROR", f"Jetson模拟串口未打开，视觉误差未发送: dcx={dcx} dcy={dcy}")
             return
-        self.jetson.write(build_vision_error_frame(dcx, dcy), f"VISION dcx={dcx} dcy={dcy}")
+        if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
+            frame = build_unified_vision_error_frame(dcx, dcy, self._next_unified_seq())
+            label = f"VISION_NEW dcx={dcx} dcy={dcy}"
+        else:
+            frame = build_vision_error_frame(dcx, dcy)
+            label = f"VISION dcx={dcx} dcy={dcy}"
+        self.jetson.write(frame, label)
 
     def start_periodic_vision(self) -> None:
         self.vision_stop.clear()
@@ -670,6 +905,11 @@ class QtUpperConsole(QMainWindow):
             self.emit_log("DEMO", "ERROR", "Jetson模拟串口未打开，无法开始一键定靶演示。")
             return
         self.save_demo_settings()
+        if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
+            if self.heartbeat_enable.isChecked():
+                self.start_heartbeat()
+            else:
+                self.heartbeat_enable.setChecked(True)
         self._clear_ra6_events()
         self.demo_stop.clear()
         self.vision_stop.set()
@@ -685,6 +925,7 @@ class QtUpperConsole(QMainWindow):
     def stop_target_demo(self) -> None:
         self.demo_stop.set()
         self.stop_periodic_vision()
+        self.stop_heartbeat()
         stop_sent = self.send_target_ctrl(False)
         self.send_arm_command("laser_off")
         if not stop_sent:
@@ -696,6 +937,9 @@ class QtUpperConsole(QMainWindow):
         if send_enable:
             self.send_target_ctrl(True)
         if wait_ready and not self._wait_ra6_event("READY", 12.0):
+            self.stop_periodic_vision()
+            self.stop_heartbeat()
+            self.send_target_ctrl(False)
             self.emit_log("DEMO", "ERROR", "未收到 READY，演示停止。请先确认 soft_reset 和状态机启动。")
             return
 
@@ -730,6 +974,7 @@ class QtUpperConsole(QMainWindow):
 
     def safety_stop(self) -> None:
         self.stop_periodic_vision()
+        self.stop_heartbeat()
         self.send_arm_command("target_disable")
         self.send_arm_command("laser_off")
         self.emit_log("APP", "SAFETY", "已停止视觉发送，并发送 target_disable / laser_off")
@@ -739,12 +984,15 @@ class QtUpperConsole(QMainWindow):
             text = data.decode("utf-8", errors="replace")
             for line in text.replace("\r", "\n").split("\n"):
                 line = line.strip()
-                if line:
+                if line and should_display_arm_line(line):
                     self.emit_log("ARM", "RX", line)
                     self._update_arm_status(line)
         else:
             self.emit_log("JETSON", "RX", bytes_to_hex(data))
-            for status in parse_ra6_status_frames(data):
+            self.jetson_rx_buffer.extend(data)
+            frames, remaining = parse_ra6_status_stream(bytes(self.jetson_rx_buffer))
+            self.jetson_rx_buffer = bytearray(remaining[-64:])
+            for status in frames:
                 self.emit_log("JETSON", "STATUS", f"{status.name}: {bytes_to_hex(status.raw)}")
                 self._update_ra6_status(status.name)
 
@@ -790,6 +1038,10 @@ class QtUpperConsole(QMainWindow):
     def _status_color(self, key: str, value: str) -> str:
         if key == "ERROR" and value == "YES":
             return "red"
+        if key == "PROTO":
+            return "green" if value == "NEW" else "gray"
+        if key == "HEARTBEAT":
+            return "green" if value == "ON" else "gray"
         if value in {"YES", "ON"} or value.startswith("已打开"):
             return "green"
         return "gray"
@@ -847,6 +1099,7 @@ class QtUpperConsole(QMainWindow):
     def closeEvent(self, event) -> None:  # noqa: N802
         self.demo_stop.set()
         self.stop_periodic_vision()
+        self.stop_heartbeat()
         self.arm.close()
         self.jetson.close()
         event.accept()

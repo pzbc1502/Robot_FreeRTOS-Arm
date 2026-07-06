@@ -70,7 +70,7 @@ static uint8_t s_tx_frame[2u + 4u + 3u + 2u];
 
 static uint32_t jetson_now_ms(void)
 {
-    return (uint32_t)xTaskGetTickCount() * (uint32_t)portTICK_PERIOD_MS;
+    return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
 }
 
 static void parser_reset(void)
@@ -350,7 +350,7 @@ static void process_byte(uint8_t byte)
 
         case JETSON_PARSER_READ_UNIFIED_CRC_HI:
         {
-            uint16_t rx_crc = (uint16_t)s_parser.unified_crc_lo | ((uint16_t)byte << 8);
+            uint16_t rx_crc = (uint16_t)((uint16_t)s_parser.unified_crc_lo | ((uint16_t)byte << 8));
             uint16_t calc_crc = crc_modbus(s_parser.unified_crc_data, s_parser.unified_crc_len);
             if (rx_crc == calc_crc)
             {
@@ -487,6 +487,11 @@ bool jetson_is_unified_protocol_active(void)
 bool jetson_is_link_alive(uint32_t now_ms)
 {
     if (!s_unified_protocol_active)
+    {
+        return true;
+    }
+
+    if (now_ms < s_last_heartbeat_ms)
     {
         return true;
     }

@@ -13,9 +13,10 @@ void vision_service_thread_entry(void * pvParameters)
     while (1)
     {
         target_obs_t obs = {0};
-        obs.now_ms = HAL_GetTick();
 
         jetson_vision_process();
+        obs.now_ms = HAL_GetTick();
+
         bool target_enable = false;
         if (jetson_get_target_control(&target_enable))
         {

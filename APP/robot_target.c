@@ -172,6 +172,8 @@ void robot_target_init(void)
 
 bool robot_target_enable_request(void)
 {
+    uint32_t now = HAL_GetTick();
+
     target_stop_visual_servo();
     force_laser_off();
     if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID))
@@ -179,6 +181,15 @@ bool robot_target_enable_request(void)
         ROBOT_TARGET_ENABLED = false;
         return false;
     }
+
+    s_target.target = s_target.pre;
+    s_target.last_step_ms = now;
+    s_target.last_vision_ms = 0u;
+    s_target.dcx = 0;
+    s_target.dcy = 0;
+    s_target.has_vision = false;
+    reset_alignment_counts();
+    enter_state(TARGET_INIT, now);
 
     ROBOT_TARGET_ENABLED = true;
     return true;
@@ -227,7 +238,10 @@ void robot_target_step(const target_obs_t *obs)
     {
         target_stop_visual_servo();
         force_laser_off();
-        (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, 1u);
+        if (s_target.state != TARGET_RECOVER)
+        {
+            (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, 1u);
+        }
         enter_state(TARGET_RECOVER, now);
         return;
     }
