@@ -17,7 +17,7 @@ def test_robot_visual_servo_api_exists() -> None:
     require(ROBOT_H, "ROBOT_STATUS_VISUAL_SERVO_ACTIVE", "visual servo status")
     require(ROBOT_H, "int robot_visual_servo_start(void);", "visual servo start API")
     require(ROBOT_H, "void robot_visual_servo_stop(void);", "visual servo stop API")
-    require(ROBOT_H, "void robot_visual_servo_set_velocity(float vx, float vz);", "visual servo velocity API")
+    require(ROBOT_H, "void robot_visual_servo_set_velocity(float vx, float vy, float vz);", "visual servo velocity API")
     require(ROBOT_H, "bool robot_is_visual_servo_active(void);", "visual servo active API")
 
 
@@ -37,10 +37,13 @@ def test_target_visual_servo_params_and_calls_exist() -> None:
     require(TARGET_H, "TARGET_VS_MAX_SPEED_MM_S", "visual servo coarse speed")
     require(TARGET_H, "TARGET_VS_FINE_MAX_SPEED_MM_S", "visual servo fine speed")
     require(TARGET_H, "TARGET_VS_CMD_TIMEOUT_MS", "visual servo command timeout")
+    require(TARGET_H, "TARGET_SAFE_DISTANCE_MM", "safe distance threshold")
+    require(TARGET_H, "TARGET_SAFE_RETREAT_SPEED_MM_S", "safe distance retreat speed")
     require(TARGET_C, "#if TARGET_USE_VISUAL_SERVO", "visual servo target branch")
     require(TARGET_C, "robot_visual_servo_start()", "target starts visual servo")
     require(TARGET_C, "robot_visual_servo_set_velocity", "target updates visual servo velocity")
     require(TARGET_C, "robot_visual_servo_stop()", "target stops visual servo")
+    require(TARGET_C, "target_handle_safe_distance_guard", "safe distance guard")
 
 
 if __name__ == "__main__":

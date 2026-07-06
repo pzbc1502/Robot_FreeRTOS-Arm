@@ -24,11 +24,16 @@ typedef struct
     uint32_t enter_ms;
     uint32_t last_step_ms;
     uint32_t last_vision_ms;
+    uint32_t last_distance_ms;
     int16_t dcx;
     int16_t dcy;
+    uint16_t distance_mm;
     uint8_t stable_count;
     uint8_t confirm_stable_count;
     bool has_vision;
+    bool has_distance;
+    bool distance_valid;
+    bool distance_too_close;
     struct position pre;
     struct position target;
 } target_ctx_t;
@@ -91,6 +96,18 @@ static bool vision_fresh(uint32_t now_ms)
     return s_target.has_vision && ((now_ms - s_target.last_vision_ms) <= TARGET_VISION_VALID_MS);
 }
 
+static bool safe_distance_fresh(uint32_t now_ms)
+{
+    return s_target.has_distance &&
+           s_target.distance_valid &&
+           ((now_ms - s_target.last_distance_ms) <= TARGET_SAFE_DISTANCE_VALID_MS);
+}
+
+static bool safe_distance_allows_output(uint32_t now_ms)
+{
+    return safe_distance_fresh(now_ms) && !s_target.distance_too_close;
+}
+
 static bool align_in_tolerance(void)
 {
     return (fabsf((float)s_target.dcx) <= TARGET_ALIGN_TOL_PX) &&
@@ -130,7 +147,7 @@ static void target_stop_visual_servo(void)
 static void target_hold_visual_servo(void)
 {
 #if TARGET_USE_VISUAL_SERVO
-    robot_visual_servo_set_velocity(0.0f, 0.0f);
+    robot_visual_servo_set_velocity(0.0f, 0.0f, 0.0f);
 #endif
 }
 
@@ -145,12 +162,99 @@ static void target_update_visual_servo_velocity(uint32_t now_ms)
     float vz = clampf_local((float)s_target.dcy * TARGET_VS_KZ_MM_S_PER_PX,
                             -speed_limit, speed_limit);
 
-    robot_visual_servo_set_velocity(vx, vz);
+    robot_visual_servo_set_velocity(vx, 0.0f, vz);
     s_target.last_step_ms = now_ms;
     LOG("[TARGET] visual servo vx=%.2f vz=%.2f dcx=%d dcy=%d\r\n",
         vx, vz, (int)s_target.dcx, (int)s_target.dcy);
 }
 #endif
+
+static void target_update_safe_distance(uint32_t now_ms, uint16_t distance_mm, bool valid)
+{
+    bool was_too_close = s_target.distance_too_close;
+
+    s_target.distance_mm = distance_mm;
+    s_target.distance_valid = valid;
+    s_target.last_distance_ms = now_ms;
+    s_target.has_distance = true;
+
+    if (valid)
+    {
+        if (distance_mm < TARGET_SAFE_DISTANCE_MM)
+        {
+            s_target.distance_too_close = true;
+        }
+        else if (distance_mm >= TARGET_SAFE_DISTANCE_RELEASE_MM)
+        {
+            s_target.distance_too_close = false;
+        }
+    }
+
+    if (s_target.distance_too_close != was_too_close)
+    {
+        (void)jetson_send_status_u8(RA6_TO_JETSON_SAFE_DISTANCE,
+                                    s_target.distance_too_close ? 0u : 1u);
+        if (s_target.distance_too_close)
+        {
+            (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR,
+                                        JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE);
+        }
+    }
+
+    LOG("[TARGET] safe distance=%u valid=%u too_close=%u\r\n",
+        (unsigned)distance_mm,
+        valid ? 1u : 0u,
+        s_target.distance_too_close ? 1u : 0u);
+}
+
+static bool target_handle_safe_distance_guard(uint32_t now_ms)
+{
+    if (!s_target.distance_too_close)
+    {
+        return false;
+    }
+
+    if ((s_target.state == TARGET_INIT) || (s_target.state == TARGET_PRE_POSITION))
+    {
+        force_laser_off();
+        return false;
+    }
+
+    force_laser_off();
+    reset_alignment_counts();
+
+    if (!safe_distance_fresh(now_ms))
+    {
+        target_hold_visual_servo();
+        LOG("[TARGET] safe distance stale during retreat\r\n");
+        enter_state(TARGET_RECOVER, now_ms);
+        return true;
+    }
+
+    if (s_target.state == TARGET_OUTPUT)
+    {
+        (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
+        enter_state(TARGET_ALIGN, now_ms);
+    }
+
+#if TARGET_USE_VISUAL_SERVO
+    if (!robot_is_visual_servo_active())
+    {
+        if (robot_visual_servo_start() != pdPASS)
+        {
+            LOG("[TARGET] safe distance retreat start failed\r\n");
+            enter_state(TARGET_RECOVER, now_ms);
+            return true;
+        }
+    }
+    robot_visual_servo_set_velocity(0.0f, TARGET_SAFE_RETREAT_SPEED_MM_S, 0.0f);
+    s_target.last_step_ms = now_ms;
+    LOG("[TARGET] safe retreat vy=%.2f distance=%u\r\n",
+        TARGET_SAFE_RETREAT_SPEED_MM_S,
+        (unsigned)s_target.distance_mm);
+#endif
+    return true;
+}
 
 static bool send_target_auto(const struct position *pos)
 {
@@ -166,6 +270,9 @@ void robot_target_init(void)
     s_target.pre.z = TARGET_PRE_Z;
     s_target.target = s_target.pre;
     s_target.state = TARGET_INIT;
+    s_target.has_distance = false;
+    s_target.distance_valid = false;
+    s_target.distance_too_close = false;
     target_stop_visual_servo();
     force_laser_off();
 }
@@ -188,6 +295,11 @@ bool robot_target_enable_request(void)
     s_target.dcx = 0;
     s_target.dcy = 0;
     s_target.has_vision = false;
+    s_target.has_distance = false;
+    s_target.distance_valid = false;
+    s_target.distance_too_close = false;
+    s_target.distance_mm = 0u;
+    s_target.last_distance_ms = 0u;
     reset_alignment_counts();
     enter_state(TARGET_INIT, now);
 
@@ -211,6 +323,7 @@ void robot_target_step(const target_obs_t *obs)
     bool limit = ((obs != NULL) && obs->limit_triggered) || robot_any_limit_triggered();
     bool fire_allowed = ((obs != NULL) && obs->fire_button) || ROBOT_TARGET_FIRE_ENABLE;
     bool new_vision = (obs != NULL) && obs->has_vision;
+    bool new_distance = (obs != NULL) && obs->has_distance;
 
     if (new_vision)
     {
@@ -234,6 +347,11 @@ void robot_target_step(const target_obs_t *obs)
         return;
     }
 
+    if (new_distance)
+    {
+        target_update_safe_distance(now, obs->distance_mm, obs->distance_valid);
+    }
+
     if (estop || limit)
     {
         target_stop_visual_servo();
@@ -243,6 +361,11 @@ void robot_target_step(const target_obs_t *obs)
             (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, 1u);
         }
         enter_state(TARGET_RECOVER, now);
+        return;
+    }
+
+    if (target_handle_safe_distance_guard(now))
+    {
         return;
     }
 
@@ -395,6 +518,13 @@ void robot_target_step(const target_obs_t *obs)
             }
             if ((s_target.confirm_stable_count >= TARGET_CONFIRM_STABLE_COUNT) && fire_allowed)
             {
+                if (!safe_distance_allows_output(now))
+                {
+                    LOG("[TARGET] output blocked by safe distance distance=%u valid=%u\r\n",
+                        (unsigned)s_target.distance_mm,
+                        safe_distance_fresh(now) ? 1u : 0u);
+                    break;
+                }
                 target_stop_visual_servo();
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 1u);
                 enter_state(TARGET_OUTPUT, now);
@@ -403,7 +533,7 @@ void robot_target_step(const target_obs_t *obs)
 
         case TARGET_OUTPUT:
             target_stop_visual_servo();
-            if (!fire_allowed || !vision_fresh(now))
+            if (!fire_allowed || !vision_fresh(now) || !safe_distance_allows_output(now))
             {
                 force_laser_off();
                 (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);

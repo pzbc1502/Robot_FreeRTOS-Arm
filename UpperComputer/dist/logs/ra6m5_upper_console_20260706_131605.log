@@ -1157,3 +1157,137 @@
 [13:29:15.925] [ARM-RX] [0] current:78.32, target:90.00, dir:1
 [13:29:17.423] [ARM-RX] soft reset joint 0 settle timeout, keep going
 [13:29:17.485] [ARM-RX] soft reset final verify PASS (issues:2), pose set HOME.
+[15:26:16.980] [ARM-TX] 发送命令 target_enable: target_enable
+[15:26:17.029] [ARM-RX] Found handler for 'target_enable', executing...
+[15:26:17.029] [ARM-RX] target_enable
+[15:26:17.091] [JETSON-RX] A5 5A 01 FE CB 01 01 99 86
+[15:26:17.091] [JETSON-STATUS] ERROR: A5 5A 01 FE CB 01 01 99 86
+[15:26:23.404] [ARM-TX] 发送命令 target_disable: target_disable
+[15:26:23.478] [ARM-RX] Found handler for 'target_disable', executing...
+[15:26:23.478] [ARM-RX] ROBOT_SOFT_RESET_EVENT
+[15:26:23.479] [ARM-RX] --- Starting soft reset ---
+[15:26:23.540] [ARM-RX] [CAN][TX] timeout id=0x00000500 dlc=5
+[15:26:23.540] [ARM-RX] [CAN][timeout] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:23.540] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 20
+[15:26:23.540] [ARM-RX] target_disable
+[15:26:23.587] [ARM-RX] [CAN][TX] write failed id=0x00000400 dlc=5 err=60003
+[15:26:23.587] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:23.587] [ARM-RX] CAN Send chunk for Motor ID 4 failed with err: 60003
+[15:26:23.589] [ARM-RX] [CAN][TX] write failed id=0x00000200 dlc=5 err=60003
+[15:26:23.589] [ARM-RX] [CAN][write_fail]
+[15:26:23.630] [ARM-RX] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:23.630] [ARM-RX] CAN Send chunk for Motor ID 2 failed with err: 60003
+[15:26:23.631] [ARM-RX] [CAN][TX] write failed id=0x00000300 dlc=5 err=60003
+[15:26:23.631] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:23.632] [ARM-RX] CAN Send ch
+[15:26:23.695] [ARM-RX] unk for Motor ID 3 failed with err: 60003
+[15:26:23.695] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=5 err=60003
+[15:26:23.695] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:23.696] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 60003
+[15:26:23.819] [ARM-RX] Soft reset motors enabled (J1~J5, J6 skipped).
+[15:26:23.819] [ARM-RX] Soft resetting joint 4...
+[15:26:23.882] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[15:26:23.882] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:23.882] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 60003
+[15:26:24.005] [ARM-RX] joint 4 update current angle timeout.
+[15:26:24.068] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[15:26:24.069] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:24.069] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 60003
+[15:26:24.194] [ARM-RX] joint 4 update current angle timeout.
+[15:26:24.256] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[15:26:24.256] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:24.256] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 60003
+[15:26:24.442] [ARM-RX] joint 4 update current angle timeout.
+[15:26:24.442] [ARM-RX] joint 4 update current angle retry failed.
+[15:26:24.442] [ARM-RX] soft reset skip joint 4: read angle failed
+[15:26:24.442] [ARM-RX] Soft resetting joint 3...
+[15:26:24.503] [ARM-RX] [CAN][TX] write failed id=0x00000400 dlc=2 err=60003
+[15:26:24.503] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:24.503] [ARM-RX] CAN Send chunk for Motor ID 4 failed with err: 60003
+[15:26:24.626] [ARM-RX] joint 3 update current angle timeout.
+[15:26:24.687] [ARM-RX] [CAN][TX] write failed id=0x00000400 dlc=2 err=60003
+[15:26:24.687] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:24.687] [ARM-RX] CAN Send chunk for Motor ID 4 failed with err: 60003
+[15:26:24.870] [ARM-RX] joint 3 update current angle timeout.
+[15:26:24.932] [ARM-RX] [CAN][TX] write failed id=0x00000400 dlc=2 err=60003
+[15:26:24.932] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:24.932] [ARM-RX] CAN Send chunk for Motor ID 4 failed with err: 60003
+[15:26:25.053] [ARM-RX] joint 3 update current angle timeout.
+[15:26:25.103] [ARM-RX] joint 3 update current angle retry failed.
+[15:26:25.103] [ARM-RX] soft reset skip joint 3: read angle failed
+[15:26:25.103] [ARM-RX] Soft resetting joint 1...
+[15:26:25.103] [ARM-RX] [CAN][TX] write failed id=0x00000200 dlc=2 err=60003
+[15:26:25.104] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:25.104] [ARM-RX] CAN Send c
+[15:26:25.161] [ARM-RX] hunk for Motor ID 2 failed with err: 60003
+[15:26:25.285] [ARM-RX] joint 1 update current angle timeout.
+[15:26:25.346] [ARM-RX] [CAN][TX] write failed id=0x00000200 dlc=2 err=60003
+[15:26:25.346] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:25.347] [ARM-RX] CAN Send chunk for Motor ID 2 failed with err: 60003
+[15:26:25.469] [ARM-RX] joint 1 update current angle timeout.
+[15:26:25.530] [ARM-RX] [CAN][TX] write failed id=0x00000200 dlc=2 err=60003
+[15:26:25.531] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:25.531] [ARM-RX] CAN Send chunk for Motor ID 2 failed with err: 60003
+[15:26:25.714] [ARM-RX] joint 1 update current angle timeout.
+[15:26:25.715] [ARM-RX] joint 1 update current angle retry failed.
+[15:26:25.715] [ARM-RX] soft reset skip joint 1: read angle failed
+[15:26:25.715] [ARM-RX] Soft resetting joint 2...
+[15:26:25.775] [ARM-RX] [CAN][TX] write failed id=0x00000300 dlc=2 err=60003
+[15:26:25.775] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:25.775] [ARM-RX] CAN Send chunk for Motor ID 3 failed with err: 60003
+[15:26:25.897] [ARM-RX] joint 2 update current angle timeout.
+[15:26:25.958] [ARM-RX] [CAN][TX] write failed id=0x00000300 dlc=2 err=60003
+[15:26:25.958] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:25.958] [ARM-RX] CAN Send chunk for Motor ID 3 failed with err: 60003
+[15:26:26.142] [ARM-RX] joint 2 update current angle timeout.
+[15:26:26.203] [ARM-RX] [CAN][TX] write failed id=0x00000300 dlc=2 err=60003
+[15:26:26.203] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:26.204] [ARM-RX] CAN Send chunk for Motor ID 3 failed with err: 60003
+[15:26:26.326] [ARM-RX] joint 2 update current angle timeout.
+[15:26:26.376] [ARM-RX] joint 2 update current angle retry failed.
+[15:26:26.377] [ARM-RX] soft reset skip joint 2: read angle failed
+[15:26:26.377] [ARM-RX] Soft resetting joint 0...
+[15:26:26.377] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=2 err=60003
+[15:26:26.378] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:26.378] [ARM-RX] CAN Send c
+[15:26:26.434] [ARM-RX] hunk for Motor ID 1 failed with err: 60003
+[15:26:26.558] [ARM-RX] joint 0 update current angle timeout.
+[15:26:26.620] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=2 err=60003
+[15:26:26.620] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:26.620] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 60003
+[15:26:26.743] [ARM-RX] joint 0 update current angle timeout.
+[15:26:26.804] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=2 err=60003
+[15:26:26.804] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:26.804] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 60003
+[15:26:26.991] [ARM-RX] joint 0 update current angle timeout.
+[15:26:26.991] [ARM-RX] joint 0 update current angle retry failed.
+[15:26:26.991] [ARM-RX] soft reset skip joint 0: read angle failed
+[15:26:27.054] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=2 err=60003
+[15:26:27.054] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:27.054] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 60003
+[15:26:27.178] [ARM-RX] joint 0 update current angle timeout.
+[15:26:27.240] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=2 err=60003
+[15:26:27.240] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:27.241] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 60003
+[15:26:27.423] [ARM-RX] joint 0 update current angle timeout.
+[15:26:27.423] [ARM-RX] [CAN][TX] write failed id=0x00000100 dlc=2 err=60003
+[15:26:27.423] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0
+[15:26:27.484] [ARM-RX] x00000401
+[15:26:27.484] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 60003
+[15:26:27.608] [ARM-RX] joint 0 update current angle timeout.
+[15:26:27.648] [ARM-RX] joint 0 update current angle retry failed.
+[15:26:27.648] [ARM-RX] soft reset verify not pass, start refine loop...
+[15:26:27.648] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[15:26:27.649] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:27.649] [ARM-RX] CAN Send chunk for Motor ID 5 f
+[15:26:27.701] [ARM-RX] ailed with err: 60003
+[15:26:27.826] [ARM-RX] joint 4 update current angle timeout.
+[15:26:27.888] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[15:26:27.889] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:27.890] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 60003
+[15:26:28.011] [ARM-RX] joint 4 update current angle timeout.
+[15:26:28.073] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[15:26:28.073] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[15:26:28.073] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 60003
+[15:26:28.115] [JETSON-INFO] 已停止周期视觉发送
+[15:26:28.117] [JETSON-INFO] heartbeat stopped

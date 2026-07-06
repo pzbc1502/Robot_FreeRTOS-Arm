@@ -33,6 +33,10 @@ extern "C" {
 #define TARGET_VS_MAX_SPEED_MM_S     (8.0f)
 #define TARGET_VS_FINE_MAX_SPEED_MM_S (3.0f)
 #define TARGET_VS_CMD_TIMEOUT_MS     (250u)
+#define TARGET_SAFE_DISTANCE_MM          (100u)
+#define TARGET_SAFE_DISTANCE_RELEASE_MM  (110u)
+#define TARGET_SAFE_DISTANCE_VALID_MS    (500u)
+#define TARGET_SAFE_RETREAT_SPEED_MM_S   (6.0f)
 
 
 
@@ -54,6 +58,9 @@ typedef struct
     bool has_vision;
     int16_t dcx;
     int16_t dcy;
+    bool has_distance;
+    bool distance_valid;
+    uint16_t distance_mm;
     uint32_t now_ms;
     bool estop_active;
     bool limit_triggered;

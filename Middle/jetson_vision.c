@@ -59,6 +59,9 @@ static uint32_t s_last_read_pos = 0u;
 static int16_t s_latest_dcx = 0;
 static int16_t s_latest_dcy = 0;
 static volatile bool s_new_error = false;
+static uint16_t s_latest_distance_mm = 0u;
+static bool s_latest_distance_valid = false;
+static volatile bool s_new_safe_distance = false;
 static bool s_target_control_enable = false;
 static volatile bool s_new_target_control = false;
 static volatile bool s_unified_protocol_active = false;
@@ -115,6 +118,19 @@ static void handle_target_control(uint8_t value)
     __enable_irq();
 
     LOG("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)value);
+}
+
+static void handle_safe_distance(uint16_t distance_mm, bool valid)
+{
+    __disable_irq();
+    s_latest_distance_mm = distance_mm;
+    s_latest_distance_valid = valid;
+    s_new_safe_distance = true;
+    __enable_irq();
+
+    LOG("[JETSON_RX] safe_distance=%u valid=%u\r\n",
+        (unsigned)distance_mm,
+        valid ? 1u : 0u);
 }
 
 static void handle_valid_target_control_frame(void)
@@ -174,6 +190,17 @@ static void handle_valid_unified_frame(void)
                                             (uint16_t)s_parser.unified_payload[2]);
                     handle_vision_error(dcx, dcy);
                 }
+            }
+            break;
+
+        case JETSON_MSG_SAFE_DISTANCE:
+            if (s_parser.unified_len == 3u)
+            {
+                uint16_t distance_mm = (uint16_t)(((uint16_t)s_parser.unified_payload[1] << 8) |
+                                                 (uint16_t)s_parser.unified_payload[0]);
+                bool valid = (s_parser.unified_payload[2] != 0u);
+                accepted = true;
+                handle_safe_distance(distance_mm, valid);
             }
             break;
 
@@ -475,6 +502,26 @@ bool jetson_get_target_control(bool *enable)
     __disable_irq();
     *enable = s_target_control_enable;
     s_new_target_control = false;
+    __enable_irq();
+    return true;
+}
+
+bool jetson_get_safe_distance(uint16_t *distance_mm, bool *valid)
+{
+    if ((distance_mm == NULL) || (valid == NULL))
+    {
+        return false;
+    }
+
+    if (!s_new_safe_distance)
+    {
+        return false;
+    }
+
+    __disable_irq();
+    *distance_mm = s_latest_distance_mm;
+    *valid = s_latest_distance_valid;
+    s_new_safe_distance = false;
     __enable_irq();
     return true;
 }

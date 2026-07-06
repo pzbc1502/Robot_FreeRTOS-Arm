@@ -27,6 +27,7 @@ extern "C" {
 #define JETSON_MSG_TARGET_CTRL     0x02u
 #define JETSON_MSG_VISION_ERROR    0x03u
 #define JETSON_MSG_CAPTURE_CTRL    0x04u
+#define JETSON_MSG_SAFE_DISTANCE   0x05u
 #define JETSON_MSG_STATUS          0x81u
 #define JETSON_MSG_ERROR           0xFEu
 
@@ -38,12 +39,16 @@ extern "C" {
 #define RA6_TO_JETSON_ALIGN_DONE   0x02u
 #define RA6_TO_JETSON_OUTPUT       0x03u
 #define RA6_TO_JETSON_TARGET_CTRL  0x04u
+#define RA6_TO_JETSON_SAFE_DISTANCE 0x06u
 #define RA6_TO_JETSON_ERROR        0xFEu
+
+#define JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE 0x09u
 
 void jetson_vision_init(void);
 void jetson_vision_process(void);
 bool jetson_get_vision_error(int16_t *dcx, int16_t *dcy);
 bool jetson_get_target_control(bool *enable);
+bool jetson_get_safe_distance(uint16_t *distance_mm, bool *valid);
 bool jetson_is_unified_protocol_active(void);
 bool jetson_is_link_alive(uint32_t now_ms);
 bool jetson_send_status_u8(uint8_t func, uint8_t value);

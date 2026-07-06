@@ -33,6 +33,7 @@ void vision_service_thread_entry(void * pvParameters)
         }
 
         obs.has_vision = jetson_get_vision_error(&obs.dcx, &obs.dcy);
+        obs.has_distance = jetson_get_safe_distance(&obs.distance_mm, &obs.distance_valid);
         obs.fire_button = BSP_Laser_FireKey_IsPressed();
         obs.estop_active = jetson_is_unified_protocol_active() &&
                            !jetson_is_link_alive(obs.now_ms);

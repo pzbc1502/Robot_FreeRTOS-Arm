@@ -265,7 +265,7 @@ int robot_send_abs_rotate_event(uint8_t joint_id, float angle);
 int robot_send_remote_event(void);
 int robot_visual_servo_start(void);
 void robot_visual_servo_stop(void);
-void robot_visual_servo_set_velocity(float vx, float vz);
+void robot_visual_servo_set_velocity(float vx, float vy, float vz);
 bool robot_is_visual_servo_active(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
 int robot_send_read_all_event(void);

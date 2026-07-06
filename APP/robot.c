@@ -30,6 +30,7 @@ static float           s_result_buf[ROBOT_MAX_PATH_SIZE * ROBOT_MAX_JOINT_NUM];
 typedef struct
 {
     float vx;
+    float vy;
     float vz;
     uint32_t last_update_ms;
     bool stop_requested;
@@ -1475,13 +1476,14 @@ bool robot_is_visual_servo_active(void)
     return ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
 }
 
-void robot_visual_servo_set_velocity(float vx, float vz)
+void robot_visual_servo_set_velocity(float vx, float vy, float vz)
 {
     uint32_t now_ms = HAL_GetTick();
 
     taskENTER_CRITICAL();
     if (ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE)) {
         g_visual_servo.vx = robot_visual_servo_clip_velocity(vx);
+        g_visual_servo.vy = robot_visual_servo_clip_velocity(vy);
         g_visual_servo.vz = robot_visual_servo_clip_velocity(vz);
         g_visual_servo.last_update_ms = now_ms;
     }
@@ -1492,6 +1494,7 @@ void robot_visual_servo_stop(void)
 {
     taskENTER_CRITICAL();
     g_visual_servo.vx = 0.0f;
+    g_visual_servo.vy = 0.0f;
     g_visual_servo.vz = 0.0f;
     g_visual_servo.stop_requested = true;
     taskEXIT_CRITICAL();
@@ -1516,6 +1519,7 @@ int robot_visual_servo_start(void)
     bool busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
     if (active) {
         g_visual_servo.vx = 0.0f;
+        g_visual_servo.vy = 0.0f;
         g_visual_servo.vz = 0.0f;
         g_visual_servo.last_update_ms = now_ms;
         g_visual_servo.stop_requested = false;
@@ -1523,6 +1527,7 @@ int robot_visual_servo_start(void)
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
         g_visual_servo.vx = 0.0f;
+        g_visual_servo.vy = 0.0f;
         g_visual_servo.vz = 0.0f;
         g_visual_servo.last_update_ms = now_ms;
         g_visual_servo.stop_requested = false;
@@ -1573,6 +1578,7 @@ static int robot_visual_servo_run(void)
 
     while (robot_is_visual_servo_active()) {
         float vx = 0.0f;
+        float vy = 0.0f;
         float vz = 0.0f;
         uint32_t last_update_ms = 0u;
         bool stop_requested = false;
@@ -1581,6 +1587,7 @@ static int robot_visual_servo_run(void)
 
         taskENTER_CRITICAL();
         vx = g_visual_servo.vx;
+        vy = g_visual_servo.vy;
         vz = g_visual_servo.vz;
         last_update_ms = g_visual_servo.last_update_ms;
         stop_requested = g_visual_servo.stop_requested;
@@ -1591,12 +1598,14 @@ static int robot_visual_servo_run(void)
         }
         if ((HAL_GetTick() - last_update_ms) > TARGET_VS_CMD_TIMEOUT_MS) {
             vx = 0.0f;
+            vy = 0.0f;
             vz = 0.0f;
         }
 
         struct position next_pos = pos;
         float dt = (float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f;
         next_pos.x += vx * dt;
+        next_pos.y += vy * dt;
         next_pos.z += vz * dt;
 
         robot_kinematics_cal_T(T_0_6_reset, T, &next_pos);
@@ -1637,6 +1646,7 @@ static int robot_visual_servo_run(void)
     robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
     taskENTER_CRITICAL();
     g_visual_servo.vx = 0.0f;
+    g_visual_servo.vy = 0.0f;
     g_visual_servo.vz = 0.0f;
     g_visual_servo.stop_requested = false;
     ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
