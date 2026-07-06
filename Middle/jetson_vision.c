@@ -1,7 +1,9 @@
 #include "jetson_vision.h"
 #include "hal_data.h"
 #include "bsp_uart.h"
+#include "crc16.h"
 #include "FreeRTOS.h"
+#include "task.h"
 #include "semphr.h"
 
 /* FSP generated UART names. */
@@ -22,6 +24,14 @@ typedef enum
     JETSON_PARSER_READ_CTRL_FUNC,
     JETSON_PARSER_READ_CTRL_VALUE,
     JETSON_PARSER_READ_CTRL_EOF,
+    JETSON_PARSER_READ_UNIFIED_SOF1,
+    JETSON_PARSER_READ_UNIFIED_VER,
+    JETSON_PARSER_READ_UNIFIED_TYPE,
+    JETSON_PARSER_READ_UNIFIED_SEQ,
+    JETSON_PARSER_READ_UNIFIED_LEN,
+    JETSON_PARSER_READ_UNIFIED_PAYLOAD,
+    JETSON_PARSER_READ_UNIFIED_CRC_LO,
+    JETSON_PARSER_READ_UNIFIED_CRC_HI,
 } jetson_parser_state_t;
 
 typedef struct
@@ -33,6 +43,13 @@ typedef struct
     uint8_t payload_index;
     uint8_t checksum;
     uint8_t ctrl_value;
+    uint8_t unified_type;
+    uint8_t unified_seq;
+    uint8_t unified_len;
+    uint8_t unified_payload[JETSON_UNIFIED_MAX_PAYLOAD];
+    uint8_t unified_crc_data[4u + JETSON_UNIFIED_MAX_PAYLOAD];
+    uint8_t unified_crc_len;
+    uint8_t unified_crc_lo;
 } jetson_parser_t;
 
 static jetson_parser_t s_parser = { .state = JETSON_PARSER_WAIT_SOF };
@@ -44,9 +61,17 @@ static int16_t s_latest_dcy = 0;
 static volatile bool s_new_error = false;
 static bool s_target_control_enable = false;
 static volatile bool s_new_target_control = false;
+static volatile bool s_unified_protocol_active = false;
+static uint32_t s_last_heartbeat_ms = 0u;
+static uint8_t s_last_unified_seq = 0u;
 
 static SemaphoreHandle_t s_tx_sem = NULL;
-static uint8_t s_tx_frame[4];
+static uint8_t s_tx_frame[2u + 4u + 3u + 2u];
+
+static uint32_t jetson_now_ms(void)
+{
+    return (uint32_t)xTaskGetTickCount() * (uint32_t)portTICK_PERIOD_MS;
+}
 
 static void parser_reset(void)
 {
@@ -56,13 +81,15 @@ static void parser_reset(void)
     s_parser.payload_index = 0u;
     s_parser.checksum = 0u;
     s_parser.ctrl_value = 0u;
+    s_parser.unified_type = 0u;
+    s_parser.unified_seq = 0u;
+    s_parser.unified_len = 0u;
+    s_parser.unified_crc_len = 0u;
+    s_parser.unified_crc_lo = 0u;
 }
 
-static void handle_valid_error_frame(void)
+static void handle_vision_error(int16_t dcx, int16_t dcy)
 {
-    int16_t dcx = (int16_t)(((uint16_t)s_parser.payload[1] << 8) | (uint16_t)s_parser.payload[0]);
-    int16_t dcy = (int16_t)(((uint16_t)s_parser.payload[3] << 8) | (uint16_t)s_parser.payload[2]);
-
     __disable_irq();
     s_latest_dcx = dcx;
     s_latest_dcy = dcy;
@@ -72,14 +99,95 @@ static void handle_valid_error_frame(void)
     LOG("[JETSON_RX] vision dcx=%d dcy=%d\r\n", (int)dcx, (int)dcy);
 }
 
-static void handle_valid_target_control_frame(void)
+static void handle_valid_error_frame(void)
+{
+    int16_t dcx = (int16_t)(((uint16_t)s_parser.payload[1] << 8) | (uint16_t)s_parser.payload[0]);
+    int16_t dcy = (int16_t)(((uint16_t)s_parser.payload[3] << 8) | (uint16_t)s_parser.payload[2]);
+
+    handle_vision_error(dcx, dcy);
+}
+
+static void handle_target_control(uint8_t value)
 {
     __disable_irq();
-    s_target_control_enable = (s_parser.ctrl_value != 0u);
+    s_target_control_enable = (value != 0u);
     s_new_target_control = true;
     __enable_irq();
 
-    LOG("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)s_parser.ctrl_value);
+    LOG("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)value);
+}
+
+static void handle_valid_target_control_frame(void)
+{
+    handle_target_control(s_parser.ctrl_value);
+}
+
+static void unified_crc_push(uint8_t byte)
+{
+    if (s_parser.unified_crc_len < sizeof(s_parser.unified_crc_data))
+    {
+        s_parser.unified_crc_data[s_parser.unified_crc_len++] = byte;
+    }
+}
+
+static void mark_unified_link_alive(void)
+{
+    __disable_irq();
+    s_unified_protocol_active = true;
+    s_last_heartbeat_ms = jetson_now_ms();
+    s_last_unified_seq = s_parser.unified_seq;
+    __enable_irq();
+}
+
+static void handle_valid_unified_frame(void)
+{
+    bool accepted = false;
+
+    switch (s_parser.unified_type)
+    {
+        case JETSON_MSG_HEARTBEAT:
+            if (s_parser.unified_len == 4u)
+            {
+                accepted = true;
+                LOG("[JETSON_RX] heartbeat seq=%u\r\n", (unsigned)s_parser.unified_seq);
+            }
+            break;
+
+        case JETSON_MSG_TARGET_CTRL:
+            if ((s_parser.unified_len == 1u) &&
+                ((s_parser.unified_payload[0] == 0u) || (s_parser.unified_payload[0] == 1u)))
+            {
+                accepted = true;
+                handle_target_control(s_parser.unified_payload[0]);
+            }
+            break;
+
+        case JETSON_MSG_VISION_ERROR:
+            if (s_parser.unified_len == 5u)
+            {
+                accepted = true;
+                if (s_parser.unified_payload[4] != 0u)
+                {
+                    int16_t dcx = (int16_t)(((uint16_t)s_parser.unified_payload[1] << 8) |
+                                            (uint16_t)s_parser.unified_payload[0]);
+                    int16_t dcy = (int16_t)(((uint16_t)s_parser.unified_payload[3] << 8) |
+                                            (uint16_t)s_parser.unified_payload[2]);
+                    handle_vision_error(dcx, dcy);
+                }
+            }
+            break;
+
+        default:
+            LOG("[JETSON_RX] unsupported unified type=0x%02X len=%u\r\n",
+                (unsigned)s_parser.unified_type,
+                (unsigned)s_parser.unified_len);
+            break;
+    }
+
+    if (accepted)
+    {
+        mark_unified_link_alive();
+    }
 }
 
 static void process_byte(uint8_t byte)
@@ -96,6 +204,10 @@ static void process_byte(uint8_t byte)
             else if (byte == JETSON_CTRL_SOF)
             {
                 s_parser.state = JETSON_PARSER_READ_CTRL_FUNC;
+            }
+            else if (byte == JETSON_UNIFIED_SOF0)
+            {
+                s_parser.state = JETSON_PARSER_READ_UNIFIED_SOF1;
             }
             break;
 
@@ -173,6 +285,87 @@ static void process_byte(uint8_t byte)
             }
             parser_reset();
             break;
+
+        case JETSON_PARSER_READ_UNIFIED_SOF1:
+            if (byte == JETSON_UNIFIED_SOF1)
+            {
+                s_parser.unified_crc_len = 0u;
+                s_parser.payload_index = 0u;
+                s_parser.state = JETSON_PARSER_READ_UNIFIED_VER;
+            }
+            else
+            {
+                parser_reset();
+            }
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_VER:
+            if (byte != JETSON_UNIFIED_VERSION)
+            {
+                parser_reset();
+                break;
+            }
+            unified_crc_push(byte);
+            s_parser.state = JETSON_PARSER_READ_UNIFIED_TYPE;
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_TYPE:
+            s_parser.unified_type = byte;
+            unified_crc_push(byte);
+            s_parser.state = JETSON_PARSER_READ_UNIFIED_SEQ;
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_SEQ:
+            s_parser.unified_seq = byte;
+            unified_crc_push(byte);
+            s_parser.state = JETSON_PARSER_READ_UNIFIED_LEN;
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_LEN:
+            if (byte > JETSON_UNIFIED_MAX_PAYLOAD)
+            {
+                parser_reset();
+                break;
+            }
+            s_parser.unified_len = byte;
+            s_parser.payload_index = 0u;
+            unified_crc_push(byte);
+            s_parser.state = (byte == 0u) ? JETSON_PARSER_READ_UNIFIED_CRC_LO :
+                                            JETSON_PARSER_READ_UNIFIED_PAYLOAD;
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_PAYLOAD:
+            s_parser.unified_payload[s_parser.payload_index++] = byte;
+            unified_crc_push(byte);
+            if (s_parser.payload_index >= s_parser.unified_len)
+            {
+                s_parser.state = JETSON_PARSER_READ_UNIFIED_CRC_LO;
+            }
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_CRC_LO:
+            s_parser.unified_crc_lo = byte;
+            s_parser.state = JETSON_PARSER_READ_UNIFIED_CRC_HI;
+            break;
+
+        case JETSON_PARSER_READ_UNIFIED_CRC_HI:
+        {
+            uint16_t rx_crc = (uint16_t)s_parser.unified_crc_lo | ((uint16_t)byte << 8);
+            uint16_t calc_crc = crc_modbus(s_parser.unified_crc_data, s_parser.unified_crc_len);
+            if (rx_crc == calc_crc)
+            {
+                handle_valid_unified_frame();
+            }
+            else
+            {
+                LOG("[JETSON_RX] crc failed type=0x%02X rx=0x%04X calc=0x%04X\r\n",
+                    (unsigned)s_parser.unified_type,
+                    (unsigned)rx_crc,
+                    (unsigned)calc_crc);
+            }
+            parser_reset();
+            break;
+        }
 
         default:
             parser_reset();
@@ -286,6 +479,58 @@ bool jetson_get_target_control(bool *enable)
     return true;
 }
 
+bool jetson_is_unified_protocol_active(void)
+{
+    return s_unified_protocol_active;
+}
+
+bool jetson_is_link_alive(uint32_t now_ms)
+{
+    if (!s_unified_protocol_active)
+    {
+        return true;
+    }
+
+    return ((now_ms - s_last_heartbeat_ms) <= JETSON_HEARTBEAT_TIMEOUT_MS);
+}
+
+static uint32_t build_unified_status_frame(uint8_t func, uint8_t value)
+{
+    uint8_t payload[3];
+    uint8_t type = JETSON_MSG_STATUS;
+    uint8_t payload_len = 3u;
+
+    if (func == RA6_TO_JETSON_ERROR)
+    {
+        type = JETSON_MSG_ERROR;
+        payload[0] = value;
+        payload_len = 1u;
+    }
+    else
+    {
+        payload[0] = func;
+        payload[1] = value;
+        payload[2] = 0u;
+    }
+
+    s_tx_frame[0] = JETSON_UNIFIED_SOF0;
+    s_tx_frame[1] = JETSON_UNIFIED_SOF1;
+    s_tx_frame[2] = JETSON_UNIFIED_VERSION;
+    s_tx_frame[3] = type;
+    s_tx_frame[4] = s_last_unified_seq;
+    s_tx_frame[5] = payload_len;
+    for (uint8_t i = 0u; i < payload_len; i++)
+    {
+        s_tx_frame[6u + i] = payload[i];
+    }
+
+    uint16_t crc = crc_modbus(&s_tx_frame[2], (uint16_t)(4u + payload_len));
+    s_tx_frame[6u + payload_len] = (uint8_t)(crc & 0xFFu);
+    s_tx_frame[7u + payload_len] = (uint8_t)((crc >> 8) & 0xFFu);
+
+    return (uint32_t)(8u + payload_len);
+}
+
 bool jetson_send_status_u8(uint8_t func, uint8_t value)
 {
     if (s_tx_sem == NULL)
@@ -293,13 +538,21 @@ bool jetson_send_status_u8(uint8_t func, uint8_t value)
         return false;
     }
 
-    s_tx_frame[0] = RA6_TO_JETSON_SOF;
-    s_tx_frame[1] = func;
-    s_tx_frame[2] = value;
-    s_tx_frame[3] = RA6_TO_JETSON_EOF;
+    uint32_t tx_len = 4u;
+    if (s_unified_protocol_active)
+    {
+        tx_len = build_unified_status_frame(func, value);
+    }
+    else
+    {
+        s_tx_frame[0] = RA6_TO_JETSON_SOF;
+        s_tx_frame[1] = func;
+        s_tx_frame[2] = value;
+        s_tx_frame[3] = RA6_TO_JETSON_EOF;
+    }
 
     (void)xSemaphoreTake(s_tx_sem, 0);
-    fsp_err_t err = R_SCI_UART_Write(&robot_jeston_ctrl, s_tx_frame, sizeof(s_tx_frame));
+    fsp_err_t err = R_SCI_UART_Write(&robot_jeston_ctrl, s_tx_frame, tx_len);
     if (FSP_SUCCESS != err)
     {
         LOG("Jetson TX start failed, err=%d\r\n", (int)err);

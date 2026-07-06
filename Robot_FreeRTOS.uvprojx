@@ -483,6 +483,16 @@
               <FilePath>.\Middle\jetson_vision.h</FilePath>
             </File>
             <File>
+              <FileName>crc16.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Middle\crc16.c</FilePath>
+            </File>
+            <File>
+              <FileName>crc16.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Middle\crc16.h</FilePath>
+            </File>
+            <File>
               <FileName>W800_mqtt.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Middle\W800_mqtt.c</FilePath>
