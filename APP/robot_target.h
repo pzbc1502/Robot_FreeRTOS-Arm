@@ -14,10 +14,10 @@ extern "C" {
 #define TARGET_PRE_X                 (0.0f)      /* 定靶预定位 X 方向偏移，单位 mm */
 #endif
 #ifndef TARGET_PRE_Y
-#define TARGET_PRE_Y                 (-60.0f)    /* 定靶预定位 Y 方向偏移，单位 mm，负值表示向前靠近目标 */
+#define TARGET_PRE_Y                 (-130.0f)    /* 定靶预定位 Y 方向偏移，单位 mm，负值表示向前靠近目标 */
 #endif
 #ifndef TARGET_PRE_Z
-#define TARGET_PRE_Z                 (-1.5f)      /* 定靶预定位 Z 方向偏移，单位 mm */
+#define TARGET_PRE_Z                 (-15.0f)      /* 定靶预定位 Z 方向偏移，单位 mm */
 #endif
 
 
@@ -51,6 +51,8 @@ extern "C" {
 #define TARGET_CONFIRM_STABLE_COUNT  (4u)        /* 输出前二次确认所需连续新视觉帧数 */
 #define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */
 #define TARGET_VISION_VALID_MS       (500u)      /* 视觉数据有效期，超时后退出对准/输出 */
+#define TARGET_PRE_POSITION_TIMEOUT_MS (8000u)    /* 预定位最长等待时间，超时进入恢复 */
+#define TARGET_READY_STATUS_PERIOD_MS (300u)      /* 等待视觉误差时 READY 状态重发周期，单位 ms */
 
 
 typedef struct

@@ -85,10 +85,13 @@ static struct joint g_joints_init[ROBOT_MAX_JOINT_NUM] = {
 
 volatile struct robot_remote_control g_remote_control = {0};
 static volatile robot_visual_servo_ctrl_t g_visual_servo = {0};
+static volatile bool g_robot_motion_abort_requested = false;
+static volatile robot_auto_result_t g_robot_auto_result = ROBOT_AUTO_RESULT_NONE;
 static volatile bool g_soft_reset_done = false;
 static volatile bool g_hard_reset_done = false;
 
-static int robot_path_interpolation_scurve(struct position *target, int *size);
+static int robot_path_interpolation_scurve(struct position *target, int *size, float profile_scale);
+static float robot_auto_profile_scale_for_target(const struct position *target);
 
 static int robot_update_current_angle(uint8_t joint_id);
 static int robot_update_current_angle_retry(uint8_t joint_id, uint8_t retry_times);
@@ -115,6 +118,8 @@ static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_
 static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
 static float robot_angle_normalize(float angle);
 static float robot_angle_diff(float cur_angle, float target_angle);
+static bool robot_motion_abort_is_requested(void);
+static void robot_motion_abort_clear(void);
 static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration);
 static void robot_auto_busy_set(void);
 static void robot_auto_busy_clear(void);
@@ -1159,6 +1164,28 @@ bool robot_is_auto_busy(void)
     return ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
 }
 
+static void robot_auto_result_set(robot_auto_result_t result)
+{
+    taskENTER_CRITICAL();
+    g_robot_auto_result = result;
+    taskEXIT_CRITICAL();
+}
+
+robot_auto_result_t robot_auto_result_consume(void)
+{
+    robot_auto_result_t result;
+
+    taskENTER_CRITICAL();
+    result = g_robot_auto_result;
+    if (result != ROBOT_AUTO_RESULT_RUNNING)
+    {
+        g_robot_auto_result = ROBOT_AUTO_RESULT_NONE;
+    }
+    taskEXIT_CRITICAL();
+
+    return result;
+}
+
 static void robot_auto_move_interpolation(struct robot_event *event)
 {
     int ret;
@@ -1169,10 +1196,21 @@ static void robot_auto_move_interpolation(struct robot_event *event)
     float           *result = s_result_buf;
 
     robot_auto_busy_set();
+    robot_auto_result_set(ROBOT_AUTO_RESULT_RUNNING);
 
     /* 生成 S 曲线路径（写入 s_path_buf），返回点数已受 ROBOT_MAX_PATH_SIZE 限制 */
-    if (robot_path_interpolation_scurve(target_pos, &path_size) <= 0) {
+    float profile_scale = event->param[3];
+    if (profile_scale <= 0.0f) {
+        profile_scale = robot_auto_profile_scale_for_target(target_pos);
+    }
+    if (profile_scale < 0.99f) {
+        LOG("AUTO slow profile scale=%.2f target=<%.2f %.2f %.2f>\r\n",
+            profile_scale, target_pos->x, target_pos->y, target_pos->z);
+    }
+
+    if (robot_path_interpolation_scurve(target_pos, &path_size, profile_scale) <= 0) {
         LOG("[WARN] scurve path generation failed\r\n");
+        robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
         robot_auto_busy_clear();
         return;
     }
@@ -1193,6 +1231,7 @@ static void robot_auto_move_interpolation(struct robot_event *event)
 
         if (ret != 0) {
             LOG("robot_auto_move_interpolation robot kinematics inverse failed\n");
+            robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
             robot_auto_busy_clear();
             return;
         }
@@ -1218,14 +1257,21 @@ static void robot_auto_move_interpolation(struct robot_event *event)
 		    g_robot.cur_pos.z = target_pos->z;
             ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_VALID);
             ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+            robot_auto_result_set(ROBOT_AUTO_RESULT_OK);
         } else {
             ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
             ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+            robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
         }
 	} else {
         /* PID aborted before the final target; old Cartesian pose is no longer trustworthy. */
         ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+        if (ret == 2) {
+            robot_auto_result_set(ROBOT_AUTO_RESULT_ABORTED);
+        } else {
+            robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
+        }
     }
     robot_auto_busy_clear();
 }
@@ -1275,6 +1321,34 @@ static const float ROBOT_JOINT_KP[ROBOT_MAX_JOINT_NUM] = {0.65f, 3.00f, 3.00f, 2
 */
 static const float ROBOT_JOINT_FF_GAIN[ROBOT_MAX_JOINT_NUM] = {1.0f, 0.65f, 0.55f, 1.0f, 0.60f, 1.0f};
 
+static bool robot_motion_abort_is_requested(void)
+{
+    bool requested;
+
+    taskENTER_CRITICAL();
+    requested = g_robot_motion_abort_requested;
+    taskEXIT_CRITICAL();
+    return requested;
+}
+
+static void robot_motion_abort_clear(void)
+{
+    taskENTER_CRITICAL();
+    g_robot_motion_abort_requested = false;
+    taskEXIT_CRITICAL();
+}
+
+void robot_motion_abort(void)
+{
+    taskENTER_CRITICAL();
+    g_robot_motion_abort_requested = true;
+    g_visual_servo.stop_requested = true;
+    g_robot_auto_result = ROBOT_AUTO_RESULT_ABORTED;
+    taskEXIT_CRITICAL();
+
+    robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+}
+
 static int robot_pid_run(struct position *path, int path_size, float *result)
 {
 	(void)path;
@@ -1285,6 +1359,12 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 	int sample_count = 0;
   
 	for (p = 1; p < path_size; p++) {
+        if (robot_motion_abort_is_requested()) {
+            LOG("robot pid run aborted by safety request\r\n");
+            robot_motion_abort_clear();
+            robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+            return 2;
+        }
 		for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
 			float angle = result[p * ROBOT_MAX_JOINT_NUM + j];
 			if (isnan(angle) || isinf(angle) || fabsf(angle) > 10000.0f) {
@@ -1315,6 +1395,12 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 		feedforward[j] = 0.0f;
 	}
 	for (int k = 0; k < ROBOT_PID_SETTLE_PERIODS; k++) {
+        if (robot_motion_abort_is_requested()) {
+            LOG("robot pid settle aborted by safety request\r\n");
+            robot_motion_abort_clear();
+            robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+            return 2;
+        }
 		robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);
 		sample_count++;
 	}
@@ -1524,6 +1610,7 @@ int robot_visual_servo_start(void)
         g_visual_servo.last_update_ms = now_ms;
         g_visual_servo.stop_requested = false;
     } else if (!busy) {
+        g_robot_motion_abort_requested = false;
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
         g_visual_servo.vx = 0.0f;
@@ -1826,7 +1913,7 @@ int robot_send_abs_rotate_event(uint8_t joint_id, float angle)
     return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
 }
 
-int robot_send_auto_event(struct position *pos)
+int robot_send_auto_event_scaled(struct position *pos, float profile_scale)
 {
     BaseType_t queued;
 
@@ -1846,7 +1933,9 @@ int robot_send_auto_event(struct position *pos)
     taskENTER_CRITICAL();
     bool busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
     if (!busy) {
+        g_robot_motion_abort_requested = false;
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+        g_robot_auto_result = ROBOT_AUTO_RESULT_RUNNING;
     }
     taskEXIT_CRITICAL();
 
@@ -1858,12 +1947,19 @@ int robot_send_auto_event(struct position *pos)
 	struct robot_event event = {0};
 	event.type = ROBOT_AUTO_EVENT;
 	memcpy(event.param, pos, sizeof(struct position));
+    event.param[3] = profile_scale;
 	queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
     if (queued != pdPASS) {
+        robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
         robot_auto_busy_clear();
     }
 	return (int)queued;
 };
+
+int robot_send_auto_event(struct position *pos)
+{
+    return robot_send_auto_event_scaled(pos, 0.0f);
+}
 
 int robot_send_time_func_event(float time_limit_ms, float radius_mm)
 {
@@ -2039,7 +2135,21 @@ void robot_cmd_service(void *pvParameters)
  * 三段式（S ≥ 2·S_acc）：加速 + 匀速 + 减速
  * 两段式（S <  2·S_acc）：加速 + 减速（Vpeak 降低）
  * 输出写入 s_path_buf，返回生成点数（0 表示距离过小） */
-static int robot_path_interpolation_scurve(struct position *target, int *size)
+static float robot_auto_profile_scale_for_target(const struct position *target)
+{
+    if (target == NULL) {
+        return 1.0f;
+    }
+
+    float min_y = fminf(g_robot.cur_pos.y, target->y);
+    if (min_y <= ROBOT_AUTO_SLOW_Y_THRESHOLD) {
+        return ROBOT_AUTO_SLOW_PROFILE_SCALE;
+    }
+
+    return 1.0f;
+}
+
+static int robot_path_interpolation_scurve(struct position *target, int *size, float profile_scale)
 {
     float dx = target->x - g_robot.cur_pos.x;
     float dy = target->y - g_robot.cur_pos.y;
@@ -2054,23 +2164,38 @@ static int robot_path_interpolation_scurve(struct position *target, int *size)
 
     float dir_x = dx / S, dir_y = dy / S, dir_z = dz / S;
 
+    if (profile_scale <= 0.0f) {
+        profile_scale = 1.0f;
+    }
+    if (profile_scale > 1.0f) {
+        profile_scale = 1.0f;
+    }
+    if (profile_scale < 0.20f) {
+        profile_scale = 0.20f;
+    }
+
+    const float vmax = SCURVE_VMAX * profile_scale;
+    const float amax = SCURVE_AMAX * profile_scale;
+    const float omega = 2.0f * amax / vmax;
+    const float t_accel = 3.14159265f / omega;
+    const float s_accel = vmax * t_accel / 2.0f;
     const float dt = ROBOT_PID_PERIOD / 1000.0f; /* 10ms */
     int n = 0;
     float t = 0.0f, s = 0.0f;
 
-    if (S >= 2.0f * SCURVE_S_ACCEL) {
+    if (S >= 2.0f * s_accel) {
         /* 三段式 */
-        float T_const = (S - 2.0f * SCURVE_S_ACCEL) / SCURVE_VMAX;
-        float T_total = 2.0f * SCURVE_T_ACCEL + T_const;
+        float T_const = (S - 2.0f * s_accel) / vmax;
+        float T_total = 2.0f * t_accel + T_const;
         while (t <= T_total + dt * 0.5f && n < ROBOT_MAX_PATH_SIZE) {
             float v;
-            if (t <= SCURVE_T_ACCEL) {
-                v = (SCURVE_VMAX * 0.5f) * (sinf(SCURVE_OMEGA * t - 3.14159265f * 0.5f) + 1.0f);
-            } else if (t <= SCURVE_T_ACCEL + T_const) {
-                v = SCURVE_VMAX;
+            if (t <= t_accel) {
+                v = (vmax * 0.5f) * (sinf(omega * t - 3.14159265f * 0.5f) + 1.0f);
+            } else if (t <= t_accel + T_const) {
+                v = vmax;
             } else {
-                float t2 = t - SCURVE_T_ACCEL - T_const;
-                v = (SCURVE_VMAX * 0.5f) * (sinf(3.14159265f * 0.5f - SCURVE_OMEGA * t2) + 1.0f);
+                float t2 = t - t_accel - T_const;
+                v = (vmax * 0.5f) * (sinf(3.14159265f * 0.5f - omega * t2) + 1.0f);
             }
             s += v * dt;
             if (s > S) s = S;
@@ -2082,8 +2207,8 @@ static int robot_path_interpolation_scurve(struct position *target, int *size)
         }
     } else {
         /* 两段式：降低峰值速度 */
-        float Vpeak = sqrtf(S * SCURVE_AMAX * 3.14159265f * 0.5f);
-        float omega2 = 2.0f * SCURVE_AMAX / Vpeak;
+        float Vpeak = sqrtf(S * amax * 3.14159265f * 0.5f);
+        float omega2 = 2.0f * amax / Vpeak;
         float T_half = 3.14159265f / omega2;
         float T_total = 2.0f * T_half;
         while (t <= T_total + dt * 0.5f && n < ROBOT_MAX_PATH_SIZE) {

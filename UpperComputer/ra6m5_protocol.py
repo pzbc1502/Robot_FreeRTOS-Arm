@@ -18,6 +18,7 @@ JETSON_UNIFIED_VERSION = 0x01
 JETSON_MSG_HEARTBEAT = 0x01
 JETSON_MSG_TARGET_CTRL = 0x02
 JETSON_MSG_VISION_ERROR = 0x03
+JETSON_MSG_SAFE_DISTANCE = 0x05
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
 
@@ -31,7 +32,10 @@ STATUS_NAMES = {
     (0x03, 0x00): "OUTPUT_OFF",
     (0x04, 0x01): "TARGET_CTRL_ON",
     (0x04, 0x00): "TARGET_CTRL_OFF",
+    (0x06, 0x01): "SAFE_DISTANCE_OK",
+    (0x06, 0x00): "SAFE_DISTANCE_TOO_CLOSE",
     (0xFE, 0x01): "ERROR",
+    (0xFE, 0x09): "SAFE_DISTANCE_TOO_CLOSE",
 }
 
 
@@ -99,6 +103,13 @@ def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
     return build_unified_frame(JETSON_MSG_VISION_ERROR, seq, _int16_le(dcx) + _int16_le(dcy) + b"\x01")
 
 
+def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -> bytes:
+    if distance_mm < 0 or distance_mm > 65535:
+        raise ValueError("safe distance must fit uint16")
+    payload = int(distance_mm).to_bytes(2, "little") + bytes([0x01 if valid else 0x00])
+    return build_unified_frame(JETSON_MSG_SAFE_DISTANCE, seq, payload)
+
+
 def _status_from_func_value(raw: bytes, func: int, value: int) -> Ra6Status:
     return Ra6Status(raw=raw, func=func, value=value, name=STATUS_NAMES.get((func, value), "UNKNOWN"))
 
@@ -136,7 +147,7 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
             if msg_type == JETSON_MSG_STATUS and len(payload) >= 3:
                 frames.append(_status_from_func_value(raw, payload[0], payload[1]))
             elif msg_type == JETSON_MSG_ERROR and len(payload) >= 1:
-                frames.append(Ra6Status(raw=raw, func=0xFE, value=payload[0], name="ERROR"))
+                frames.append(_status_from_func_value(raw, 0xFE, payload[0]))
             idx += total_len
             consumed = idx
             continue
@@ -173,6 +184,7 @@ def self_test() -> None:
     assert build_unified_heartbeat_frame(1, 1234) == bytes.fromhex("A5 5A 01 01 01 04 D2 04 00 00 19 AF")
     assert build_unified_target_control_frame(True, 2) == bytes.fromhex("A5 5A 01 02 02 01 01 79 E8")
     assert build_unified_vision_error_frame(-7, -50, 3) == bytes.fromhex("A5 5A 01 03 03 05 F9 FF CE FF 01 39 EF")
+    assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
     assert [(item.func, item.value, item.name) for item in frames] == [
@@ -182,6 +194,14 @@ def self_test() -> None:
     unified = build_unified_frame(0x81, 7, bytes([0x02, 0x01, 0x00]))
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(unified)] == [
         (0x02, 0x01, "ALIGN_DONE"),
+    ]
+    safe_status = build_unified_frame(0x81, 8, bytes([0x06, 0x00, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_status)] == [
+        (0x06, 0x00, "SAFE_DISTANCE_TOO_CLOSE"),
+    ]
+    safe_error = build_unified_frame(0xFE, 9, bytes([0x09]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_error)] == [
+        (0xFE, 0x09, "SAFE_DISTANCE_TOO_CLOSE"),
     ]
     bad_crc = bytearray(unified)
     bad_crc[-1] ^= 0xFF

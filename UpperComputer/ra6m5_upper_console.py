@@ -36,6 +36,7 @@ SETTINGS_ORG = "RA6M5Robot"
 SETTINGS_APP = "UpperConsole"
 DEFAULT_DEMO_SEQUENCE = "30,-20:5;15,-10:5;8,-5:5;0,0:0"
 DEFAULT_DEMO_PERIOD_MS = "200"
+DEFAULT_SAFE_DISTANCE_SEQUENCE = "130:8;85:12;115:8"
 DEFAULT_CAPTURE_RECIPES = {
     "左视图": "# 左视图\nsoft_reset\nauto 45 -130 -15\nabs_rotate 0 85\nread_all",
     "正视图": "# 正视图\nsoft_reset\nauto 0 -130 -15\nabs_rotate 0 90\nread_all",
@@ -57,6 +58,7 @@ JETSON_UNIFIED_VERSION = 0x01
 JETSON_MSG_HEARTBEAT = 0x01
 JETSON_MSG_TARGET_CTRL = 0x02
 JETSON_MSG_VISION_ERROR = 0x03
+JETSON_MSG_SAFE_DISTANCE = 0x05
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
 RA6_SOF = 0xCC
@@ -68,7 +70,10 @@ STATUS_NAMES = {
     (0x03, 0x00): "OUTPUT_OFF",
     (0x04, 0x01): "TARGET_CTRL_ON",
     (0x04, 0x00): "TARGET_CTRL_OFF",
+    (0x06, 0x01): "SAFE_DISTANCE_OK",
+    (0x06, 0x00): "SAFE_DISTANCE_TOO_CLOSE",
     (0xFE, 0x01): "ERROR",
+    (0xFE, 0x09): "SAFE_DISTANCE_TOO_CLOSE",
 }
 
 
@@ -136,12 +141,24 @@ def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
     return build_unified_frame(JETSON_MSG_VISION_ERROR, seq, _int16_le(dcx) + _int16_le(dcy) + b"\x01")
 
 
+def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -> bytes:
+    if distance_mm < 0 or distance_mm > 65535:
+        raise ValueError("safe distance must fit uint16")
+    payload = int(distance_mm).to_bytes(2, "little") + bytes([0x01 if valid else 0x00])
+    return build_unified_frame(JETSON_MSG_SAFE_DISTANCE, seq, payload)
+
+
 def should_log_serial_tx(label: str) -> bool:
-    return not label.startswith("HEARTBEAT")
+    return not (label.startswith("HEARTBEAT") or label.startswith("SAFE_DISTANCE"))
 
 
 def should_display_arm_line(line: str) -> bool:
-    return "[JETSON_RX] heartbeat seq=" not in line
+    noisy_fragments = (
+        "[JETSON_RX] heartbeat seq=",
+        "[JETSON_RX] safe_distance=",
+        "[TARGET] safe distance=",
+    )
+    return not any(fragment in line for fragment in noisy_fragments)
 
 
 def _status_from_func_value(raw: bytes, func: int, value: int) -> Ra6Status:
@@ -181,7 +198,7 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
             if msg_type == JETSON_MSG_STATUS and len(payload) >= 3:
                 frames.append(_status_from_func_value(raw, payload[0], payload[1]))
             elif msg_type == JETSON_MSG_ERROR and len(payload) >= 1:
-                frames.append(Ra6Status(raw=raw, func=0xFE, value=payload[0], name="ERROR"))
+                frames.append(_status_from_func_value(raw, 0xFE, payload[0]))
             idx += total_len
             consumed = idx
             continue
@@ -211,6 +228,23 @@ def parse_vision_sequence(text: str) -> list[tuple[int, int, int]]:
     return items
 
 
+def parse_safe_distance_sequence(text: str) -> list[tuple[int, int]]:
+    items: list[tuple[int, int]] = []
+    for part in text.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        distance_text, _, count_text = part.partition(":")
+        distance_mm = int(distance_text.strip())
+        count = int(count_text) if count_text else 1
+        if distance_mm < 0 or distance_mm > 65535:
+            raise ValueError("safe distance must fit uint16")
+        if count < 0:
+            raise ValueError("safe distance sequence count must be >= 0")
+        items.append((distance_mm, count))
+    return items
+
+
 def protocol_self_test() -> None:
     assert build_vision_error_frame(-7, -50) == bytes.fromhex("FF 05 03 F9 FF CE FF CD FE")
     assert build_target_control_frame(True) == bytes.fromhex("AA 01 01 BB")
@@ -218,6 +252,7 @@ def protocol_self_test() -> None:
     assert build_unified_heartbeat_frame(1, 1234) == bytes.fromhex("A5 5A 01 01 01 04 D2 04 00 00 19 AF")
     assert build_unified_target_control_frame(True, 2) == bytes.fromhex("A5 5A 01 02 02 01 01 79 E8")
     assert build_unified_vision_error_frame(-7, -50, 3) == bytes.fromhex("A5 5A 01 03 03 05 F9 FF CE FF 01 39 EF")
+    assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
     assert [(item.func, item.value, item.name) for item in frames] == [
@@ -228,13 +263,26 @@ def protocol_self_test() -> None:
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(unified)] == [
         (0x02, 0x01, "ALIGN_DONE"),
     ]
+    safe_status = build_unified_frame(0x81, 8, bytes([0x06, 0x00, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_status)] == [
+        (0x06, 0x00, "SAFE_DISTANCE_TOO_CLOSE"),
+    ]
+    safe_error = build_unified_frame(0xFE, 9, bytes([0x09]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_error)] == [
+        (0xFE, 0x09, "SAFE_DISTANCE_TOO_CLOSE"),
+    ]
     bad_crc = bytearray(unified)
     bad_crc[-1] ^= 0xFF
     assert parse_ra6_status_frames(bytes(bad_crc)) == []
     assert parse_vision_sequence("15,-10:2;8,-5:1;0,0:0") == [(15, -10, 2), (8, -5, 1), (0, 0, 0)]
+    assert parse_safe_distance_sequence("130:8;85:12;115:8") == [(130, 8), (85, 12), (115, 8)]
+    assert parse_safe_distance_sequence("120") == [(120, 1)]
     assert should_log_serial_tx("HEARTBEAT") is False
+    assert should_log_serial_tx("SAFE_DISTANCE") is False
     assert should_log_serial_tx("TARGET_CTRL_START_NEW") is True
     assert should_display_arm_line("[JETSON_RX] heartbeat seq=84") is False
+    assert should_display_arm_line("[JETSON_RX] safe_distance=120 valid=1") is False
+    assert should_display_arm_line("[TARGET] safe distance=120 valid=1 too_close=0") is False
     assert should_display_arm_line("[JETSON_RX] target_ctrl=1") is True
 
 
@@ -314,12 +362,16 @@ class QtUpperConsole(QMainWindow):
         self.heartbeat_stop = threading.Event()
         self.heartbeat_stop.set()
         self.heartbeat_thread: threading.Thread | None = None
+        self.safe_distance_stop = threading.Event()
+        self.safe_distance_stop.set()
+        self.safe_distance_thread: threading.Thread | None = None
         self.demo_stop = threading.Event()
         self.ra6_events = {name: threading.Event() for name in STATUS_NAMES.values()}
         self.capture_step_index = {name: 0 for name in DEFAULT_CAPTURE_RECIPES}
         self.status_labels: dict[str, QLabel] = {}
         self.status_dots: dict[str, QLabel] = {}
         self.unified_seq = 0
+        self.seq_lock = threading.Lock()
         self.jetson_rx_buffer = bytearray()
         self._build_ui()
         self._set_status("PROTO", self.current_protocol_label())
@@ -438,28 +490,48 @@ class QtUpperConsole(QMainWindow):
         group = QGroupBox("Jetson 模拟器")
         layout = QVBoxLayout(group)
         self.protocol_mode = QComboBox()
-        self.protocol_mode.addItem("OLD AA/FF/CC", JETSON_PROTOCOL_OLD)
-        self.protocol_mode.addItem("NEW A5 5A + CRC16", JETSON_PROTOCOL_NEW)
+        self.protocol_mode.addItem("旧协议 AA/FF/CC", JETSON_PROTOCOL_OLD)
+        self.protocol_mode.addItem("新协议 A5 5A + CRC16", JETSON_PROTOCOL_NEW)
         saved_protocol = self._settings_text("jetson/protocol", JETSON_PROTOCOL_OLD)
         protocol_index = self.protocol_mode.findData(saved_protocol)
         self.protocol_mode.setCurrentIndex(protocol_index if protocol_index >= 0 else 0)
         self.protocol_mode.currentIndexChanged.connect(self.on_protocol_changed)
 
-        self.heartbeat_enable = QCheckBox("Heartbeat keep")
+        self.heartbeat_enable = QCheckBox("心跳保持")
         self.heartbeat_enable.setChecked(self._settings_bool("jetson/heartbeat_enable", False))
         self.heartbeat_enable.toggled.connect(self.on_heartbeat_toggled)
         self.heartbeat_period_ms = QLineEdit(self._settings_text("jetson/heartbeat_ms", "200"))
+        self.safe_distance_enable = QCheckBox("安全距离保持")
+        self.safe_distance_enable.setChecked(self._settings_bool("jetson/safe_distance_enable", False))
+        self.safe_distance_enable.toggled.connect(self.on_safe_distance_toggled)
+        self.safe_distance_mm = QLineEdit(self._settings_text("jetson/safe_distance_mm", "120"))
+        self.safe_distance_valid = QCheckBox("有效")
+        self.safe_distance_valid.setChecked(self._settings_bool("jetson/safe_distance_valid", True))
 
         row = QHBoxLayout()
-        row.addWidget(QLabel("Protocol"))
+        row.addWidget(QLabel("协议"))
         row.addWidget(self.protocol_mode, 1)
         row.addWidget(self.heartbeat_enable)
-        row.addWidget(QLabel("HB ms"))
+        row.addWidget(QLabel("心跳ms"))
         row.addWidget(self.heartbeat_period_ms)
+        layout.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("安全距离mm"))
+        row.addWidget(self.safe_distance_mm)
+        row.addWidget(self.safe_distance_valid)
+        row.addWidget(self.safe_distance_enable)
+        row.addWidget(self._button("单发安全距离", self.send_safe_distance_once))
         layout.addLayout(row)
         row = QHBoxLayout()
         row.addWidget(self._button("启动状态机 AA 01 01 BB", lambda: self.send_target_ctrl(True)))
         row.addWidget(self._button("关闭状态机 AA 01 00 BB", self.stop_target_ctrl_with_reset))
+        layout.addLayout(row)
+        self.safe_distance_sequence = QLineEdit(self._settings_text("jetson/safe_distance_sequence", DEFAULT_SAFE_DISTANCE_SEQUENCE))
+        row = QHBoxLayout()
+        row.addWidget(QLabel("安全距离序列"))
+        row.addWidget(self.safe_distance_sequence, 1)
+        row.addWidget(self._button("运行距离序列", self.run_safe_distance_sequence))
+        row.addWidget(self._button("停止距离序列", self.stop_safe_distance))
         layout.addLayout(row)
         self.dcx = QLineEdit("0")
         self.dcy = QLineEdit("0")
@@ -549,7 +621,7 @@ class QtUpperConsole(QMainWindow):
     def _status_group(self) -> QGroupBox:
         group = QGroupBox("状态")
         grid = QGridLayout(group)
-        keys = ["ARM_PORT", "JETSON_PORT", "PROTO", "HEARTBEAT", "POSE_VALID", "TARGET_CTRL", "READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"]
+        keys = ["ARM_PORT", "JETSON_PORT", "PROTO", "HEARTBEAT", "POSE_VALID", "TARGET_CTRL", "READY", "ALIGN_DONE", "SAFE_DIST", "CONFIRMING", "OUTPUT", "ERROR"]
         for idx, key in enumerate(keys):
             dot = QLabel()
             dot.setFixedSize(14, 14)
@@ -595,10 +667,16 @@ class QtUpperConsole(QMainWindow):
         enabled = self.current_jetson_protocol() == JETSON_PROTOCOL_NEW
         self.heartbeat_enable.setEnabled(enabled)
         self.heartbeat_period_ms.setEnabled(enabled)
+        if hasattr(self, "safe_distance_enable"):
+            self.safe_distance_enable.setEnabled(enabled)
+            self.safe_distance_mm.setEnabled(enabled)
+            self.safe_distance_valid.setEnabled(enabled)
+            self.safe_distance_sequence.setEnabled(enabled)
 
     def _next_unified_seq(self) -> int:
-        self.unified_seq = (self.unified_seq + 1) & 0xFF
-        return self.unified_seq
+        with self.seq_lock:
+            self.unified_seq = (self.unified_seq + 1) & 0xFF
+            return self.unified_seq
 
     def on_protocol_changed(self) -> None:
         protocol = self.current_jetson_protocol()
@@ -610,8 +688,11 @@ class QtUpperConsole(QMainWindow):
             self.emit_log("JETSON", "INFO", "protocol switched to NEW A5 5A + CRC16")
             if self.heartbeat_enable.isChecked():
                 self.start_heartbeat()
+            if self.safe_distance_enable.isChecked():
+                self.start_safe_distance()
         else:
             self.stop_heartbeat()
+            self.stop_safe_distance()
             self.emit_log("JETSON", "INFO", "protocol switched to OLD AA/FF/CC; heartbeat is disabled")
 
     def on_heartbeat_toggled(self, checked: bool) -> None:
@@ -622,6 +703,16 @@ class QtUpperConsole(QMainWindow):
             self.start_heartbeat()
         else:
             self.stop_heartbeat()
+
+    def on_safe_distance_toggled(self, checked: bool) -> None:
+        self.settings.setValue("jetson/safe_distance_enable", checked)
+        self.settings.setValue("jetson/safe_distance_mm", self.safe_distance_mm.text())
+        self.settings.setValue("jetson/safe_distance_valid", self.safe_distance_valid.isChecked())
+        self.settings.sync()
+        if checked:
+            self.start_safe_distance()
+        else:
+            self.stop_safe_distance()
 
     def start_heartbeat(self) -> None:
         if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
@@ -673,6 +764,125 @@ class QtUpperConsole(QMainWindow):
         if self.heartbeat_stop is stop_event:
             self._set_status("HEARTBEAT", "OFF")
 
+    def send_safe_distance_once(self) -> None:
+        try:
+            sent = self.send_safe_distance_values(int(self.safe_distance_mm.text()), self.safe_distance_valid.isChecked())
+            if sent:
+                self.emit_log("JETSON", "INFO", f"safe distance sent: {self.safe_distance_mm.text()} mm")
+        except Exception as exc:
+            self.emit_log("JETSON", "ERROR", str(exc))
+
+    def send_safe_distance_values(self, distance_mm: int, valid: bool) -> bool:
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self.emit_log("JETSON", "WARN", "OLD protocol does not support safe distance")
+            return False
+        if not self.jetson.is_open():
+            self.emit_log("JETSON", "ERROR", "Jetson serial is not open; safe distance not sent")
+            return False
+        frame = build_unified_safe_distance_frame(distance_mm, valid, self._next_unified_seq())
+        self.jetson.write(frame, f"SAFE_DISTANCE distance={distance_mm} valid={1 if valid else 0}")
+        return True
+
+    def start_safe_distance(self) -> None:
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self._set_status("SAFE_DIST", "-")
+            self.emit_log("JETSON", "WARN", "OLD protocol does not support safe distance")
+            return
+        if not self.jetson.is_open():
+            self.emit_log("JETSON", "WARN", "Jetson serial is not open; safe distance not started")
+            return
+        try:
+            distance_mm = int(self.safe_distance_mm.text())
+            period_ms = max(50, int(self.period_ms.text()))
+        except ValueError as exc:
+            self.emit_log("JETSON", "ERROR", f"bad safe distance setting: {exc}")
+            return
+        valid = self.safe_distance_valid.isChecked()
+        self.settings.setValue("jetson/safe_distance_mm", str(distance_mm))
+        self.settings.setValue("jetson/safe_distance_valid", valid)
+        self.settings.sync()
+
+        if self.safe_distance_thread is not None and self.safe_distance_thread.is_alive() and not self.safe_distance_stop.is_set():
+            return
+
+        self.safe_distance_stop.set()
+        stop_event = threading.Event()
+        self.safe_distance_stop = stop_event
+        self.safe_distance_thread = threading.Thread(
+            target=self._safe_distance_loop,
+            args=(distance_mm, valid, period_ms, stop_event),
+            daemon=True,
+        )
+        self.safe_distance_thread.start()
+        self.emit_log("JETSON", "INFO", f"safe distance started: {distance_mm} mm, {period_ms} ms")
+
+    def stop_safe_distance(self) -> None:
+        self.safe_distance_stop.set()
+        self.emit_log("JETSON", "INFO", "safe distance stopped")
+
+    def _safe_distance_loop(self, distance_mm: int, valid: bool, period_ms: int, stop_event: threading.Event) -> None:
+        while not stop_event.is_set():
+            if not self.jetson.is_open() or self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+                stop_event.set()
+                break
+            try:
+                self.send_safe_distance_values(distance_mm, valid)
+            except Exception as exc:
+                self.emit_log("JETSON", "ERROR", str(exc))
+                stop_event.set()
+                break
+            time.sleep(period_ms / 1000.0)
+
+    def run_safe_distance_sequence(self) -> None:
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self.emit_log("JETSON", "WARN", "旧协议不支持安全距离序列，请切换到新协议")
+            return
+        if not self.jetson.is_open():
+            self.emit_log("JETSON", "ERROR", "Jetson模拟串口未打开，安全距离序列未发送")
+            return
+        try:
+            sequence = parse_safe_distance_sequence(self.safe_distance_sequence.text())
+            period_ms = max(50, int(self.period_ms.text()))
+        except Exception as exc:
+            self.emit_log("JETSON", "ERROR", f"安全距离序列格式错误: {exc}")
+            return
+        if not sequence:
+            self.emit_log("JETSON", "WARN", "安全距离序列为空")
+            return
+
+        self.settings.setValue("jetson/safe_distance_sequence", self.safe_distance_sequence.text())
+        self.settings.sync()
+        self.safe_distance_stop.set()
+        stop_event = threading.Event()
+        self.safe_distance_stop = stop_event
+        valid = self.safe_distance_valid.isChecked()
+        self.safe_distance_thread = threading.Thread(
+            target=self._safe_distance_sequence_loop,
+            args=(sequence, valid, period_ms, stop_event),
+            daemon=True,
+        )
+        self.safe_distance_thread.start()
+        self.emit_log("JETSON", "INFO", f"安全距离序列开始: {self.safe_distance_sequence.text()} period={period_ms} ms")
+
+    def _safe_distance_sequence_loop(self, sequence: list[tuple[int, int]], valid: bool, period_ms: int, stop_event: threading.Event) -> None:
+        for distance_mm, count in sequence:
+            if stop_event.is_set():
+                return
+            label_count = "持续" if count == 0 else str(count)
+            self.emit_log("JETSON", "INFO", f"安全距离段: {distance_mm} mm x {label_count}")
+            if count == 0:
+                while not stop_event.is_set():
+                    self.send_safe_distance_values(distance_mm, valid)
+                    time.sleep(period_ms / 1000.0)
+                return
+            for _ in range(count):
+                if stop_event.is_set():
+                    return
+                self.send_safe_distance_values(distance_mm, valid)
+                time.sleep(period_ms / 1000.0)
+        if self.safe_distance_stop is stop_event:
+            self.emit_log("JETSON", "INFO", "安全距离序列完成")
+
     def refresh_ports(self) -> None:
         ports = [item.device for item in list_ports.comports()]
         for combo, preferred in ((self.arm_port, "COM7"), (self.jetson_port, "COM14")):
@@ -709,6 +919,8 @@ class QtUpperConsole(QMainWindow):
                 self._clear_target_runtime_status(clear_target=True)
                 if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW and self.heartbeat_enable.isChecked():
                     self.start_heartbeat()
+                if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW and self.safe_distance_enable.isChecked():
+                    self.start_safe_distance()
         except Exception as exc:
             self.emit_log(channel.name, "ERROR", str(exc))
             QMessageBox.warning(self, "串口打开失败", str(exc))
@@ -717,6 +929,7 @@ class QtUpperConsole(QMainWindow):
         if channel is self.jetson:
             self.stop_periodic_vision()
             self.stop_heartbeat()
+            self.stop_safe_distance()
         channel.close()
         self._set_status("ARM_PORT" if channel is self.arm else "JETSON_PORT", "已关闭")
         if channel is self.arm:
@@ -774,6 +987,8 @@ class QtUpperConsole(QMainWindow):
             if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
                 if enable and self.heartbeat_enable.isChecked():
                     self.start_heartbeat()
+                if enable and self.safe_distance_enable.isChecked():
+                    self.start_safe_distance()
                 frame = build_unified_target_control_frame(enable, self._next_unified_seq())
                 label = "TARGET_CTRL_START_NEW" if enable else "TARGET_CTRL_STOP_NEW"
             else:
@@ -787,6 +1002,7 @@ class QtUpperConsole(QMainWindow):
 
     def stop_target_ctrl_with_reset(self) -> None:
         self.stop_heartbeat()
+        self.stop_safe_distance()
         if not self.send_target_ctrl(False):
             self.send_arm_command("soft_reset")
 
@@ -904,12 +1120,19 @@ class QtUpperConsole(QMainWindow):
         if not self.jetson.is_open():
             self.emit_log("DEMO", "ERROR", "Jetson模拟串口未打开，无法开始一键定靶演示。")
             return
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self.emit_log("DEMO", "ERROR", "OLD protocol does not support safe distance; switch to NEW A5 5A + CRC16 for one-key demo")
+            return
         self.save_demo_settings()
         if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
             if self.heartbeat_enable.isChecked():
                 self.start_heartbeat()
             else:
                 self.heartbeat_enable.setChecked(True)
+            if self.safe_distance_enable.isChecked():
+                self.start_safe_distance()
+            else:
+                self.safe_distance_enable.setChecked(True)
         self._clear_ra6_events()
         self.demo_stop.clear()
         self.vision_stop.set()
@@ -926,6 +1149,7 @@ class QtUpperConsole(QMainWindow):
         self.demo_stop.set()
         self.stop_periodic_vision()
         self.stop_heartbeat()
+        self.stop_safe_distance()
         stop_sent = self.send_target_ctrl(False)
         self.send_arm_command("laser_off")
         if not stop_sent:
@@ -939,6 +1163,7 @@ class QtUpperConsole(QMainWindow):
         if wait_ready and not self._wait_ra6_event("READY", 12.0):
             self.stop_periodic_vision()
             self.stop_heartbeat()
+            self.stop_safe_distance()
             self.send_target_ctrl(False)
             self.emit_log("DEMO", "ERROR", "未收到 READY，演示停止。请先确认 soft_reset 和状态机启动。")
             return
@@ -975,6 +1200,7 @@ class QtUpperConsole(QMainWindow):
     def safety_stop(self) -> None:
         self.stop_periodic_vision()
         self.stop_heartbeat()
+        self.stop_safe_distance()
         self.send_arm_command("target_disable")
         self.send_arm_command("laser_off")
         self.emit_log("APP", "SAFETY", "已停止视觉发送，并发送 target_disable / laser_off")
@@ -1017,6 +1243,7 @@ class QtUpperConsole(QMainWindow):
             self._set_status("TARGET_CTRL", "OFF")
             self._set_status("READY", "-")
             self._set_status("ALIGN_DONE", "-")
+            self._set_status("SAFE_DIST", "-")
             self._set_status("CONFIRMING", "-")
             self._set_status("OUTPUT", "OFF")
             self._set_status("ERROR", "-")
@@ -1028,6 +1255,14 @@ class QtUpperConsole(QMainWindow):
             self._set_status("OUTPUT", "ON")
         elif name == "OUTPUT_OFF":
             self._set_status("OUTPUT", "OFF")
+        elif name == "SAFE_DISTANCE_OK":
+            if self.ra6_events.get("SAFE_DISTANCE_TOO_CLOSE") is not None:
+                self.ra6_events["SAFE_DISTANCE_TOO_CLOSE"].clear()
+            self._set_status("SAFE_DIST", "OK")
+            self._set_status("ERROR", "-")
+        elif name == "SAFE_DISTANCE_TOO_CLOSE":
+            self._set_status("SAFE_DIST", "TOO_CLOSE", "red")
+            self._set_status("ERROR", "YES")
         elif name == "ERROR":
             self._set_status("ERROR", "YES")
 
@@ -1042,6 +1277,11 @@ class QtUpperConsole(QMainWindow):
             return "green" if value == "NEW" else "gray"
         if key == "HEARTBEAT":
             return "green" if value == "ON" else "gray"
+        if key == "SAFE_DIST":
+            if value == "OK":
+                return "green"
+            if value == "TOO_CLOSE":
+                return "red"
         if value in {"YES", "ON"} or value.startswith("已打开"):
             return "green"
         return "gray"
@@ -1063,7 +1303,7 @@ class QtUpperConsole(QMainWindow):
     def _clear_target_runtime_status(self, clear_target: bool) -> None:
         if clear_target:
             self._set_status("TARGET_CTRL", "-")
-        for key in ("READY", "ALIGN_DONE", "CONFIRMING", "OUTPUT", "ERROR"):
+        for key in ("READY", "ALIGN_DONE", "SAFE_DIST", "CONFIRMING", "OUTPUT", "ERROR"):
             self._set_status(key, "-")
 
     def _clear_ra6_events(self) -> None:
@@ -1075,6 +1315,8 @@ class QtUpperConsole(QMainWindow):
         event = self.ra6_events[name]
         while time.monotonic() < deadline and not self.demo_stop.is_set():
             if self.ra6_events["ERROR"].is_set():
+                return False
+            if self.ra6_events.get("SAFE_DISTANCE_TOO_CLOSE") is not None and self.ra6_events["SAFE_DISTANCE_TOO_CLOSE"].is_set():
                 return False
             if event.wait(0.1):
                 return True
@@ -1100,6 +1342,7 @@ class QtUpperConsole(QMainWindow):
         self.demo_stop.set()
         self.stop_periodic_vision()
         self.stop_heartbeat()
+        self.stop_safe_distance()
         self.arm.close()
         self.jetson.close()
         event.accept()
@@ -1110,6 +1353,7 @@ def qt_gui_self_test() -> None:
     window = QtUpperConsole(Path("logs"))
     assert window.windowTitle() == APP_TITLE
     assert "ARM_PORT" in window.status_labels
+    assert parse_safe_distance_sequence(window.safe_distance_sequence.text())
     for button in window.findChildren(QPushButton):
         if button.text() == "soft_reset":
             button.click()

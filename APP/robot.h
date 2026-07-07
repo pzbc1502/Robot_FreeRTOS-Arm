@@ -73,6 +73,8 @@ extern "C" {
 #define SCURVE_OMEGA    (2.0f * SCURVE_AMAX / SCURVE_VMAX)   /* 角频率 rad/s ≈ 3.333 */
 #define SCURVE_T_ACCEL  (3.14159265f / SCURVE_OMEGA)          /* 加速段时长 s ≈ 0.9425 */
 #define SCURVE_S_ACCEL  (SCURVE_VMAX * SCURVE_T_ACCEL / 2.0f)/* 加速段位移 mm ≈ 141.76 */
+#define ROBOT_AUTO_SLOW_Y_THRESHOLD      (-90.0f) /* 大伸展区阈值，进入后降低 AUTO 轨迹速度 */
+#define ROBOT_AUTO_SLOW_PROFILE_SCALE    (0.40f)   /* 大伸展 AUTO 速度/加速度缩放系数 */
 
 #define ROBOT_RESET_DEFAULT_ANGLE           360     /* 复位默认搜索角度范围 */
 #define ROBOT_RESET_DEFAULT_VELOCITY        (15.0f) /* 复位默认速度，单位 rpm */
@@ -208,6 +210,15 @@ enum robot_event_type
     ROBOT_READ_ALL_EVENT,           /* 批量读取 J1~J5 当前角度 */
 };
 
+typedef enum
+{
+    ROBOT_AUTO_RESULT_NONE = 0,
+    ROBOT_AUTO_RESULT_RUNNING,
+    ROBOT_AUTO_RESULT_OK,
+    ROBOT_AUTO_RESULT_FAILED,
+    ROBOT_AUTO_RESULT_ABORTED,
+} robot_auto_result_t;
+
 /* 关节索引枚举 */
 enum
 {
@@ -257,16 +268,19 @@ void robot_cmd_send_from_isr(char *cmd, enum cmd_type type);
 int robot_cmd_send(char *cmd, enum cmd_type type);
 int robot_send_rel_rotate_event(uint8_t joint_id, float angle);
 int robot_send_auto_event(struct position *pos);
+int robot_send_auto_event_scaled(struct position *pos, float profile_scale);
 int robot_send_reset_event(bool hard_reset);
 bool robot_is_soft_reset_done(void);
 bool robot_is_hard_reset_done(void);
 bool robot_is_auto_busy(void);
+robot_auto_result_t robot_auto_result_consume(void);
 int robot_send_abs_rotate_event(uint8_t joint_id, float angle);
 int robot_send_remote_event(void);
 int robot_visual_servo_start(void);
 void robot_visual_servo_stop(void);
 void robot_visual_servo_set_velocity(float vx, float vy, float vz);
 bool robot_is_visual_servo_active(void);
+void robot_motion_abort(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
 int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);

@@ -25,6 +25,7 @@ typedef struct
     uint32_t last_step_ms;
     uint32_t last_vision_ms;
     uint32_t last_distance_ms;
+    uint32_t last_ready_status_ms;
     int16_t dcx;
     int16_t dcy;
     uint16_t distance_mm;
@@ -84,13 +85,6 @@ static bool robot_any_limit_triggered(void)
     return false;
 }
 
-static bool position_near(const struct position *a, const struct position *b)
-{
-    return (fabsf(a->x - b->x) <= 1.0f) &&
-           (fabsf(a->y - b->y) <= 1.0f) &&
-           (fabsf(a->z - b->z) <= 1.0f);
-}
-
 static bool vision_fresh(uint32_t now_ms)
 {
     return s_target.has_vision && ((now_ms - s_target.last_vision_ms) <= TARGET_VISION_VALID_MS);
@@ -124,6 +118,7 @@ static void enter_state(target_state_t state, uint32_t now_ms)
 {
     if (s_target.state != state)
     {
+        LOG("[TARGET] %s -> %s\r\n", target_state_name(s_target.state), target_state_name(state));
         reset_alignment_counts();
     }
     s_target.state = state;
@@ -172,6 +167,7 @@ static void target_update_visual_servo_velocity(uint32_t now_ms)
 static void target_update_safe_distance(uint32_t now_ms, uint16_t distance_mm, bool valid)
 {
     bool was_too_close = s_target.distance_too_close;
+    bool had_distance = s_target.has_distance;
 
     s_target.distance_mm = distance_mm;
     s_target.distance_valid = valid;
@@ -190,7 +186,8 @@ static void target_update_safe_distance(uint32_t now_ms, uint16_t distance_mm, b
         }
     }
 
-    if (s_target.distance_too_close != was_too_close)
+    if ((s_target.distance_too_close != was_too_close) ||
+        (!had_distance && valid && !s_target.distance_too_close))
     {
         (void)jetson_send_status_u8(RA6_TO_JETSON_SAFE_DISTANCE,
                                     s_target.distance_too_close ? 0u : 1u);
@@ -214,14 +211,17 @@ static bool target_handle_safe_distance_guard(uint32_t now_ms)
         return false;
     }
 
-    if ((s_target.state == TARGET_INIT) || (s_target.state == TARGET_PRE_POSITION))
-    {
-        force_laser_off();
-        return false;
-    }
-
     force_laser_off();
     reset_alignment_counts();
+
+    if (robot_is_auto_busy() && !robot_is_visual_servo_active())
+    {
+        robot_motion_abort();
+        LOG("[TARGET] safe distance too close, abort current motion distance=%u\r\n",
+            (unsigned)s_target.distance_mm);
+        enter_state(TARGET_RECOVER, now_ms);
+        return true;
+    }
 
     if (!safe_distance_fresh(now_ms))
     {
@@ -300,6 +300,7 @@ bool robot_target_enable_request(void)
     s_target.distance_too_close = false;
     s_target.distance_mm = 0u;
     s_target.last_distance_ms = 0u;
+    s_target.last_ready_status_ms = 0u;
     reset_alignment_counts();
     enter_state(TARGET_INIT, now);
 
@@ -376,6 +377,10 @@ void robot_target_step(const target_obs_t *obs)
             force_laser_off();
             s_target.target = s_target.pre;
             reset_alignment_counts();
+            if (!safe_distance_fresh(now))
+            {
+                break;
+            }
             if (send_target_auto(&s_target.target))
             {
                 enter_state(TARGET_PRE_POSITION, now);
@@ -385,15 +390,52 @@ void robot_target_step(const target_obs_t *obs)
         case TARGET_PRE_POSITION:
             target_stop_visual_servo();
             force_laser_off();
-            if (position_near(&g_robot.cur_pos, &s_target.target))
+            if (!safe_distance_fresh(now))
             {
-                (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
-                enter_state(TARGET_WAIT_DETECT, now);
+                robot_motion_abort();
+                LOG("[TARGET] safe distance stale during pre-position, abort motion\r\n");
+                enter_state(TARGET_RECOVER, now);
+                break;
+            }
+            if ((now - s_target.enter_ms) >= TARGET_PRE_POSITION_TIMEOUT_MS)
+            {
+                robot_motion_abort();
+                LOG("[TARGET] pre-position timeout\r\n");
+                enter_state(TARGET_RECOVER, now);
+                break;
+            }
+
+            robot_auto_result_t auto_result = robot_auto_result_consume();
+            switch (auto_result)
+            {
+                case ROBOT_AUTO_RESULT_OK:
+                    (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
+                    s_target.last_ready_status_ms = now;
+                    enter_state(TARGET_WAIT_DETECT, now);
+                    break;
+
+                case ROBOT_AUTO_RESULT_FAILED:
+                    LOG("[TARGET] pre-position auto failed\r\n");
+                    enter_state(TARGET_RECOVER, now);
+                    break;
+
+                case ROBOT_AUTO_RESULT_ABORTED:
+                    LOG("[TARGET] pre-position auto aborted\r\n");
+                    enter_state(TARGET_RECOVER, now);
+                    break;
+
+                default:
+                    break;
             }
             break;
 
         case TARGET_WAIT_DETECT:
             force_laser_off();
+            if ((now - s_target.last_ready_status_ms) >= TARGET_READY_STATUS_PERIOD_MS)
+            {
+                (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
+                s_target.last_ready_status_ms = now;
+            }
             if (vision_fresh(now))
             {
 #if TARGET_USE_VISUAL_SERVO
