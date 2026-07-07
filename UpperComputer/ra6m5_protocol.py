@@ -18,6 +18,7 @@ JETSON_UNIFIED_VERSION = 0x01
 JETSON_MSG_HEARTBEAT = 0x01
 JETSON_MSG_TARGET_CTRL = 0x02
 JETSON_MSG_VISION_ERROR = 0x03
+JETSON_MSG_CAPTURE_CTRL = 0x04
 JETSON_MSG_SAFE_DISTANCE = 0x05
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
@@ -34,6 +35,17 @@ STATUS_NAMES = {
     (0x04, 0x00): "TARGET_CTRL_OFF",
     (0x06, 0x01): "SAFE_DISTANCE_OK",
     (0x06, 0x00): "SAFE_DISTANCE_TOO_CLOSE",
+    (0x10, 0x01): "CAPTURE_POINT_LEFT",
+    (0x10, 0x02): "CAPTURE_POINT_FRONT",
+    (0x10, 0x03): "CAPTURE_POINT_RIGHT",
+    (0x11, 0x01): "CAPTURE_DONE_HOME",
+    (0x12, 0x01): "TARGET_PRESTART_LEFT",
+    (0x12, 0x02): "TARGET_PRESTART_FRONT",
+    (0x12, 0x03): "TARGET_PRESTART_RIGHT",
+    (0xFE, 0x03): "INVALID_PARAM",
+    (0xFE, 0x05): "BUSY",
+    (0xFE, 0x07): "HEARTBEAT_TIMEOUT",
+    (0xFE, 0x08): "SAFETY_ERROR",
     (0xFE, 0x01): "ERROR",
     (0xFE, 0x09): "SAFE_DISTANCE_TOO_CLOSE",
 }
@@ -101,6 +113,17 @@ def build_unified_target_control_frame(enable: bool, seq: int) -> bytes:
 
 def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
     return build_unified_frame(JETSON_MSG_VISION_ERROR, seq, _int16_le(dcx) + _int16_le(dcy) + b"\x01")
+
+
+def build_unified_capture_control_frame(action: int, point_id: int, seq: int) -> bytes:
+    if action not in (0x01, 0x02, 0x03):
+        raise ValueError("capture action must be 1, 2, or 3")
+    if action == 0x02:
+        if point_id != 0:
+            raise ValueError("capture finish action requires point_id=0")
+    elif point_id not in (1, 2, 3):
+        raise ValueError("capture point_id must be 1, 2, or 3")
+    return build_unified_frame(JETSON_MSG_CAPTURE_CTRL, seq, bytes([action & 0xFF, point_id & 0xFF]))
 
 
 def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -> bytes:
@@ -184,6 +207,9 @@ def self_test() -> None:
     assert build_unified_heartbeat_frame(1, 1234) == bytes.fromhex("A5 5A 01 01 01 04 D2 04 00 00 19 AF")
     assert build_unified_target_control_frame(True, 2) == bytes.fromhex("A5 5A 01 02 02 01 01 79 E8")
     assert build_unified_vision_error_frame(-7, -50, 3) == bytes.fromhex("A5 5A 01 03 03 05 F9 FF CE FF 01 39 EF")
+    assert build_unified_capture_control_frame(0x01, 1, 5) == build_unified_frame(0x04, 5, bytes([0x01, 0x01]))
+    assert build_unified_capture_control_frame(0x02, 0, 6) == build_unified_frame(0x04, 6, bytes([0x02, 0x00]))
+    assert build_unified_capture_control_frame(0x03, 3, 7) == build_unified_frame(0x04, 7, bytes([0x03, 0x03]))
     assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
@@ -202,6 +228,14 @@ def self_test() -> None:
     safe_error = build_unified_frame(0xFE, 9, bytes([0x09]))
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_error)] == [
         (0xFE, 0x09, "SAFE_DISTANCE_TOO_CLOSE"),
+    ]
+    capture_status = build_unified_frame(0x81, 10, bytes([0x10, 0x03, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(capture_status)] == [
+        (0x10, 0x03, "CAPTURE_POINT_RIGHT"),
+    ]
+    prestart_status = build_unified_frame(0x81, 11, bytes([0x12, 0x02, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(prestart_status)] == [
+        (0x12, 0x02, "TARGET_PRESTART_FRONT"),
     ]
     bad_crc = bytearray(unified)
     bad_crc[-1] ^= 0xFF

@@ -87,6 +87,8 @@ volatile struct robot_remote_control g_remote_control = {0};
 static volatile robot_visual_servo_ctrl_t g_visual_servo = {0};
 static volatile bool g_robot_motion_abort_requested = false;
 static volatile robot_auto_result_t g_robot_auto_result = ROBOT_AUTO_RESULT_NONE;
+static volatile robot_joint_result_t g_robot_joint_result = ROBOT_JOINT_RESULT_NONE;
+static volatile robot_reset_result_t g_robot_reset_result = ROBOT_RESET_RESULT_NONE;
 static volatile bool g_soft_reset_done = false;
 static volatile bool g_hard_reset_done = false;
 
@@ -1186,6 +1188,50 @@ robot_auto_result_t robot_auto_result_consume(void)
     return result;
 }
 
+static void robot_joint_result_set(robot_joint_result_t result)
+{
+    taskENTER_CRITICAL();
+    g_robot_joint_result = result;
+    taskEXIT_CRITICAL();
+}
+
+robot_joint_result_t robot_joint_result_consume(void)
+{
+    robot_joint_result_t result;
+
+    taskENTER_CRITICAL();
+    result = g_robot_joint_result;
+    if (result != ROBOT_JOINT_RESULT_RUNNING)
+    {
+        g_robot_joint_result = ROBOT_JOINT_RESULT_NONE;
+    }
+    taskEXIT_CRITICAL();
+
+    return result;
+}
+
+static void robot_reset_result_set(robot_reset_result_t result)
+{
+    taskENTER_CRITICAL();
+    g_robot_reset_result = result;
+    taskEXIT_CRITICAL();
+}
+
+robot_reset_result_t robot_reset_result_consume(void)
+{
+    robot_reset_result_t result;
+
+    taskENTER_CRITICAL();
+    result = g_robot_reset_result;
+    if (result != ROBOT_RESET_RESULT_RUNNING)
+    {
+        g_robot_reset_result = ROBOT_RESET_RESULT_NONE;
+    }
+    taskEXIT_CRITICAL();
+
+    return result;
+}
+
 static void robot_auto_move_interpolation(struct robot_event *event)
 {
     int ret;
@@ -1344,6 +1390,7 @@ void robot_motion_abort(void)
     g_robot_motion_abort_requested = true;
     g_visual_servo.stop_requested = true;
     g_robot_auto_result = ROBOT_AUTO_RESULT_ABORTED;
+    g_robot_joint_result = ROBOT_JOINT_RESULT_ABORTED;
     taskEXIT_CRITICAL();
 
     robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
@@ -1444,27 +1491,37 @@ static void robot_control_task(void *arg)
     while(xQueueReceive(g_robot.event_queue, &event, portMAX_DELAY) == pdPASS) {
         switch (event.type) {
             case ROBOT_JOINT_REL_ROTATE:
+            {
 				LOG("[joint_id: %d] ROBOT_JOINT_REL_ROTATE %f\n", event.joint_id, event.param[0]);
+                bool rel_ok = false;
                 if (robot_joint_rotate_to((uint32_t)event.joint_id, DIR_POSITIVE,event.param[0],
 						ROBOT_JOINT_DEFAULT_VELOCITY, ROBOT_JOINT_DEFAULT_ACCELERATION, false) == 0) {
                     float target = g_robot.joints[event.joint_id].current_angle;
-                    if (!robot_joint_wait_target((uint8_t)event.joint_id, target,
-                            ROBOT_JOINT_POS_CONFIRM_TOL_DEG, ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS)) {
+                    rel_ok = robot_joint_wait_target((uint8_t)event.joint_id, target,
+                            ROBOT_JOINT_POS_CONFIRM_TOL_DEG, ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS);
+                    if (!rel_ok) {
                         (void)robot_joint_stop((uint8_t)event.joint_id);
                     }
                 }
+                robot_joint_result_set(rel_ok ? ROBOT_JOINT_RESULT_OK : ROBOT_JOINT_RESULT_FAILED);
                 break; 
+            }
 			case ROBOT_JOINT_ABS_ROTATE:
+            {
 				LOG("[joint_id: %d] ROBOT_JOINT_ABS_ROTATE %f\n", event.joint_id, event.param[0]);
+                bool abs_ok = false;
 				if (robot_joint_rotate_to((uint32_t)event.joint_id, DIR_POSITIVE, event.param[0],
 					ROBOT_JOINT_DEFAULT_VELOCITY, ROBOT_JOINT_DEFAULT_ACCELERATION, true) == 0) {
                     float target = g_robot.joints[event.joint_id].current_angle;
-                    if (!robot_joint_wait_target((uint8_t)event.joint_id, target,
-                            ROBOT_JOINT_POS_CONFIRM_TOL_DEG, ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS)) {
+                    abs_ok = robot_joint_wait_target((uint8_t)event.joint_id, target,
+                            ROBOT_JOINT_POS_CONFIRM_TOL_DEG, ROBOT_JOINT_POS_CONFIRM_TIMEOUT_MS);
+                    if (!abs_ok) {
                         (void)robot_joint_stop((uint8_t)event.joint_id);
                     }
                 }
+                robot_joint_result_set(abs_ok ? ROBOT_JOINT_RESULT_OK : ROBOT_JOINT_RESULT_FAILED);
 				break;
+            }
 			case ROBOT_LIMIT_SWITCH_EVENT:
 				LOG("[joint_id: %d] ROBOT_LIMIT_SWITCH_EVENT\n", event.joint_id);
 				robot_joint_limit_post_handle(event.joint_id);
@@ -1480,10 +1537,14 @@ static void robot_control_task(void *arg)
 			case ROBOT_HARD_RESET_EVENT:
 				LOG("ROBOT_HARD_RESET_EVENT\n");
 				robot_joint_hard_reset();
+                robot_reset_result_set(ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID) ?
+                                       ROBOT_RESET_RESULT_OK : ROBOT_RESET_RESULT_FAILED);
 				break;
 			case ROBOT_SOFT_RESET_EVENT:
 				LOG("ROBOT_SOFT_RESET_EVENT\n");
 				robot_joint_soft_reset();
+                robot_reset_result_set(ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID) ?
+                                       ROBOT_RESET_RESULT_OK : ROBOT_RESET_RESULT_FAILED);
 				break;
 			case ROBOT_TEST_EVENT:
 				LOG("ROBOT_RESET_EVENT\n");
@@ -1894,7 +1955,12 @@ int robot_send_rel_rotate_event(uint8_t joint_id, float angle)
 	event.type = ROBOT_JOINT_REL_ROTATE;
 	event.joint_id = joint_id;
 	event.param[0] = angle;
-    return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    robot_joint_result_set(ROBOT_JOINT_RESULT_RUNNING);
+    BaseType_t queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    if (queued != pdPASS) {
+        robot_joint_result_set(ROBOT_JOINT_RESULT_FAILED);
+    }
+    return (int)queued;
 }
 
 int robot_send_remote_event(void)
@@ -1910,7 +1976,12 @@ int robot_send_abs_rotate_event(uint8_t joint_id, float angle)
 	event.type = ROBOT_JOINT_ABS_ROTATE;
 	event.joint_id = joint_id;
 	event.param[0] = angle;
-    return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    robot_joint_result_set(ROBOT_JOINT_RESULT_RUNNING);
+    BaseType_t queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    if (queued != pdPASS) {
+        robot_joint_result_set(ROBOT_JOINT_RESULT_FAILED);
+    }
+    return (int)queued;
 }
 
 int robot_send_auto_event_scaled(struct position *pos, float profile_scale)
@@ -2007,6 +2078,7 @@ int robot_send_read_all_event(void)
 int robot_send_reset_event(bool hard_reset)
 {
 	struct robot_event event = {0};
+    BaseType_t queued;
 	if (hard_reset) {
 		event.type = ROBOT_HARD_RESET_EVENT;
         g_hard_reset_done = false;
@@ -2014,7 +2086,12 @@ int robot_send_reset_event(bool hard_reset)
 		event.type = ROBOT_SOFT_RESET_EVENT;
         g_soft_reset_done = false;
 	}
-	return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    robot_reset_result_set(ROBOT_RESET_RESULT_RUNNING);
+	queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    if (queued != pdPASS) {
+        robot_reset_result_set(ROBOT_RESET_RESULT_FAILED);
+    }
+	return (int)queued;
 }
 
 bool robot_is_soft_reset_done(void)

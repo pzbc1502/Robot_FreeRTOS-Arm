@@ -219,6 +219,23 @@ typedef enum
     ROBOT_AUTO_RESULT_ABORTED,
 } robot_auto_result_t;
 
+typedef enum
+{
+    ROBOT_JOINT_RESULT_NONE = 0,
+    ROBOT_JOINT_RESULT_RUNNING,
+    ROBOT_JOINT_RESULT_OK,
+    ROBOT_JOINT_RESULT_FAILED,
+    ROBOT_JOINT_RESULT_ABORTED,
+} robot_joint_result_t;
+
+typedef enum
+{
+    ROBOT_RESET_RESULT_NONE = 0,
+    ROBOT_RESET_RESULT_RUNNING,
+    ROBOT_RESET_RESULT_OK,
+    ROBOT_RESET_RESULT_FAILED,
+} robot_reset_result_t;
+
 /* 关节索引枚举 */
 enum
 {
@@ -274,6 +291,8 @@ bool robot_is_soft_reset_done(void);
 bool robot_is_hard_reset_done(void);
 bool robot_is_auto_busy(void);
 robot_auto_result_t robot_auto_result_consume(void);
+robot_joint_result_t robot_joint_result_consume(void);
+robot_reset_result_t robot_reset_result_consume(void);
 int robot_send_abs_rotate_event(uint8_t joint_id, float angle);
 int robot_send_remote_event(void);
 int robot_visual_servo_start(void);

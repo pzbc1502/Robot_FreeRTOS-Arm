@@ -58,6 +58,7 @@ JETSON_UNIFIED_VERSION = 0x01
 JETSON_MSG_HEARTBEAT = 0x01
 JETSON_MSG_TARGET_CTRL = 0x02
 JETSON_MSG_VISION_ERROR = 0x03
+JETSON_MSG_CAPTURE_CTRL = 0x04
 JETSON_MSG_SAFE_DISTANCE = 0x05
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
@@ -72,6 +73,17 @@ STATUS_NAMES = {
     (0x04, 0x00): "TARGET_CTRL_OFF",
     (0x06, 0x01): "SAFE_DISTANCE_OK",
     (0x06, 0x00): "SAFE_DISTANCE_TOO_CLOSE",
+    (0x10, 0x01): "CAPTURE_POINT_LEFT",
+    (0x10, 0x02): "CAPTURE_POINT_FRONT",
+    (0x10, 0x03): "CAPTURE_POINT_RIGHT",
+    (0x11, 0x01): "CAPTURE_DONE_HOME",
+    (0x12, 0x01): "TARGET_PRESTART_LEFT",
+    (0x12, 0x02): "TARGET_PRESTART_FRONT",
+    (0x12, 0x03): "TARGET_PRESTART_RIGHT",
+    (0xFE, 0x03): "INVALID_PARAM",
+    (0xFE, 0x05): "BUSY",
+    (0xFE, 0x07): "HEARTBEAT_TIMEOUT",
+    (0xFE, 0x08): "SAFETY_ERROR",
     (0xFE, 0x01): "ERROR",
     (0xFE, 0x09): "SAFE_DISTANCE_TOO_CLOSE",
 }
@@ -139,6 +151,17 @@ def build_unified_target_control_frame(enable: bool, seq: int) -> bytes:
 
 def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
     return build_unified_frame(JETSON_MSG_VISION_ERROR, seq, _int16_le(dcx) + _int16_le(dcy) + b"\x01")
+
+
+def build_unified_capture_control_frame(action: int, point_id: int, seq: int) -> bytes:
+    if action not in (0x01, 0x02, 0x03):
+        raise ValueError("capture action must be 1, 2, or 3")
+    if action == 0x02:
+        if point_id != 0:
+            raise ValueError("capture finish action requires point_id=0")
+    elif point_id not in (1, 2, 3):
+        raise ValueError("capture point_id must be 1, 2, or 3")
+    return build_unified_frame(JETSON_MSG_CAPTURE_CTRL, seq, bytes([action & 0xFF, point_id & 0xFF]))
 
 
 def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -> bytes:
@@ -252,6 +275,9 @@ def protocol_self_test() -> None:
     assert build_unified_heartbeat_frame(1, 1234) == bytes.fromhex("A5 5A 01 01 01 04 D2 04 00 00 19 AF")
     assert build_unified_target_control_frame(True, 2) == bytes.fromhex("A5 5A 01 02 02 01 01 79 E8")
     assert build_unified_vision_error_frame(-7, -50, 3) == bytes.fromhex("A5 5A 01 03 03 05 F9 FF CE FF 01 39 EF")
+    assert build_unified_capture_control_frame(0x01, 1, 5) == build_unified_frame(0x04, 5, bytes([0x01, 0x01]))
+    assert build_unified_capture_control_frame(0x02, 0, 6) == build_unified_frame(0x04, 6, bytes([0x02, 0x00]))
+    assert build_unified_capture_control_frame(0x03, 3, 7) == build_unified_frame(0x04, 7, bytes([0x03, 0x03]))
     assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
@@ -270,6 +296,14 @@ def protocol_self_test() -> None:
     safe_error = build_unified_frame(0xFE, 9, bytes([0x09]))
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_error)] == [
         (0xFE, 0x09, "SAFE_DISTANCE_TOO_CLOSE"),
+    ]
+    capture_status = build_unified_frame(0x81, 10, bytes([0x10, 0x03, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(capture_status)] == [
+        (0x10, 0x03, "CAPTURE_POINT_RIGHT"),
+    ]
+    prestart_status = build_unified_frame(0x81, 11, bytes([0x12, 0x02, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(prestart_status)] == [
+        (0x12, 0x02, "TARGET_PRESTART_FRONT"),
     ]
     bad_crc = bytearray(unified)
     bad_crc[-1] ^= 0xFF
@@ -525,6 +559,17 @@ class QtUpperConsole(QMainWindow):
         row = QHBoxLayout()
         row.addWidget(self._button("启动状态机 AA 01 01 BB", lambda: self.send_target_ctrl(True)))
         row.addWidget(self._button("关闭状态机 AA 01 00 BB", self.stop_target_ctrl_with_reset))
+        layout.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(self._button("左视图拍摄", lambda: self.send_capture_ctrl(0x01, 1)))
+        row.addWidget(self._button("正视图拍摄", lambda: self.send_capture_ctrl(0x01, 2)))
+        row.addWidget(self._button("右视图拍摄", lambda: self.send_capture_ctrl(0x01, 3)))
+        row.addWidget(self._button("三视图完成回HOME", lambda: self.send_capture_ctrl(0x02, 0)))
+        layout.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(self._button("选择左视图定靶点", lambda: self.send_capture_ctrl(0x03, 1)))
+        row.addWidget(self._button("选择正视图定靶点", lambda: self.send_capture_ctrl(0x03, 2)))
+        row.addWidget(self._button("选择右视图定靶点", lambda: self.send_capture_ctrl(0x03, 3)))
         layout.addLayout(row)
         self.safe_distance_sequence = QLineEdit(self._settings_text("jetson/safe_distance_sequence", DEFAULT_SAFE_DISTANCE_SEQUENCE))
         row = QHBoxLayout()
@@ -1000,6 +1045,27 @@ class QtUpperConsole(QMainWindow):
             return False
         return True
 
+    def send_capture_ctrl(self, action: int, point_id: int) -> bool:
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self.emit_log("JETSON", "ERROR", "CAPTURE_CTRL requires NEW A5 5A + CRC16 protocol.")
+            return False
+        if not self.jetson.is_open():
+            self.emit_log("JETSON", "ERROR", "Jetson serial is not open; capture control not sent.")
+            return False
+        try:
+            if self.heartbeat_enable.isChecked():
+                self.start_heartbeat()
+            self.send_safe_distance_values(int(self.safe_distance_mm.text()), self.safe_distance_valid.isChecked())
+            if self.safe_distance_enable.isChecked():
+                self.start_safe_distance()
+            frame = build_unified_capture_control_frame(action, point_id, self._next_unified_seq())
+            label = f"CAPTURE_CTRL a={action} p={point_id}"
+            self.jetson.write(frame, label)
+        except Exception as exc:
+            self.emit_log("JETSON", "ERROR", str(exc))
+            return False
+        return True
+
     def stop_target_ctrl_with_reset(self) -> None:
         self.stop_heartbeat()
         self.stop_safe_distance()
@@ -1262,6 +1328,18 @@ class QtUpperConsole(QMainWindow):
             self._set_status("ERROR", "-")
         elif name == "SAFE_DISTANCE_TOO_CLOSE":
             self._set_status("SAFE_DIST", "TOO_CLOSE", "red")
+            self._set_status("ERROR", "YES")
+        elif name.startswith("CAPTURE_POINT_"):
+            self._set_status("READY", name.replace("CAPTURE_POINT_", "CAP_"), "green")
+            self._set_status("ERROR", "-")
+        elif name == "CAPTURE_DONE_HOME":
+            self._set_status("POSE_VALID", "YES")
+            self._set_status("READY", "HOME", "green")
+            self._set_status("ERROR", "-")
+        elif name.startswith("TARGET_PRESTART_"):
+            self._set_status("READY", name.replace("TARGET_PRESTART_", "PRE_"), "green")
+            self._set_status("ERROR", "-")
+        elif name in {"INVALID_PARAM", "BUSY", "HEARTBEAT_TIMEOUT", "SAFETY_ERROR"}:
             self._set_status("ERROR", "YES")
         elif name == "ERROR":
             self._set_status("ERROR", "YES")

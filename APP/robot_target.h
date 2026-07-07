@@ -75,6 +75,7 @@ extern volatile bool ROBOT_TARGET_FIRE_ENABLE;
 void robot_target_init(void);
 bool robot_target_enable_request(void);
 void robot_target_disable_request(void);
+void robot_target_mark_preposition_ready_once(void);
 void robot_target_step(const target_obs_t *obs);
 
 #ifdef __cplusplus

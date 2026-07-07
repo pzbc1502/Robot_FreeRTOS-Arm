@@ -43,6 +43,7 @@ volatile bool ROBOT_TARGET_ENABLED = false;
 volatile bool ROBOT_TARGET_FIRE_ENABLE = false;
 
 static target_ctx_t s_target;
+static bool s_target_preposition_ready_once = false;
 
 static float clampf_local(float value, float min_value, float max_value)
 {
@@ -312,9 +313,15 @@ void robot_target_disable_request(void)
 {
     ROBOT_TARGET_ENABLED = false;
     ROBOT_TARGET_FIRE_ENABLE = false;
+    s_target_preposition_ready_once = false;
     target_stop_visual_servo();
     force_laser_off();
     (void)robot_send_reset_event(false);
+}
+
+void robot_target_mark_preposition_ready_once(void)
+{
+    s_target_preposition_ready_once = true;
 }
 
 void robot_target_step(const target_obs_t *obs)
@@ -375,12 +382,20 @@ void robot_target_step(const target_obs_t *obs)
         case TARGET_INIT:
             target_stop_visual_servo();
             force_laser_off();
-            s_target.target = s_target.pre;
             reset_alignment_counts();
             if (!safe_distance_fresh(now))
             {
                 break;
             }
+            if (s_target_preposition_ready_once)
+            {
+                s_target_preposition_ready_once = false;
+                (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
+                s_target.last_ready_status_ms = now;
+                enter_state(TARGET_WAIT_DETECT, now);
+                break;
+            }
+            s_target.target = s_target.pre;
             if (send_target_auto(&s_target.target))
             {
                 enter_state(TARGET_PRE_POSITION, now);

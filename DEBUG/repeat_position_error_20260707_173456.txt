@@ -1,0 +1,3 @@
+[INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\repeat_position_error_20260707_173456.txt
+[INFO] ARM=COM7 baud=115200 cycles=1 auto='auto 23.15 -123.45 -15.20'
+[FATAL] could not open port 'COM7': PermissionError(13, '拒绝访问。', None, 5)

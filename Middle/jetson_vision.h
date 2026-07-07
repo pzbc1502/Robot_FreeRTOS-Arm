@@ -40,14 +40,26 @@ extern "C" {
 #define RA6_TO_JETSON_OUTPUT       0x03u
 #define RA6_TO_JETSON_TARGET_CTRL  0x04u
 #define RA6_TO_JETSON_SAFE_DISTANCE 0x06u
+#define RA6_TO_JETSON_CAPTURE_POINT 0x10u
+#define RA6_TO_JETSON_CAPTURE_DONE  0x11u
+#define RA6_TO_JETSON_TARGET_PRESTART 0x12u
 #define RA6_TO_JETSON_ERROR        0xFEu
 
+#define JETSON_CAPTURE_ACTION_GOTO   0x01u
+#define JETSON_CAPTURE_ACTION_FINISH 0x02u
+#define JETSON_CAPTURE_ACTION_SELECT 0x03u
+
+#define JETSON_ERROR_INVALID_PARAM 0x03u
+#define JETSON_ERROR_BUSY          0x05u
+#define JETSON_ERROR_HEARTBEAT_TIMEOUT 0x07u
+#define JETSON_ERROR_SAFETY        0x08u
 #define JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE 0x09u
 
 void jetson_vision_init(void);
 void jetson_vision_process(void);
 bool jetson_get_vision_error(int16_t *dcx, int16_t *dcy);
 bool jetson_get_target_control(bool *enable);
+bool jetson_get_capture_control(uint8_t *action, uint8_t *point_id);
 bool jetson_get_safe_distance(uint16_t *distance_mm, bool *valid);
 bool jetson_is_unified_protocol_active(void);
 bool jetson_is_link_alive(uint32_t now_ms);

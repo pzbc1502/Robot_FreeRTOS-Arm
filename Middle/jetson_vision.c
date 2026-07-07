@@ -62,6 +62,9 @@ static volatile bool s_new_error = false;
 static uint16_t s_latest_distance_mm = 0u;
 static bool s_latest_distance_valid = false;
 static volatile bool s_new_safe_distance = false;
+static uint8_t s_capture_action = 0u;
+static uint8_t s_capture_point_id = 0u;
+static volatile bool s_new_capture_control = false;
 static bool s_target_control_enable = false;
 static volatile bool s_new_target_control = false;
 static volatile bool s_unified_protocol_active = false;
@@ -133,6 +136,39 @@ static void handle_safe_distance(uint16_t distance_mm, bool valid)
         valid ? 1u : 0u);
 }
 
+static bool capture_control_valid(uint8_t action, uint8_t point_id)
+{
+    if (action == JETSON_CAPTURE_ACTION_GOTO)
+    {
+        return (point_id >= 1u) && (point_id <= 3u);
+    }
+
+    if (action == JETSON_CAPTURE_ACTION_FINISH)
+    {
+        return point_id == 0u;
+    }
+
+    if (action == JETSON_CAPTURE_ACTION_SELECT)
+    {
+        return (point_id >= 1u) && (point_id <= 3u);
+    }
+
+    return false;
+}
+
+static void handle_capture_control(uint8_t action, uint8_t point_id)
+{
+    __disable_irq();
+    s_capture_action = action;
+    s_capture_point_id = point_id;
+    s_new_capture_control = true;
+    __enable_irq();
+
+    LOG("[JETSON_RX] capture_ctrl action=%u point=%u\r\n",
+        (unsigned)action,
+        (unsigned)point_id);
+}
+
 static void handle_valid_target_control_frame(void)
 {
     handle_target_control(s_parser.ctrl_value);
@@ -201,6 +237,27 @@ static void handle_valid_unified_frame(void)
                 bool valid = (s_parser.unified_payload[2] != 0u);
                 accepted = true;
                 handle_safe_distance(distance_mm, valid);
+            }
+            break;
+
+        case JETSON_MSG_CAPTURE_CTRL:
+            if (s_parser.unified_len == 2u)
+            {
+                uint8_t action = s_parser.unified_payload[0];
+                uint8_t point_id = s_parser.unified_payload[1];
+                accepted = true;
+                mark_unified_link_alive();
+                if (capture_control_valid(action, point_id))
+                {
+                    handle_capture_control(action, point_id);
+                }
+                else
+                {
+                    LOG("[JETSON_RX] invalid capture_ctrl action=%u point=%u\r\n",
+                        (unsigned)action,
+                        (unsigned)point_id);
+                    (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, JETSON_ERROR_INVALID_PARAM);
+                }
             }
             break;
 
@@ -502,6 +559,26 @@ bool jetson_get_target_control(bool *enable)
     __disable_irq();
     *enable = s_target_control_enable;
     s_new_target_control = false;
+    __enable_irq();
+    return true;
+}
+
+bool jetson_get_capture_control(uint8_t *action, uint8_t *point_id)
+{
+    if ((action == NULL) || (point_id == NULL))
+    {
+        return false;
+    }
+
+    if (!s_new_capture_control)
+    {
+        return false;
+    }
+
+    __disable_irq();
+    *action = s_capture_action;
+    *point_id = s_capture_point_id;
+    s_new_capture_control = false;
     __enable_irq();
     return true;
 }
