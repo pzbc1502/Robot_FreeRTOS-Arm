@@ -1,4 +1,5 @@
 #include "bsp_uart.h"
+#include "bsp_usb_cdc.h"
 #include "robot.h"
 #include "Middle/W800_mqtt.h"
 #include "jetson_vision.h"
@@ -181,6 +182,7 @@ void safe_printf(const char *format, ...)
                 xSemaphoreTake(g_uart1_tx_sem, 0); 
                 R_SCI_UART_Write(&robot_uart1_ctrl, (uint8_t *)buffer, len);
                 xSemaphoreTake(g_uart1_tx_sem, pdMS_TO_TICKS(100));
+                BSP_USB_CDC_WriteBestEffort(buffer, len);
                 xSemaphoreGive(g_log_mutex);
             }
         }
@@ -191,6 +193,7 @@ void safe_printf(const char *format, ...)
             R_SCI_UART_Write(&robot_uart1_ctrl, (uint8_t *)buffer, len);
             uint32_t timeout = 0xFFFFF;
             while(!g_uart1_tx_complete && timeout--);
+            BSP_USB_CDC_WriteBestEffort(buffer, len);
         }
     }
 
@@ -201,6 +204,7 @@ void safe_printf(const char *format, ...)
         R_SCI_UART_Write(&robot_uart1_ctrl, (uint8_t *)buffer, len);
         uint32_t timeout = 0xFFFFF;
         while(!g_uart1_tx_complete && timeout--);
+        BSP_USB_CDC_WriteBestEffort(buffer, len);
     }
 }
 

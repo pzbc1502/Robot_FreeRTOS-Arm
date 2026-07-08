@@ -2195,6 +2195,7 @@ void robot_cmd_service(void *pvParameters)
 		switch (rb_cmd.type)
 		{
 			case CMD_TYPE_UART1:
+			case CMD_TYPE_USB:
 				robot_uart1_handle(&rb_cmd);
 				break;
 			

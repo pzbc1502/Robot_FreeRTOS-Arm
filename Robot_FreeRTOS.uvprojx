@@ -623,6 +623,21 @@
               <FilePath>.\USER_BSP\bsp_uart.h</FilePath>
             </File>
             <File>
+              <FileName>bsp_usb_cdc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\USER_BSP\bsp_usb_cdc.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_usb_cdc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\USER_BSP\bsp_usb_cdc.h</FilePath>
+            </File>
+            <File>
+              <FileName>usb_descriptor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\USER_BSP\usb_descriptor.c</FilePath>
+            </File>
+            <File>
               <FileName>libemqtt.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\USER_BSP\libemqtt.c</FilePath>

@@ -153,6 +153,11 @@ static bool capture_control_valid(uint8_t action, uint8_t point_id)
         return (point_id >= 1u) && (point_id <= 3u);
     }
 
+    if (action == JETSON_CAPTURE_ACTION_CURRENT)
+    {
+        return point_id == 0u;
+    }
+
     return false;
 }
 

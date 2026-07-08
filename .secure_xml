@@ -29,7 +29,7 @@
     <node id="board.clock.pll2.display" option="board.clock.pll2.display.value"/>
     <node id="board.clock.clock.source" option="board.clock.clock.source.pll"/>
     <node id="board.clock.clkout.source" option="board.clock.clkout.source.disabled"/>
-    <node id="board.clock.uclk.source" option="board.clock.uclk.source.disabled"/>
+    <node id="board.clock.uclk.source" option="board.clock.uclk.source.pll2"/>
     <node id="board.clock.u60ck.source" option="board.clock.u60ck.source.disabled"/>
     <node id="board.clock.octaspiclk.source" option="board.clock.octaspiclk.source.disabled"/>
     <node id="board.clock.canfdclk.source" option="board.clock.octaspiclk.source.pll2"/>
@@ -101,6 +101,7 @@
       <configSetting altId="p400.gpio_mode.gpio_mode_out.high" configurationId="p400.gpio_mode"/>
       <configSetting altId="p401.gpio_mode.gpio_mode_peripheral" configurationId="p401.gpio_mode"/>
       <configSetting altId="p402.gpio_mode.gpio_mode_peripheral" configurationId="p402.gpio_mode"/>
+      <configSetting altId="p407.gpio_mode.gpio_mode_peripheral" configurationId="p407.gpio_mode"/>
       <configSetting altId="p411.gpio_irq.gpio_irq_enabled" configurationId="p411.gpio_irq"/>
       <configSetting altId="p411.gpio_mode.gpio_mode_irq" configurationId="p411.gpio_mode"/>
       <configSetting altId="p411.gpio_pupd.gpio_pupd_ip_up" configurationId="p411.gpio_pupd"/>
@@ -133,6 +134,7 @@
       <configSetting altId="sci6.txd.p506" configurationId="sci6.txd" isUsedByDriver="true" peripheral="SCI6"/>
       <configSetting altId="sci9.rxd.p202" configurationId="sci9.rxd" isUsedByDriver="true" peripheral="SCI9"/>
       <configSetting altId="sci9.txd.p203" configurationId="sci9.txd" isUsedByDriver="true" peripheral="SCI9"/>
+      <configSetting altId="usbfs0.vbus.p407" configurationId="usbfs0.vbus" isUsedByDriver="true" peripheral="USB_FS0"/>
     </pincfg>
   </raPinConfiguration>
 </raConfiguration>

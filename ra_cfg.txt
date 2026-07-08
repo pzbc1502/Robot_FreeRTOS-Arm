@@ -124,7 +124,7 @@ FSP Configuration
     PLL2 Mul x20.0
     Clock Src: PLL
     CLKOUT Disabled
-    USBCLK Disabled
+    USBCLK Src: PLL2
     USB60CLK Disabled
     OCTACLK Disabled
     CANFDCLK Src: PLL2
@@ -217,7 +217,7 @@ FSP Configuration
       P404 M13 - - - - Disabled - - "AGT0: AGTIO0; AGT1: AGTIO1; AGT2: AGTIO2; AGT3: AGTIO3; ETHERC_MII0: ET0_EXOUT; ETHERC_RMII0: ET0_EXOUT; GPT3: GTIOC3B; ICU0: IRQ15; RTC0: RTCIC2; SCI7: CTS7; SSI0: SSILRCK0" - None - - 
       P405 P15 - - - - Disabled - - "ETHERC_MII0: ET0_TX_EN; ETHERC_RMII0: RMII_TXD_EN; GPT1: GTIOC1A; SSI0: SSITXD0" - None - - 
       P406 N14 - - - - Disabled - - "AGT5: AGTO5; ETHERC_MII0: ET0_RX_ER; ETHERC_RMII0: RMII_TXD1; GPT1: GTIOC1B; SPI0: SSLA3; SSI0: SSIRXD0" - None - - 
-      P407 A15 - - - - Disabled - - "ADC0: ADTRG0; AGT0: AGTIO0; CTSU0: TS03; ETHERC_MII0: ET0_EXOUT; ETHERC_RMII0: ET0_EXOUT; GPT6: GTIOC6A; IIC0: SDA0; RTC0: RTCOUT; SCI4: CTSRTS4; SPI0: SSLA3; USB_FS0: USB_VBUS" - None - - 
+      P407 A15 USB_FS0_USB_VBUS - Low - "Peripheral mode" CMOS None "ADC0: ADTRG0; AGT0: AGTIO0; CTSU0: TS03; ETHERC_MII0: ET0_EXOUT; ETHERC_RMII0: ET0_EXOUT; GPT6: GTIOC6A; IIC0: SDA0; RTC0: RTCOUT; SCI4: CTSRTS4; SPI0: SSLA3; USB_FS0: USB_VBUS" - IO - - 
       P408 D13 - - - - Disabled - - "AGT2: AGTOB2; CTSU0: TS04; ETHERC_MII0: ET0_CRS; ETHERC_RMII0: RMII_CRS_DV; GPT_OPS0: GTOWLO; GPT6: GTIOC6B; ICU0: IRQ07; IIC0: SCL0; SCI3: RXD3; SCI3: SCL3; SCI4: CTS4; USB_FS0: USB_ID; USB_HS0: USBHS_ID" - None - - 
       P409 B15 - - - - Disabled - - "AGT2: AGTOA2; CTSU0: TS05; ETHERC_MII0: ET0_RX_CLK; ETHERC_RMII0: RMII_RX_ER; GPT_OPS0: GTOWUP; ICU0: IRQ06; IIC2: SDA2; SCI3: SDA3; SCI3: TXD3; USB_FS0: USB_EXICEN; USB_HS0: USBHS_EXICEN" - None - - 
       P410 C14 - - - - Disabled - - "AGT1: AGTOB1; CTSU0: TS06; ETHERC_MII0: ET0_ERXD0; ETHERC_RMII0: RMII_RXD1; GPT_OPS0: GTOVLO; GPT9: GTIOC9B; ICU0: IRQ05; IIC2: SCL2; SCI0: RXD0; SCI0: SCL0; SCI3: SCK3; SDHI0: SD0DAT1; SPI1: MISOB" - None - - 
@@ -482,6 +482,23 @@ FSP Configuration
   Module "Transfer (r_dtc)"
     Parameter Checking: Disabled
     Linker section to keep DTC vector table: .fsp_dtc_vector_table
+    
+  Module "USB PCDC (r_usb_pcdc)"
+  Module "USB (r_usb_basic)"
+    Parameter Checking: Default (BSP)
+    CL Only Mode: Disabled
+    CPU Bus Access Wait Cycles: 9 cycles
+    Battery Charging: Enabled
+    Power IC Shutdown Polarity: Active High
+    Dedicated Charging Port (DCP) Mode: Disabled
+    Notifications for SET_INTERFACE/SET_FEATURE/CLEAR_FEATURE: Enabled
+    Double Buffering: Enabled
+    Continuous Transfer Mode: Disabled
+    LDO Regulator: Not Supported
+    DMA/DTC Support: DMA Disabled
+    USB Multiport Enable: Disabled
+    USB Compliance Test mode: Disabled
+    USB TPL table name: NULL
     
   FreeRTOS
     General: Custom FreeRTOSConfig.h: 
@@ -806,6 +823,26 @@ FSP Configuration
       Interrupts: Transmit End Interrupt Priority: Priority 12
       Interrupts: Error Interrupt Priority: Priority 12
       
+    Instance "g_usb_pcdc USB PCDC (r_usb_pcdc)"
+      Name: g_usb_pcdc
+      
+      Instance "g_basic0 USB (r_usb_basic)"
+        Name: g_basic0
+        USB Mode: Peri mode
+        USB Speed: Full Speed
+        USB Module Number: USB_IP0 Port
+        USB Descriptor: g_usb_descriptor
+        USB Compliance Callback: NULL
+        USBFS Interrupt Priority: Priority 12
+        USBFS Resume Priority: Priority 12
+        USBFS D0FIFO Interrupt Priority: Priority 12
+        USBFS D1FIFO Interrupt Priority: Priority 12
+        USBHS Interrupt Priority: Not Supported
+        USBHS D0FIFO Interrupt Priority: Not Supported
+        USBHS D1FIFO Interrupt Priority: Not Supported
+        USB Callback: usb_pcdc_callback
+        USB Callback Context: NULL
+        
   Thread "robot_thread"
     Symbol: robot_thread
     Name: robot_thread

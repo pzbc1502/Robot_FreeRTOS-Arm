@@ -39,6 +39,7 @@ STATUS_NAMES = {
     (0x10, 0x02): "CAPTURE_POINT_FRONT",
     (0x10, 0x03): "CAPTURE_POINT_RIGHT",
     (0x11, 0x01): "CAPTURE_DONE_HOME",
+    (0x12, 0x00): "TARGET_PRESTART_CURRENT",
     (0x12, 0x01): "TARGET_PRESTART_LEFT",
     (0x12, 0x02): "TARGET_PRESTART_FRONT",
     (0x12, 0x03): "TARGET_PRESTART_RIGHT",
@@ -116,15 +117,14 @@ def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
 
 
 def build_unified_capture_control_frame(action: int, point_id: int, seq: int) -> bytes:
-    if action not in (0x01, 0x02, 0x03):
-        raise ValueError("capture action must be 1, 2, or 3")
-    if action == 0x02:
+    if action not in (0x01, 0x02, 0x03, 0x04):
+        raise ValueError("capture action must be 1, 2, 3, or 4")
+    if action in (0x02, 0x04):
         if point_id != 0:
-            raise ValueError("capture finish action requires point_id=0")
+            raise ValueError("capture finish/current action requires point_id=0")
     elif point_id not in (1, 2, 3):
         raise ValueError("capture point_id must be 1, 2, or 3")
     return build_unified_frame(JETSON_MSG_CAPTURE_CTRL, seq, bytes([action & 0xFF, point_id & 0xFF]))
-
 
 def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -> bytes:
     if distance_mm < 0 or distance_mm > 65535:
@@ -210,6 +210,7 @@ def self_test() -> None:
     assert build_unified_capture_control_frame(0x01, 1, 5) == build_unified_frame(0x04, 5, bytes([0x01, 0x01]))
     assert build_unified_capture_control_frame(0x02, 0, 6) == build_unified_frame(0x04, 6, bytes([0x02, 0x00]))
     assert build_unified_capture_control_frame(0x03, 3, 7) == build_unified_frame(0x04, 7, bytes([0x03, 0x03]))
+    assert build_unified_capture_control_frame(0x04, 0, 8) == build_unified_frame(0x04, 8, bytes([0x04, 0x00]))
     assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
@@ -237,7 +238,16 @@ def self_test() -> None:
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(prestart_status)] == [
         (0x12, 0x02, "TARGET_PRESTART_FRONT"),
     ]
+    current_prestart_status = build_unified_frame(0x81, 12, bytes([0x12, 0x00, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(current_prestart_status)] == [
+        (0x12, 0x00, "TARGET_PRESTART_CURRENT"),
+    ]
     bad_crc = bytearray(unified)
     bad_crc[-1] ^= 0xFF
     assert parse_ra6_status_frames(bytes(bad_crc)) == []
     assert parse_vision_sequence("15,-10:2;8,-5:1;0,0:0") == [(15, -10, 2), (8, -5, 1), (0, 0, 0)]
+
+
+if __name__ == "__main__":
+    self_test()
+    print("ra6m5_protocol self_test passed")

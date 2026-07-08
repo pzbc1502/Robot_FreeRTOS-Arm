@@ -251,6 +251,7 @@ enum
 enum cmd_type
 {
     CMD_TYPE_UART1 = 0,   /* 来自串口 */
+    CMD_TYPE_USB,         /* USB CDC command port */
     CMD_TYPE_MQTT,        /* 来自 MQTT 网络 */
 };
 

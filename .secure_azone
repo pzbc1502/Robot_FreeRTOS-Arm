@@ -27,6 +27,7 @@
             <slot name="P400.CM33" secure="true"/>
             <slot name="P401.CM33" secure="true"/>
             <slot name="P402.CM33" secure="true"/>
+            <slot name="P407.CM33" secure="true"/>
             <slot name="P411.CM33" secure="true"/>
         </peripheral>
         <peripheral name="PORT5.CM33" group="PORT">
@@ -61,6 +62,8 @@
         <peripheral name="CANFD0.CM33" group="CANFD" security="s"/>
         <peripheral name="DMA_DMAC7.CM33" group="DMA_DMAC" security="s"/>
         <peripheral name="SCI5.CM33" group="SCI" security="s"/>
+        <peripheral name="USB_FS.CM33" security="s"/>
+        <peripheral name="USB_HS.CM33" security="s"/>
         <peripheral name="ICU.CM33">
             <slot name="IRQ0.CM33" secure="true"/>
             <slot name="IRQ1.CM33" secure="true"/>
@@ -90,6 +93,10 @@
             <slot name="IRQ25.CM33" secure="true"/>
             <slot name="IRQ26.CM33" secure="true"/>
             <slot name="IRQ27.CM33" secure="true"/>
+            <slot name="IRQ28.CM33" secure="true"/>
+            <slot name="IRQ29.CM33" secure="true"/>
+            <slot name="IRQ30.CM33" secure="true"/>
+            <slot name="IRQ31.CM33" secure="true"/>
         </peripheral>
     </partition>
 </azone>

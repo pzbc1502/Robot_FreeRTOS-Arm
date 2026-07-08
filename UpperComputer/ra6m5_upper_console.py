@@ -77,6 +77,7 @@ STATUS_NAMES = {
     (0x10, 0x02): "CAPTURE_POINT_FRONT",
     (0x10, 0x03): "CAPTURE_POINT_RIGHT",
     (0x11, 0x01): "CAPTURE_DONE_HOME",
+    (0x12, 0x00): "TARGET_PRESTART_CURRENT",
     (0x12, 0x01): "TARGET_PRESTART_LEFT",
     (0x12, 0x02): "TARGET_PRESTART_FRONT",
     (0x12, 0x03): "TARGET_PRESTART_RIGHT",
@@ -154,11 +155,11 @@ def build_unified_vision_error_frame(dcx: int, dcy: int, seq: int) -> bytes:
 
 
 def build_unified_capture_control_frame(action: int, point_id: int, seq: int) -> bytes:
-    if action not in (0x01, 0x02, 0x03):
-        raise ValueError("capture action must be 1, 2, or 3")
-    if action == 0x02:
+    if action not in (0x01, 0x02, 0x03, 0x04):
+        raise ValueError("capture action must be 1, 2, 3, or 4")
+    if action in (0x02, 0x04):
         if point_id != 0:
-            raise ValueError("capture finish action requires point_id=0")
+            raise ValueError("capture finish/current action requires point_id=0")
     elif point_id not in (1, 2, 3):
         raise ValueError("capture point_id must be 1, 2, or 3")
     return build_unified_frame(JETSON_MSG_CAPTURE_CTRL, seq, bytes([action & 0xFF, point_id & 0xFF]))
@@ -278,6 +279,7 @@ def protocol_self_test() -> None:
     assert build_unified_capture_control_frame(0x01, 1, 5) == build_unified_frame(0x04, 5, bytes([0x01, 0x01]))
     assert build_unified_capture_control_frame(0x02, 0, 6) == build_unified_frame(0x04, 6, bytes([0x02, 0x00]))
     assert build_unified_capture_control_frame(0x03, 3, 7) == build_unified_frame(0x04, 7, bytes([0x03, 0x03]))
+    assert build_unified_capture_control_frame(0x04, 0, 8) == build_unified_frame(0x04, 8, bytes([0x04, 0x00]))
     assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
@@ -304,6 +306,10 @@ def protocol_self_test() -> None:
     prestart_status = build_unified_frame(0x81, 11, bytes([0x12, 0x02, 0x00]))
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(prestart_status)] == [
         (0x12, 0x02, "TARGET_PRESTART_FRONT"),
+    ]
+    current_prestart_status = build_unified_frame(0x81, 12, bytes([0x12, 0x00, 0x00]))
+    assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(current_prestart_status)] == [
+        (0x12, 0x00, "TARGET_PRESTART_CURRENT"),
     ]
     bad_crc = bytearray(unified)
     bad_crc[-1] ^= 0xFF
@@ -618,16 +624,22 @@ class QtUpperConsole(QMainWindow):
         self.demo_wait_ready = QCheckBox("等待READY")
         self.demo_prompt_p000 = QCheckBox("对准后提示按P000")
         self.demo_auto_stop = QCheckBox("输出关闭后自动停止")
+        self.demo_use_current_prestart = QCheckBox("当前位置作为定靶起点")
         for checkbox, key, default in (
             (self.demo_send_enable, "demo/send_enable", True),
             (self.demo_wait_ready, "demo/wait_ready", True),
             (self.demo_prompt_p000, "demo/prompt_p000", True),
             (self.demo_auto_stop, "demo/auto_stop", True),
+            (self.demo_use_current_prestart, "demo/use_current_prestart", False),
         ):
             checkbox.setChecked(self._settings_bool(key, default))
         row = QHBoxLayout()
         for checkbox in (self.demo_send_enable, self.demo_wait_ready, self.demo_prompt_p000, self.demo_auto_stop):
             row.addWidget(checkbox)
+        layout.addLayout(row)
+        row = QHBoxLayout()
+        row.addWidget(self.demo_use_current_prestart)
+        row.addStretch(1)
         layout.addLayout(row)
 
         row = QHBoxLayout()
@@ -1130,6 +1142,7 @@ class QtUpperConsole(QMainWindow):
         self.settings.setValue("demo/wait_ready", self.demo_wait_ready.isChecked())
         self.settings.setValue("demo/prompt_p000", self.demo_prompt_p000.isChecked())
         self.settings.setValue("demo/auto_stop", self.demo_auto_stop.isChecked())
+        self.settings.setValue("demo/use_current_prestart", self.demo_use_current_prestart.isChecked())
         self.settings.sync()
         self.emit_log("DEMO", "INFO", "演示配置已保存")
 
@@ -1207,6 +1220,7 @@ class QtUpperConsole(QMainWindow):
             self.demo_wait_ready.isChecked(),
             self.demo_prompt_p000.isChecked(),
             self.demo_auto_stop.isChecked(),
+            self.demo_use_current_prestart.isChecked(),
         )
         threading.Thread(target=self._target_demo_loop, args=(sequence, period, options), daemon=True).start()
         self.emit_log("DEMO", "INFO", "一键定靶演示开始")
@@ -1222,9 +1236,19 @@ class QtUpperConsole(QMainWindow):
             self.send_arm_command("soft_reset")
         self.emit_log("DEMO", "INFO", "演示已停止，已关闭视觉发送、激光输出，并请求回 HOME")
 
-    def _target_demo_loop(self, sequence: list[tuple[int, int, int]], period_ms: int, options: tuple[bool, bool, bool, bool]) -> None:
-        send_enable, wait_ready, prompt_p000, auto_stop = options
+    def _target_demo_loop(self, sequence: list[tuple[int, int, int]], period_ms: int, options: tuple[bool, bool, bool, bool, bool]) -> None:
+        send_enable, wait_ready, prompt_p000, auto_stop, use_current_prestart = options
         if send_enable:
+            if use_current_prestart:
+                if not self.send_capture_ctrl(0x04, 0):
+                    self.emit_log("DEMO", "ERROR", "当前位置定靶起点标记失败，演示停止。")
+                    return
+                if not self._wait_ra6_event("TARGET_PRESTART_CURRENT", 3.0):
+                    self.stop_periodic_vision()
+                    self.stop_heartbeat()
+                    self.stop_safe_distance()
+                    self.emit_log("DEMO", "ERROR", "未收到当前位置定靶起点确认，演示停止。")
+                    return
             self.send_target_ctrl(True)
         if wait_ready and not self._wait_ra6_event("READY", 12.0):
             self.stop_periodic_vision()

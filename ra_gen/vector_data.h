@@ -6,7 +6,7 @@
         #endif
                 /* Number of interrupts allocated */
         #ifndef VECTOR_DATA_IRQ_COUNT
-        #define VECTOR_DATA_IRQ_COUNT    (28)
+        #define VECTOR_DATA_IRQ_COUNT    (32)
         #endif
         /* ISR prototypes */
         void r_icu_isr(void);
@@ -19,6 +19,10 @@
         void canfd_channel_tx_isr(void);
         void canfd_common_fifo_rx_isr(void);
         void canfd_rx_fifo_isr(void);
+        void usbfs_interrupt_handler(void);
+        void usbfs_resume_handler(void);
+        void usbfs_d0fifo_handler(void);
+        void usbfs_d1fifo_handler(void);
 
         /* Vector table allocations */
         #define VECTOR_NUMBER_ICU_IRQ1 ((IRQn_Type) 0) /* ICU IRQ1 (External pin interrupt 1) */
@@ -77,8 +81,16 @@
         #define SCI5_TEI_IRQn          ((IRQn_Type) 26) /* SCI5 TEI (Transmit end) */
         #define VECTOR_NUMBER_SCI5_ERI ((IRQn_Type) 27) /* SCI5 ERI (Receive error) */
         #define SCI5_ERI_IRQn          ((IRQn_Type) 27) /* SCI5 ERI (Receive error) */
+        #define VECTOR_NUMBER_USBFS_INT ((IRQn_Type) 28) /* USBFS INT (USBFS interrupt) */
+        #define USBFS_INT_IRQn          ((IRQn_Type) 28) /* USBFS INT (USBFS interrupt) */
+        #define VECTOR_NUMBER_USBFS_RESUME ((IRQn_Type) 29) /* USBFS RESUME (USBFS resume interrupt) */
+        #define USBFS_RESUME_IRQn          ((IRQn_Type) 29) /* USBFS RESUME (USBFS resume interrupt) */
+        #define VECTOR_NUMBER_USBFS_FIFO_0 ((IRQn_Type) 30) /* USBFS FIFO 0 (DMA/DTC transfer request 0) */
+        #define USBFS_FIFO_0_IRQn          ((IRQn_Type) 30) /* USBFS FIFO 0 (DMA/DTC transfer request 0) */
+        #define VECTOR_NUMBER_USBFS_FIFO_1 ((IRQn_Type) 31) /* USBFS FIFO 1 (DMA/DTC transfer request 1) */
+        #define USBFS_FIFO_1_IRQn          ((IRQn_Type) 31) /* USBFS FIFO 1 (DMA/DTC transfer request 1) */
         /* The number of entries required for the ICU vector table. */
-        #define BSP_ICU_VECTOR_NUM_ENTRIES (28)
+        #define BSP_ICU_VECTOR_NUM_ENTRIES (32)
 
         #ifdef __cplusplus
         }

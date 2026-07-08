@@ -50,6 +50,7 @@ typedef struct
     bool distance_valid;
     bool distance_too_close;
     bool sent_safe_error;
+    bool base_pose_ready;
 } capture_ctx_t;
 
 static const capture_step_t s_left_steps[] =
@@ -66,7 +67,7 @@ static const capture_step_t s_front_steps[] =
     { CAPTURE_STEP_AUTO, 0u, 0.0f },
     { CAPTURE_STEP_ABS,  0u, 90.0f },
     { CAPTURE_STEP_ABS,  3u, 0.0f },
-    { CAPTURE_STEP_ABS,  4u, 90.0f },
+    { CAPTURE_STEP_ABS,  4u, 80.0f },
     { CAPTURE_STEP_DONE, 0u, 0.0f },
 };
 
@@ -119,6 +120,11 @@ static bool capture_action_valid(uint8_t action, uint8_t point_id)
     if (action == JETSON_CAPTURE_ACTION_SELECT)
     {
         return (point_id >= 1u) && (point_id <= 3u);
+    }
+
+    if (action == JETSON_CAPTURE_ACTION_CURRENT)
+    {
+        return point_id == 0u;
     }
 
     return false;
@@ -194,6 +200,7 @@ static void capture_abort(uint8_t error_code)
     s_capture.action = 0u;
     s_capture.point_id = 0u;
     s_capture.step_index = 0u;
+    s_capture.base_pose_ready = false;
 }
 
 static bool capture_handle_safety(uint32_t now_ms)
@@ -216,6 +223,7 @@ static bool capture_handle_safety(uint32_t now_ms)
 
     capture_laser_off();
     robot_motion_abort();
+    s_capture.base_pose_ready = false;
     if (!s_capture.sent_safe_error)
     {
         (void)jetson_send_status_u8(RA6_TO_JETSON_SAFE_DISTANCE, 0u);
@@ -245,6 +253,7 @@ static void capture_finish(uint32_t now_ms)
     else if (s_capture.action == JETSON_CAPTURE_ACTION_FINISH)
     {
         (void)jetson_send_status_u8(RA6_TO_JETSON_CAPTURE_DONE, 1u);
+        s_capture.base_pose_ready = false;
     }
     else if (s_capture.action == JETSON_CAPTURE_ACTION_SELECT)
     {
@@ -274,6 +283,14 @@ static void capture_start_current_step(uint32_t now_ms)
     {
         case CAPTURE_STEP_AUTO:
         {
+            if (s_capture.base_pose_ready)
+            {
+                LOG("[CAPTURE] base pose ready, skip repeated auto\r\n");
+                s_capture.step_index++;
+                s_capture.state = CAPTURE_START_STEP;
+                break;
+            }
+
             struct position pos = { .x = 0.0f, .y = -130.0f, .z = -15.0f };
             if (robot_send_auto_event(&pos) == pdPASS)
             {
@@ -340,6 +357,15 @@ bool robot_capture_request(uint8_t action, uint8_t point_id)
     {
         (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, JETSON_ERROR_BUSY);
         return false;
+    }
+
+    if (action == JETSON_CAPTURE_ACTION_CURRENT)
+    {
+        capture_laser_off();
+        robot_target_mark_preposition_ready_once();
+        (void)jetson_send_status_u8(RA6_TO_JETSON_TARGET_PRESTART, 0u);
+        LOG("[CAPTURE] current pose marked as target prestart\r\n");
+        return true;
     }
 
     s_capture.action = action;
@@ -428,6 +454,7 @@ void robot_capture_step(const robot_capture_obs_t *obs)
             robot_auto_result_t result = robot_auto_result_consume();
             if (result == ROBOT_AUTO_RESULT_OK)
             {
+                s_capture.base_pose_ready = true;
                 s_capture.step_index++;
                 s_capture.state = CAPTURE_START_STEP;
             }
