@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable, Sequence
 import datetime as dt
 import queue
 import threading
@@ -36,6 +37,8 @@ SETTINGS_ORG = "RA6M5Robot"
 SETTINGS_APP = "UpperConsole"
 DEFAULT_DEMO_SEQUENCE = "30,-20:5;15,-10:5;8,-5:5;0,0:0"
 DEFAULT_DEMO_PERIOD_MS = "200"
+DEFAULT_WORKFLOW_SAFE_DISTANCE_MM = "120"
+DEFAULT_WORKFLOW_VISION_SEQUENCE = "20,-15:2;8,-6:2;0,0:0"
 DEFAULT_SAFE_DISTANCE_SEQUENCE = "130:8;85:12;115:8"
 DEFAULT_CAPTURE_RECIPES = {
     "左视图": "# 左视图\nsoft_reset\nauto 45 -130 -15\nabs_rotate 0 85\nread_all",
@@ -60,8 +63,31 @@ JETSON_MSG_TARGET_CTRL = 0x02
 JETSON_MSG_VISION_ERROR = 0x03
 JETSON_MSG_CAPTURE_CTRL = 0x04
 JETSON_MSG_SAFE_DISTANCE = 0x05
+JETSON_MSG_WORKFLOW_CTRL = 0x06
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
+EVENT_READY = 0x01
+EVENT_ALIGN_DONE = 0x02
+EVENT_OUTPUT = 0x03
+EVENT_TARGET_CTRL = 0x04
+EVENT_SAFE_DISTANCE = 0x06
+EVENT_VISION_STATE = 0x07
+EVENT_CAPTURE_POINT = 0x10
+EVENT_CAPTURE_HOME = 0x11
+EVENT_SELECTED_VIEW = 0x12
+EVENT_WORKFLOW = 0x20
+EVENT_COMMAND_ACK = 0x21
+WORKFLOW_START = 0x01
+WORKFLOW_FINISH = 0x02
+WORKFLOW_ABORT = 0x03
+WORKFLOW_START_ACCEPTED = 0x01
+WORKFLOW_MEASURE_READY = 0x02
+WORKFLOW_SAFE_LATCHED = 0x03
+WORKFLOW_RETREAT_WAIT_RESTART = 0x04
+WORKFLOW_RETURN_HOME_DONE = 0x05
+WORKFLOW_ABORTED_HOLD = 0x06
+WORKFLOW_FAULT_HOLD = 0x07
+WORKFLOW_RETREAT_STEP_READY = 0x08
 RA6_SOF = 0xCC
 RA6_EOF = 0xDD
 STATUS_NAMES = {
@@ -81,12 +107,46 @@ STATUS_NAMES = {
     (0x12, 0x01): "TARGET_PRESTART_LEFT",
     (0x12, 0x02): "TARGET_PRESTART_FRONT",
     (0x12, 0x03): "TARGET_PRESTART_RIGHT",
+    (EVENT_WORKFLOW, WORKFLOW_START_ACCEPTED): "WORKFLOW_START_ACCEPTED",
+    (EVENT_WORKFLOW, WORKFLOW_MEASURE_READY): "WORKFLOW_MEASURE_READY",
+    (EVENT_WORKFLOW, WORKFLOW_SAFE_LATCHED): "WORKFLOW_SAFE_LATCHED",
+    (EVENT_WORKFLOW, WORKFLOW_RETREAT_WAIT_RESTART): "WORKFLOW_RETREAT_WAIT_RESTART",
+    (EVENT_WORKFLOW, WORKFLOW_RETURN_HOME_DONE): "WORKFLOW_RETURN_HOME_DONE",
+    (EVENT_WORKFLOW, WORKFLOW_ABORTED_HOLD): "WORKFLOW_ABORTED_HOLD",
+    (EVENT_WORKFLOW, WORKFLOW_FAULT_HOLD): "WORKFLOW_FAULT_HOLD",
+    (EVENT_WORKFLOW, WORKFLOW_RETREAT_STEP_READY): "WORKFLOW_RETREAT_STEP_READY",
+    (EVENT_COMMAND_ACK, 0x00): "COMMAND_ACK",
+    (EVENT_COMMAND_ACK, 0x01): "COMMAND_ACK",
     (0xFE, 0x03): "INVALID_PARAM",
     (0xFE, 0x05): "BUSY",
     (0xFE, 0x07): "HEARTBEAT_TIMEOUT",
     (0xFE, 0x08): "SAFETY_ERROR",
     (0xFE, 0x01): "ERROR",
     (0xFE, 0x09): "SAFE_DISTANCE_TOO_CLOSE",
+    (0xFE, 0x0A): "VISION_LOST",
+    (0xFE, 0x0B): "SOFT_RESET_FAILED",
+    (0xFE, 0x0C): "INVALID_STATE",
+    (0xFE, 0x0D): "SEQ_CONFLICT",
+    (0xFE, 0x0E): "TARGET_GATE_DENIED",
+    (0xFE, 0x0F): "MOTION_ABORTED",
+}
+
+FORMAL_ERROR_MESSAGES = {
+    0x01: "协议版本不匹配",
+    0x02: "未知消息类型",
+    0x03: "参数无效",
+    0x04: "机械臂位姿无效",
+    0x05: "机械臂忙",
+    0x06: "机械臂运动失败",
+    0x07: "Jetson 心跳超时",
+    0x08: "安全保护触发",
+    0x09: "安全距离不足",
+    0x0A: "视觉数据丢失",
+    0x0B: "软件复位失败",
+    0x0C: "状态机状态不允许该命令",
+    0x0D: "通信序号冲突",
+    0x0E: "激光输出安全条件未满足",
+    0x0F: "机械臂运动已中止",
 }
 
 
@@ -96,6 +156,11 @@ class Ra6Status:
     func: int
     value: int
     name: str
+    seq: int | None = None
+    event: int | None = None
+    error: int = 0
+    msg_type: int | None = None
+    is_formal: bool = False
 
 
 def bytes_to_hex(data: bytes) -> str:
@@ -172,8 +237,18 @@ def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -
     return build_unified_frame(JETSON_MSG_SAFE_DISTANCE, seq, payload)
 
 
+def build_unified_workflow_control_frame(action: int, seq: int) -> bytes:
+    if action not in (WORKFLOW_START, WORKFLOW_FINISH, WORKFLOW_ABORT):
+        raise ValueError("workflow action must be START, FINISH, or ABORT")
+    return build_unified_frame(JETSON_MSG_WORKFLOW_CTRL, seq, bytes([action]))
+
+
 def should_log_serial_tx(label: str) -> bool:
-    return not (label.startswith("HEARTBEAT") or label.startswith("SAFE_DISTANCE"))
+    return not (
+        label.startswith("HEARTBEAT")
+        or label.startswith("SAFE_DISTANCE")
+        or label.startswith("FORMAL_VISION")
+    )
 
 
 def should_display_arm_line(line: str) -> bool:
@@ -185,8 +260,27 @@ def should_display_arm_line(line: str) -> bool:
     return not any(fragment in line for fragment in noisy_fragments)
 
 
-def _status_from_func_value(raw: bytes, func: int, value: int) -> Ra6Status:
-    return Ra6Status(raw=raw, func=func, value=value, name=STATUS_NAMES.get((func, value), "UNKNOWN"))
+def _status_from_func_value(
+    raw: bytes,
+    func: int,
+    value: int,
+    *,
+    seq: int | None = None,
+    error: int = 0,
+    msg_type: int | None = None,
+    is_formal: bool = False,
+) -> Ra6Status:
+    return Ra6Status(
+        raw=raw,
+        func=func,
+        value=value,
+        name=STATUS_NAMES.get((func, value), "UNKNOWN"),
+        seq=seq,
+        event=func,
+        error=error,
+        msg_type=msg_type,
+        is_formal=is_formal,
+    )
 
 
 def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
@@ -218,11 +312,32 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
                 consumed = idx
                 continue
             msg_type = raw[3]
+            seq = raw[4]
             payload = raw[6:6 + payload_len]
-            if msg_type == JETSON_MSG_STATUS and len(payload) >= 3:
-                frames.append(_status_from_func_value(raw, payload[0], payload[1]))
+            if msg_type == JETSON_MSG_STATUS and len(payload) == 3:
+                frames.append(
+                    _status_from_func_value(
+                        raw,
+                        payload[0],
+                        payload[1],
+                        seq=seq,
+                        error=payload[2],
+                        msg_type=msg_type,
+                        is_formal=True,
+                    )
+                )
             elif msg_type == JETSON_MSG_ERROR and len(payload) >= 1:
-                frames.append(_status_from_func_value(raw, 0xFE, payload[0]))
+                frames.append(
+                    _status_from_func_value(
+                        raw,
+                        0xFE,
+                        payload[0],
+                        seq=seq,
+                        error=payload[0],
+                        msg_type=msg_type,
+                        is_formal=True,
+                    )
+                )
             idx += total_len
             consumed = idx
             continue
@@ -267,6 +382,231 @@ def parse_safe_distance_sequence(text: str) -> list[tuple[int, int]]:
             raise ValueError("safe distance sequence count must be >= 0")
         items.append((distance_mm, count))
     return items
+
+
+def parse_formal_vision_sequence(text: str) -> tuple[tuple[int, int, float], ...]:
+    items: list[tuple[int, int, float]] = []
+    for part in text.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        xy_text, _, duration_text = part.partition(":")
+        x_text, comma, y_text = xy_text.partition(",")
+        if not comma:
+            raise ValueError(f"视觉序列格式错误: {part}")
+        duration_s = float(duration_text) if duration_text else 1.5
+        if duration_s < 0:
+            raise ValueError("视觉序列持续时间不能小于 0")
+        dcx = int(x_text.strip())
+        dcy = int(y_text.strip())
+        _int16_le(dcx)
+        _int16_le(dcy)
+        items.append((dcx, dcy, duration_s))
+    if not items:
+        raise ValueError("视觉序列不能为空")
+    return tuple(items)
+
+
+class FormalWorkflowProtocolError(RuntimeError):
+    pass
+
+
+class FormalWorkflowStopped(RuntimeError):
+    pass
+
+
+def formal_error_message(error_code: int) -> str:
+    return FORMAL_ERROR_MESSAGES.get(error_code, f"未知错误 0x{error_code:02X}")
+
+
+class FormalStatusMailbox:
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._pending: list[Ra6Status] = []
+
+    def clear(self) -> None:
+        with self._condition:
+            self._pending.clear()
+
+    def publish(self, status: Ra6Status) -> None:
+        if not status.is_formal:
+            return
+        with self._condition:
+            self._pending.append(status)
+            if len(self._pending) > 256:
+                del self._pending[:-256]
+            self._condition.notify_all()
+
+    def wait(
+        self,
+        event: int,
+        value: int | None,
+        seq: int,
+        timeout_s: float,
+        stop_event: threading.Event,
+    ) -> Ra6Status:
+        deadline = time.monotonic() + timeout_s
+        with self._condition:
+            while True:
+                if stop_event.is_set():
+                    raise FormalWorkflowStopped("比赛流程已由用户终止")
+
+                for index, status in enumerate(self._pending):
+                    if status.msg_type == JETSON_MSG_ERROR:
+                        self._pending.pop(index)
+                        raise FormalWorkflowProtocolError(
+                            f"RA6M5 异步错误 0x{status.error:02X}: {formal_error_message(status.error)}"
+                        )
+                    if status.error != 0 and status.seq in (0, seq):
+                        self._pending.pop(index)
+                        raise FormalWorkflowProtocolError(
+                            f"RA6M5 拒绝/故障 0x{status.error:02X}: {formal_error_message(status.error)}"
+                        )
+                    if (
+                        status.seq == seq
+                        and status.event == event
+                        and (value is None or status.value == value)
+                    ):
+                        return self._pending.pop(index)
+
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    value_text = "*" if value is None else f"0x{value:02X}"
+                    raise TimeoutError(
+                        f"等待 RA6M5 状态超时: SEQ=0x{seq:02X}, EVENT=0x{event:02X}, VALUE={value_text}"
+                    )
+                self._condition.wait(min(0.1, remaining))
+
+
+@dataclass(frozen=True)
+class FormalWorkflowConfig:
+    view_id: int
+    safe_distance_mm: int
+    vision_steps: tuple[tuple[int, int, float], ...]
+
+
+class FormalWorkflowRunner:
+    def __init__(
+        self,
+        *,
+        send_control: Callable[[int, bytes, str, float], int],
+        wait_status: Callable[[int, int | None, int, float], Ra6Status],
+        send_distance: Callable[[int], None],
+        start_vision: Callable[[Sequence[tuple[int, int, float]]], None],
+        stop_vision: Callable[[], None],
+        set_stage: Callable[[str], None],
+        should_stop: Callable[[], bool],
+        pause: Callable[[float], None],
+    ) -> None:
+        self.send_control = send_control
+        self.wait_status = wait_status
+        self.send_distance = send_distance
+        self.start_vision = start_vision
+        self.stop_vision = stop_vision
+        self.set_stage = set_stage
+        self.should_stop = should_stop
+        self.pause = pause
+
+    def _check_stop(self) -> None:
+        if self.should_stop():
+            raise FormalWorkflowStopped("比赛流程已由用户终止")
+
+    def _wait(self, event: int, value: int | None, seq: int, timeout_s: float) -> Ra6Status:
+        self._check_stop()
+        return self.wait_status(event, value, seq, timeout_s)
+
+    def run(self, config: FormalWorkflowConfig) -> None:
+        self._check_stop()
+        self.set_stage("正在启动比赛状态机")
+        start_seq = self.send_control(
+            JETSON_MSG_WORKFLOW_CTRL,
+            bytes([WORKFLOW_START]),
+            "启动比赛流程",
+            5.0,
+        )
+        self._wait(EVENT_WORKFLOW, WORKFLOW_START_ACCEPTED, start_seq, 5.0)
+
+        self.set_stage("机械臂正在回 HOME 并前往公共测距位")
+        self._wait(EVENT_WORKFLOW, WORKFLOW_MEASURE_READY, start_seq, 65.0)
+
+        self.set_stage("公共测距位已到达，正在确认安全距离")
+        for _ in range(3):
+            self._check_stop()
+            self.send_distance(config.safe_distance_mm)
+            self.pause(0.2)
+        self._wait(EVENT_WORKFLOW, WORKFLOW_SAFE_LATCHED, start_seq, 5.0)
+
+        self.set_stage("安全距离已确认，机械臂正在回 HOME")
+        capture_seq = self.send_control(
+            JETSON_MSG_CAPTURE_CTRL,
+            b"\x02\x00",
+            "拍摄流程回 HOME",
+            5.0,
+        )
+        self._wait(EVENT_CAPTURE_HOME, 1, capture_seq, 50.0)
+
+        for point_id, name in ((1, "左视图"), (2, "正视图"), (3, "右视图")):
+            self.set_stage(f"机械臂正在前往{name}拍摄点")
+            capture_seq = self.send_control(
+                JETSON_MSG_CAPTURE_CTRL,
+                bytes([0x01, point_id]),
+                f"前往{name}拍摄点",
+                5.0,
+            )
+            self._wait(EVENT_CAPTURE_POINT, point_id, capture_seq, 25.0)
+            self.set_stage(f"{name}拍摄点已到达，正在模拟图像采集")
+            self.pause(1.0)
+            self.set_stage(f"{name}图像采集完成")
+
+        self.set_stage("三视图采集完成，机械臂正在回 HOME")
+        capture_seq = self.send_control(
+            JETSON_MSG_CAPTURE_CTRL,
+            b"\x02\x00",
+            "三视图完成后回 HOME",
+            5.0,
+        )
+        self._wait(EVENT_CAPTURE_HOME, 1, capture_seq, 50.0)
+
+        view_name = {1: "左视图", 2: "正视图", 3: "右视图"}[config.view_id]
+        self.set_stage(f"医生已选择{view_name}，机械臂正在前往定靶起点")
+        select_seq = self.send_control(
+            JETSON_MSG_CAPTURE_CTRL,
+            bytes([0x03, config.view_id]),
+            f"选择{view_name}",
+            5.0,
+        )
+        self._wait(EVENT_SELECTED_VIEW, config.view_id, select_seq, 25.0)
+
+        self.set_stage("定靶起点已到达，正在启动视觉定靶")
+        target_seq = self.send_control(
+            JETSON_MSG_TARGET_CTRL,
+            b"\x01",
+            "启动视觉定靶",
+            5.0,
+        )
+        self._wait(EVENT_TARGET_CTRL, 1, target_seq, 5.0)
+        self._wait(EVENT_READY, 1, target_seq, 5.0)
+
+        self.set_stage("正在发送视觉误差并等待机械臂对准")
+        self.start_vision(config.vision_steps)
+        try:
+            self._wait(EVENT_ALIGN_DONE, 1, target_seq, 30.0)
+            self.set_stage("视觉对准完成，请按住 P000 开启激光")
+            self._wait(EVENT_OUTPUT, 1, target_seq, 60.0)
+            self.set_stage("激光已开启，请松开 P000")
+            self._wait(EVENT_OUTPUT, 0, target_seq, 60.0)
+        finally:
+            self.stop_vision()
+
+        self.set_stage("激光已关闭，机械臂正在回 HOME")
+        finish_seq = self.send_control(
+            JETSON_MSG_WORKFLOW_CTRL,
+            bytes([WORKFLOW_FINISH]),
+            "完成流程并回 HOME",
+            5.0,
+        )
+        self._wait(EVENT_WORKFLOW, WORKFLOW_RETURN_HOME_DONE, finish_seq, 50.0)
+        self.set_stage("流程完成，机械臂已回 HOME")
 
 
 def protocol_self_test() -> None:
@@ -396,6 +736,8 @@ class QtUpperConsole(QMainWindow):
         self.settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
         self.logger = SessionLogger(log_dir or (Path.cwd() / "logs"))
         self.log_queue: queue.Queue[str] = queue.Queue()
+        self.status_update_queue: queue.Queue[tuple[str, str, str | None]] = queue.Queue()
+        self._jetson_protocol = JETSON_PROTOCOL_OLD
         self.arm = SerialChannel("ARM", self)
         self.jetson = SerialChannel("JETSON", self)
         self.vision_stop = threading.Event()
@@ -406,11 +748,23 @@ class QtUpperConsole(QMainWindow):
         self.safe_distance_stop.set()
         self.safe_distance_thread: threading.Thread | None = None
         self.demo_stop = threading.Event()
+        self.automatic_demo_lock = threading.Lock()
+        self.automatic_demo_owner: str | None = None
+        self.formal_status_mailbox = FormalStatusMailbox()
+        self.formal_workflow_stop = threading.Event()
+        self.formal_workflow_stop.set()
+        self.formal_workflow_thread: threading.Thread | None = None
+        self.formal_workflow_active = False
+        self.formal_abort_sent = threading.Event()
+        self.formal_vision_stop = threading.Event()
+        self.formal_vision_stop.set()
+        self.formal_vision_thread: threading.Thread | None = None
+        self.workflow_stage_queue: queue.Queue[str] = queue.Queue()
         self.ra6_events = {name: threading.Event() for name in STATUS_NAMES.values()}
         self.capture_step_index = {name: 0 for name in DEFAULT_CAPTURE_RECIPES}
         self.status_labels: dict[str, QLabel] = {}
         self.status_dots: dict[str, QLabel] = {}
-        self.unified_seq = 0
+        self.unified_seq = int(time.time_ns() % 255) + 1
         self.seq_lock = threading.Lock()
         self.jetson_rx_buffer = bytearray()
         self._build_ui()
@@ -535,6 +889,7 @@ class QtUpperConsole(QMainWindow):
         saved_protocol = self._settings_text("jetson/protocol", JETSON_PROTOCOL_OLD)
         protocol_index = self.protocol_mode.findData(saved_protocol)
         self.protocol_mode.setCurrentIndex(protocol_index if protocol_index >= 0 else 0)
+        self._jetson_protocol = str(self.protocol_mode.currentData() or JETSON_PROTOCOL_OLD)
         self.protocol_mode.currentIndexChanged.connect(self.on_protocol_changed)
 
         self.heartbeat_enable = QCheckBox("心跳保持")
@@ -606,6 +961,7 @@ class QtUpperConsole(QMainWindow):
         row.addWidget(self._button("运行序列", self.run_vision_sequence))
         layout.addLayout(row)
         layout.addWidget(self._target_demo_group())
+        layout.addWidget(self._formal_workflow_group())
         return group
 
     def _target_demo_group(self) -> QGroupBox:
@@ -648,6 +1004,264 @@ class QtUpperConsole(QMainWindow):
         row.addWidget(self._button("保存演示配置", self.save_demo_settings))
         layout.addLayout(row)
         return group
+
+    def _formal_workflow_group(self) -> QGroupBox:
+        group = QGroupBox("比赛全流程模拟")
+        layout = QVBoxLayout(group)
+
+        self.workflow_view = QComboBox()
+        self.workflow_view.addItem("左视图", 1)
+        self.workflow_view.addItem("正视图", 2)
+        self.workflow_view.addItem("右视图", 3)
+        saved_view = int(self._settings_text("workflow/view_id", "2"))
+        view_index = self.workflow_view.findData(saved_view)
+        self.workflow_view.setCurrentIndex(view_index if view_index >= 0 else 1)
+
+        self.workflow_safe_distance = QLineEdit(
+            self._settings_text("workflow/safe_distance_mm", DEFAULT_WORKFLOW_SAFE_DISTANCE_MM)
+        )
+        row = QHBoxLayout()
+        row.addWidget(QLabel("选中视图"))
+        row.addWidget(self.workflow_view)
+        row.addWidget(QLabel("安全距离 mm"))
+        row.addWidget(self.workflow_safe_distance)
+        layout.addLayout(row)
+
+        self.workflow_vision_sequence = QLineEdit(
+            self._settings_text("workflow/vision_sequence", DEFAULT_WORKFLOW_VISION_SEQUENCE)
+        )
+        row = QHBoxLayout()
+        row.addWidget(QLabel("视觉序列（每段秒）"))
+        row.addWidget(self.workflow_vision_sequence, 1)
+        layout.addLayout(row)
+
+        self.workflow_stage = QLabel("未运行")
+        row = QHBoxLayout()
+        row.addWidget(QLabel("当前阶段"))
+        row.addWidget(self.workflow_stage, 1)
+        layout.addLayout(row)
+
+        row = QHBoxLayout()
+        row.addWidget(self._button("开始一键比赛全流程", lambda: self.start_formal_workflow_demo()))
+        row.addWidget(self._button("终止并保持", lambda: self.stop_formal_workflow_demo()))
+        row.addWidget(self._button("保存比赛流程配置", self.save_formal_workflow_settings))
+        layout.addLayout(row)
+        return group
+
+    def save_formal_workflow_settings(self) -> None:
+        self.settings.setValue("workflow/view_id", int(self.workflow_view.currentData()))
+        self.settings.setValue("workflow/safe_distance_mm", self.workflow_safe_distance.text())
+        self.settings.setValue("workflow/vision_sequence", self.workflow_vision_sequence.text())
+        self.settings.sync()
+        self.emit_log("WORKFLOW", "INFO", "比赛全流程配置已保存")
+
+    def _set_workflow_stage(self, text: str) -> None:
+        self.workflow_stage_queue.put(text)
+        self.emit_log("WORKFLOW", "STAGE", text)
+
+    def _acquire_automatic_demo(self, owner: str) -> bool:
+        with self.automatic_demo_lock:
+            if self.automatic_demo_owner is not None:
+                return False
+            self.automatic_demo_owner = owner
+            return True
+
+    def _release_automatic_demo(self, owner: str) -> None:
+        with self.automatic_demo_lock:
+            if self.automatic_demo_owner == owner:
+                self.automatic_demo_owner = None
+
+    def _wait_formal_status(
+        self,
+        event: int,
+        value: int | None,
+        seq: int,
+        timeout_s: float,
+    ) -> Ra6Status:
+        return self.formal_status_mailbox.wait(
+            event,
+            value,
+            seq,
+            timeout_s,
+            self.formal_workflow_stop,
+        )
+
+    def _send_formal_control(
+        self,
+        msg_type: int,
+        payload: bytes,
+        label: str,
+        timeout_s: float = 5.0,
+    ) -> int:
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            raise FormalWorkflowProtocolError("请先选择正式协议 A5 5A + CRC16")
+        if not self.jetson.is_open():
+            raise FormalWorkflowProtocolError("Jetson模拟串口未打开")
+
+        seq = self._next_unified_seq()
+        frame = build_unified_frame(msg_type, seq, payload)
+        self.jetson.write(frame, f"正式控制 {label} SEQ=0x{seq:02X}")
+        ack = self._wait_formal_status(EVENT_COMMAND_ACK, None, seq, timeout_s)
+        if ack.value != 1 or ack.error != 0:
+            raise FormalWorkflowProtocolError(
+                f"{label}被 RA6M5 拒绝: 0x{ack.error:02X} {formal_error_message(ack.error)}"
+            )
+        self.emit_log("WORKFLOW", "ACK", f"{label}已接受，SEQ=0x{seq:02X}")
+        return seq
+
+    def _send_formal_distance(self, distance_mm: int) -> None:
+        if not self.jetson.is_open():
+            raise FormalWorkflowProtocolError("发送安全距离时 Jetson模拟串口已断开")
+        seq = self._next_unified_seq()
+        frame = build_unified_safe_distance_frame(distance_mm, True, seq)
+        self.jetson.write(frame, f"SAFE_DISTANCE 比赛流程 {distance_mm}mm SEQ=0x{seq:02X}")
+
+    def _workflow_pause(self, seconds: float) -> None:
+        if self.formal_workflow_stop.wait(seconds):
+            raise FormalWorkflowStopped("比赛流程已由用户终止")
+
+    def _start_formal_heartbeat(self) -> None:
+        self.heartbeat_period_ms.setText("200")
+        self.settings.setValue("jetson/heartbeat_ms", "200")
+        self.settings.setValue("jetson/heartbeat_enable", True)
+        self.settings.sync()
+        self.heartbeat_enable.blockSignals(True)
+        self.heartbeat_enable.setChecked(True)
+        self.heartbeat_enable.blockSignals(False)
+        self.start_heartbeat()
+
+    def _start_formal_vision(self, steps: Sequence[tuple[int, int, float]]) -> None:
+        self._stop_formal_vision()
+        self.formal_vision_stop.clear()
+        self.formal_vision_thread = threading.Thread(
+            target=self._formal_vision_loop,
+            args=(tuple(steps),),
+            daemon=True,
+        )
+        self.formal_vision_thread.start()
+
+    def _stop_formal_vision(self) -> None:
+        self.formal_vision_stop.set()
+        thread = self.formal_vision_thread
+        if thread is not None and thread is not threading.current_thread() and thread.is_alive():
+            thread.join(timeout=1.0)
+        self.formal_vision_thread = None
+
+    def _formal_vision_loop(self, steps: tuple[tuple[int, int, float], ...]) -> None:
+        try:
+            for dcx, dcy, duration_s in steps:
+                entered = time.monotonic()
+                while not self.formal_vision_stop.is_set() and not self.formal_workflow_stop.is_set():
+                    seq = self._next_unified_seq()
+                    frame = build_unified_vision_error_frame(dcx, dcy, seq)
+                    self.jetson.write(
+                        frame,
+                        f"FORMAL_VISION dcx={dcx} dcy={dcy} SEQ=0x{seq:02X}",
+                    )
+                    if duration_s > 0 and time.monotonic() - entered >= duration_s:
+                        break
+                    self.formal_vision_stop.wait(0.2)
+                if self.formal_vision_stop.is_set() or self.formal_workflow_stop.is_set():
+                    return
+        except Exception as exc:
+            self.emit_log("WORKFLOW", "ERROR", f"视觉误差发送失败：{exc}")
+            self.formal_workflow_stop.set()
+
+    def _send_formal_abort_best_effort(self) -> None:
+        if self.formal_abort_sent.is_set():
+            return
+        self.formal_abort_sent.set()
+        if not self.jetson.is_open():
+            self.emit_log("WORKFLOW", "WARN", "无法发送 ABORT：Jetson模拟串口未打开")
+            return
+        try:
+            seq = self._next_unified_seq()
+            frame = build_unified_workflow_control_frame(WORKFLOW_ABORT, seq)
+            self.jetson.write(frame, f"WORKFLOW ABORT SEQ=0x{seq:02X}")
+            self.emit_log("WORKFLOW", "SAFETY", "已请求 RA6M5 终止流程并保持当前位置，激光应立即关闭")
+        except Exception as exc:
+            self.emit_log("WORKFLOW", "ERROR", f"发送 ABORT 失败：{exc}")
+
+    def start_formal_workflow_demo(self) -> None:
+        if not self.jetson.is_open():
+            self._set_workflow_stage("无法启动：Jetson模拟串口未打开")
+            self.emit_log("WORKFLOW", "ERROR", "比赛全流程无法启动：Jetson模拟串口未打开")
+            return
+        if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self._set_workflow_stage("无法启动：请选择正式协议 A5 5A + CRC16")
+            self.emit_log("WORKFLOW", "ERROR", "比赛全流程只支持正式协议 A5 5A + CRC16")
+            return
+        try:
+            safe_distance_mm = int(self.workflow_safe_distance.text())
+            if not 100 <= safe_distance_mm <= 65535:
+                raise ValueError("安全距离不得低于固件阈值 100 mm")
+            view_id = int(self.workflow_view.currentData())
+            if view_id not in (1, 2, 3):
+                raise ValueError("请选择左、正或右视图")
+            vision_steps = parse_formal_vision_sequence(self.workflow_vision_sequence.text())
+        except Exception as exc:
+            self._set_workflow_stage(f"参数错误：{exc}")
+            self.emit_log("WORKFLOW", "ERROR", f"比赛全流程参数错误：{exc}")
+            return
+        if not self._acquire_automatic_demo("formal"):
+            self._set_workflow_stage("无法启动：另一个自动演示正在运行")
+            self.emit_log("WORKFLOW", "WARN", "另一个自动演示正在运行，请先停止后再启动比赛全流程")
+            return
+
+        self.save_formal_workflow_settings()
+        self.stop_safe_distance()
+        self.formal_status_mailbox.clear()
+        self.formal_workflow_stop.clear()
+        self.formal_abort_sent.clear()
+        self.formal_workflow_active = True
+        self._start_formal_heartbeat()
+        config = FormalWorkflowConfig(view_id, safe_distance_mm, vision_steps)
+        self.formal_workflow_thread = threading.Thread(
+            target=self._formal_workflow_thread_main,
+            args=(config,),
+            daemon=True,
+        )
+        self.formal_workflow_thread.start()
+        self.emit_log("WORKFLOW", "INFO", "一键比赛全流程已启动")
+
+    def _formal_workflow_thread_main(self, config: FormalWorkflowConfig) -> None:
+        completed = False
+        runner = FormalWorkflowRunner(
+            send_control=self._send_formal_control,
+            wait_status=self._wait_formal_status,
+            send_distance=self._send_formal_distance,
+            start_vision=self._start_formal_vision,
+            stop_vision=self._stop_formal_vision,
+            set_stage=self._set_workflow_stage,
+            should_stop=self.formal_workflow_stop.is_set,
+            pause=self._workflow_pause,
+        )
+        try:
+            runner.run(config)
+            completed = True
+            self.emit_log("WORKFLOW", "DONE", "比赛全流程完成，机械臂已回 HOME")
+        except FormalWorkflowStopped:
+            self._set_workflow_stage("流程已终止，机械臂保持当前位置")
+            self.emit_log("WORKFLOW", "SAFETY", "用户终止比赛流程，机械臂保持当前位置")
+        except Exception as exc:
+            self._set_workflow_stage(f"流程失败：{exc}")
+            self.emit_log("WORKFLOW", "ERROR", f"比赛全流程失败：{exc}")
+        finally:
+            self._stop_formal_vision()
+            if not completed:
+                self._send_formal_abort_best_effort()
+            self.stop_heartbeat()
+            self.formal_workflow_active = False
+            self._release_automatic_demo("formal")
+
+    def stop_formal_workflow_demo(self) -> None:
+        if not self.formal_workflow_active:
+            self.emit_log("WORKFLOW", "INFO", "当前没有正在运行的比赛全流程")
+            return
+        self._set_workflow_stage("正在终止，机械臂将保持当前位置")
+        self.formal_workflow_stop.set()
+        self._stop_formal_vision()
+        self._send_formal_abort_best_effort()
 
     def _capture_group(self) -> QGroupBox:
         group = QGroupBox("人脸三视图拍摄点位")
@@ -713,9 +1327,7 @@ class QtUpperConsole(QMainWindow):
         return button
 
     def current_jetson_protocol(self) -> str:
-        if not hasattr(self, "protocol_mode"):
-            return JETSON_PROTOCOL_OLD
-        return str(self.protocol_mode.currentData() or JETSON_PROTOCOL_OLD)
+        return self._jetson_protocol
 
     def current_protocol_label(self) -> str:
         return "NEW" if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW else "OLD"
@@ -733,10 +1345,15 @@ class QtUpperConsole(QMainWindow):
     def _next_unified_seq(self) -> int:
         with self.seq_lock:
             self.unified_seq = (self.unified_seq + 1) & 0xFF
+            if self.unified_seq == 0:
+                self.unified_seq = 1
             return self.unified_seq
 
     def on_protocol_changed(self) -> None:
-        protocol = self.current_jetson_protocol()
+        protocol = str(self.protocol_mode.currentData() or JETSON_PROTOCOL_OLD)
+        self._jetson_protocol = protocol
+        if protocol != JETSON_PROTOCOL_NEW and self.formal_workflow_active:
+            self.stop_formal_workflow_demo()
         self.settings.setValue("jetson/protocol", protocol)
         self.settings.sync()
         self._set_status("PROTO", self.current_protocol_label())
@@ -795,6 +1412,13 @@ class QtUpperConsole(QMainWindow):
         self.heartbeat_stop.set()
         stop_event = threading.Event()
         self.heartbeat_stop = stop_event
+        try:
+            self._send_heartbeat_frame()
+        except Exception as exc:
+            stop_event.set()
+            self._set_status("HEARTBEAT", "OFF")
+            self.emit_log("JETSON", "ERROR", f"首帧心跳发送失败：{exc}")
+            return
         self.heartbeat_thread = threading.Thread(target=self._heartbeat_loop, args=(period_ms, stop_event), daemon=True)
         self.heartbeat_thread.start()
         self._set_status("HEARTBEAT", "ON")
@@ -805,14 +1429,20 @@ class QtUpperConsole(QMainWindow):
         self._set_status("HEARTBEAT", "OFF")
         self.emit_log("JETSON", "INFO", "heartbeat stopped")
 
+    def _send_heartbeat_frame(self) -> None:
+        tick_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
+        self.jetson.write(
+            build_unified_heartbeat_frame(self._next_unified_seq(), tick_ms),
+            "HEARTBEAT",
+        )
+
     def _heartbeat_loop(self, period_ms: int, stop_event: threading.Event) -> None:
         while not stop_event.is_set():
             if not self.jetson.is_open() or self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
                 stop_event.set()
                 break
-            tick_ms = int(time.monotonic() * 1000) & 0xFFFFFFFF
             try:
-                self.jetson.write(build_unified_heartbeat_frame(self._next_unified_seq(), tick_ms), "HEARTBEAT")
+                self._send_heartbeat_frame()
             except Exception as exc:
                 self.emit_log("JETSON", "ERROR", str(exc))
                 stop_event.set()
@@ -984,6 +1614,10 @@ class QtUpperConsole(QMainWindow):
 
     def close_channel(self, channel: SerialChannel) -> None:
         if channel is self.jetson:
+            if self.formal_workflow_active:
+                self.formal_workflow_stop.set()
+                self._stop_formal_vision()
+                self._send_formal_abort_best_effort()
             self.stop_periodic_vision()
             self.stop_heartbeat()
             self.stop_safe_distance()
@@ -1001,6 +1635,9 @@ class QtUpperConsole(QMainWindow):
         command = command.strip()
         if not command:
             self.emit_log("ARM", "WARN", "空命令已忽略。")
+            return
+        if self.formal_workflow_active and command.lower() != "laser_off":
+            self.emit_log("ARM", "SAFETY", f"比赛全流程运行中，已拒绝手动命令: {command}")
             return
         self._remember_arm_command(command)
         if not self.arm.is_open():
@@ -1042,10 +1679,11 @@ class QtUpperConsole(QMainWindow):
             return False
         try:
             if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
-                if enable and self.heartbeat_enable.isChecked():
-                    self.start_heartbeat()
-                if enable and self.safe_distance_enable.isChecked():
-                    self.start_safe_distance()
+                if enable and threading.current_thread() is threading.main_thread():
+                    if self.heartbeat_enable.isChecked():
+                        self.start_heartbeat()
+                    if self.safe_distance_enable.isChecked():
+                        self.start_safe_distance()
                 frame = build_unified_target_control_frame(enable, self._next_unified_seq())
                 label = "TARGET_CTRL_START_NEW" if enable else "TARGET_CTRL_STOP_NEW"
             else:
@@ -1065,11 +1703,12 @@ class QtUpperConsole(QMainWindow):
             self.emit_log("JETSON", "ERROR", "Jetson serial is not open; capture control not sent.")
             return False
         try:
-            if self.heartbeat_enable.isChecked():
-                self.start_heartbeat()
-            self.send_safe_distance_values(int(self.safe_distance_mm.text()), self.safe_distance_valid.isChecked())
-            if self.safe_distance_enable.isChecked():
-                self.start_safe_distance()
+            if threading.current_thread() is threading.main_thread():
+                if self.heartbeat_enable.isChecked():
+                    self.start_heartbeat()
+                self.send_safe_distance_values(int(self.safe_distance_mm.text()), self.safe_distance_valid.isChecked())
+                if self.safe_distance_enable.isChecked():
+                    self.start_safe_distance()
             frame = build_unified_capture_control_frame(action, point_id, self._next_unified_seq())
             label = f"CAPTURE_CTRL a={action} p={point_id}"
             self.jetson.write(frame, label)
@@ -1202,6 +1841,14 @@ class QtUpperConsole(QMainWindow):
         if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
             self.emit_log("DEMO", "ERROR", "OLD protocol does not support safe distance; switch to NEW A5 5A + CRC16 for one-key demo")
             return
+        if not self._acquire_automatic_demo("target"):
+            with self.automatic_demo_lock:
+                owner = self.automatic_demo_owner
+            if owner == "formal":
+                self.emit_log("DEMO", "WARN", "比赛全流程正在运行，不能同时启动一键定靶演示")
+            else:
+                self.emit_log("DEMO", "WARN", "另一个自动演示正在运行")
+            return
         self.save_demo_settings()
         if self.current_jetson_protocol() == JETSON_PROTOCOL_NEW:
             if self.heartbeat_enable.isChecked():
@@ -1222,10 +1869,15 @@ class QtUpperConsole(QMainWindow):
             self.demo_auto_stop.isChecked(),
             self.demo_use_current_prestart.isChecked(),
         )
-        threading.Thread(target=self._target_demo_loop, args=(sequence, period, options), daemon=True).start()
+        threading.Thread(target=self._target_demo_thread_main, args=(sequence, period, options), daemon=True).start()
         self.emit_log("DEMO", "INFO", "一键定靶演示开始")
 
     def stop_target_demo(self) -> None:
+        with self.automatic_demo_lock:
+            owner = self.automatic_demo_owner
+        if owner == "formal":
+            self.emit_log("DEMO", "WARN", "比赛全流程正在运行，请使用“终止并保持”按钮")
+            return
         self.demo_stop.set()
         self.stop_periodic_vision()
         self.stop_heartbeat()
@@ -1235,6 +1887,17 @@ class QtUpperConsole(QMainWindow):
         if not stop_sent:
             self.send_arm_command("soft_reset")
         self.emit_log("DEMO", "INFO", "演示已停止，已关闭视觉发送、激光输出，并请求回 HOME")
+
+    def _target_demo_thread_main(
+        self,
+        sequence: list[tuple[int, int, int]],
+        period_ms: int,
+        options: tuple[bool, bool, bool, bool, bool],
+    ) -> None:
+        try:
+            self._target_demo_loop(sequence, period_ms, options)
+        finally:
+            self._release_automatic_demo("target")
 
     def _target_demo_loop(self, sequence: list[tuple[int, int, int]], period_ms: int, options: tuple[bool, bool, bool, bool, bool]) -> None:
         send_enable, wait_ready, prompt_p000, auto_stop, use_current_prestart = options
@@ -1260,7 +1923,7 @@ class QtUpperConsole(QMainWindow):
 
         self.vision_stop.clear()
         threading.Thread(target=self._sequence_loop, args=(sequence, period_ms), daemon=True).start()
-        self.emit_log("DEMO", "INFO", f"开始发送视觉序列: {self.demo_sequence.text()}")
+        self.emit_log("DEMO", "INFO", "开始发送视觉序列")
 
         if prompt_p000 and self._wait_ra6_event("ALIGN_DONE", 30.0):
             self.emit_log("DEMO", "ACTION", "已对准：请按住 P000 KEY 允许激光输出。")
@@ -1288,6 +1951,11 @@ class QtUpperConsole(QMainWindow):
         self.vision_stop.set()
 
     def safety_stop(self) -> None:
+        if self.formal_workflow_active:
+            self.stop_formal_workflow_demo()
+            self.send_arm_command("laser_off")
+            self.emit_log("APP", "SAFETY", "比赛全流程已请求 ABORT，并发送 laser_off")
+            return
         self.stop_periodic_vision()
         self.stop_heartbeat()
         self.stop_safe_distance()
@@ -1309,7 +1977,19 @@ class QtUpperConsole(QMainWindow):
             frames, remaining = parse_ra6_status_stream(bytes(self.jetson_rx_buffer))
             self.jetson_rx_buffer = bytearray(remaining[-64:])
             for status in frames:
-                self.emit_log("JETSON", "STATUS", f"{status.name}: {bytes_to_hex(status.raw)}")
+                if status.is_formal:
+                    self.formal_status_mailbox.publish(status)
+                    self.emit_log(
+                        "JETSON",
+                        "STATUS",
+                        (
+                            f"{status.name} SEQ=0x{status.seq:02X} "
+                            f"VALUE=0x{status.value:02X} ERROR=0x{status.error:02X}: "
+                            f"{bytes_to_hex(status.raw)}"
+                        ),
+                    )
+                else:
+                    self.emit_log("JETSON", "STATUS", f"{status.name}: {bytes_to_hex(status.raw)}")
                 self._update_ra6_status(status.name)
 
     def _update_arm_status(self, line: str) -> None:
@@ -1363,12 +2043,26 @@ class QtUpperConsole(QMainWindow):
         elif name.startswith("TARGET_PRESTART_"):
             self._set_status("READY", name.replace("TARGET_PRESTART_", "PRE_"), "green")
             self._set_status("ERROR", "-")
-        elif name in {"INVALID_PARAM", "BUSY", "HEARTBEAT_TIMEOUT", "SAFETY_ERROR"}:
+        elif name in {
+            "INVALID_PARAM",
+            "BUSY",
+            "HEARTBEAT_TIMEOUT",
+            "SAFETY_ERROR",
+            "VISION_LOST",
+            "SOFT_RESET_FAILED",
+            "INVALID_STATE",
+            "SEQ_CONFLICT",
+            "TARGET_GATE_DENIED",
+            "MOTION_ABORTED",
+        }:
             self._set_status("ERROR", "YES")
         elif name == "ERROR":
             self._set_status("ERROR", "YES")
 
     def _set_status(self, key: str, value: str, color: str | None = None) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            self.status_update_queue.put((key, value, color))
+            return
         self.status_labels[key].setText(f"{key}: {value}")
         self._set_status_dot(key, color or self._status_color(key, value))
 
@@ -1435,12 +2129,28 @@ class QtUpperConsole(QMainWindow):
     def _flush_logs(self) -> None:
         while True:
             try:
+                key, value, color = self.status_update_queue.get_nowait()
+            except queue.Empty:
+                break
+            self._set_status(key, value, color)
+        while True:
+            try:
+                stage = self.workflow_stage_queue.get_nowait()
+            except queue.Empty:
+                break
+            self.workflow_stage.setText(stage)
+        while True:
+            try:
                 line = self.log_queue.get_nowait()
             except queue.Empty:
                 return
             self.log_text.append(line)
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        if self.formal_workflow_active:
+            self.formal_workflow_stop.set()
+            self._stop_formal_vision()
+            self._send_formal_abort_best_effort()
         self.demo_stop.set()
         self.stop_periodic_vision()
         self.stop_heartbeat()

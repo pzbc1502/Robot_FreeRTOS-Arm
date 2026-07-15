@@ -6,6 +6,8 @@ ROBOT_H = (ROOT / "APP" / "robot.h").read_text(encoding="utf-8")
 ROBOT_C = (ROOT / "APP" / "robot.c").read_text(encoding="utf-8")
 TARGET_H = (ROOT / "APP" / "robot_target.h").read_text(encoding="utf-8")
 TARGET_C = (ROOT / "APP" / "robot_target.c").read_text(encoding="utf-8")
+WORKFLOW_H = (ROOT / "APP" / "robot_workflow.h").read_text(encoding="utf-8")
+WORKFLOW_C = (ROOT / "APP" / "robot_workflow.c").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, label: str) -> None:
@@ -52,42 +54,35 @@ def test_target_visual_servo_params_and_calls_exist() -> None:
     require(TARGET_H, "TARGET_VS_MAX_SPEED_MM_S", "visual servo coarse speed")
     require(TARGET_H, "TARGET_VS_FINE_MAX_SPEED_MM_S", "visual servo fine speed")
     require(TARGET_H, "TARGET_VS_CMD_TIMEOUT_MS", "visual servo command timeout")
-    require(TARGET_H, "TARGET_SAFE_DISTANCE_MM", "safe distance threshold")
-    require(TARGET_H, "TARGET_SAFE_RETREAT_SPEED_MM_S", "safe distance retreat speed")
-    require(TARGET_H, "TARGET_READY_STATUS_PERIOD_MS", "READY status retry period")
     require(TARGET_C, "#if TARGET_USE_VISUAL_SERVO", "visual servo target branch")
     require(TARGET_C, "robot_visual_servo_start()", "target starts visual servo")
     require(TARGET_C, "robot_visual_servo_set_velocity", "target updates visual servo velocity")
     require(TARGET_C, "robot_visual_servo_stop()", "target stops visual servo")
-    require(TARGET_C, "target_handle_safe_distance_guard", "safe distance guard")
-    require(TARGET_C, "if (!safe_distance_fresh(now))", "pre-position waits for safe distance")
-    require(TARGET_C, "robot_motion_abort();", "safe distance aborts current motion")
+    require(WORKFLOW_H, "ROBOT_WORKFLOW_SAFE_DISTANCE_MM", "workflow safe distance threshold")
+    require(WORKFLOW_H, "ROBOT_WORKFLOW_RETREAT_STEP_MM", "workflow retreat step")
+    require(WORKFLOW_C, "workflow_handle_safe_distance", "workflow safe-distance owner")
+    assert "SAFE_DISTANCE" not in TARGET_C, "target substate must not own distance safety"
 
 
-def test_pre_position_ready_uses_coarse_auto_completion() -> None:
-    pre_position = case_body(TARGET_C, "case TARGET_PRE_POSITION:", "case TARGET_WAIT_DETECT:")
-    assert "position_near(" not in pre_position, "READY must not require exact Cartesian target after coarse AUTO"
-    assert "robot_is_auto_busy()" not in pre_position, "pre-position should consume explicit AUTO result, not poll busy"
-    require(pre_position, "robot_auto_result_t auto_result = robot_auto_result_consume();", "auto result consume")
-    require(pre_position, "case ROBOT_AUTO_RESULT_OK:", "auto ok branch")
-    require(pre_position, "case ROBOT_AUTO_RESULT_FAILED:", "auto failed branch")
-    require(pre_position, "case ROBOT_AUTO_RESULT_ABORTED:", "auto aborted branch")
-    require(pre_position, "jetson_send_status_u8(RA6_TO_JETSON_READY, 1u)", "READY status after coarse auto")
-    require(pre_position, "s_target.last_ready_status_ms = now;", "READY status timestamp after coarse auto")
+def test_selected_view_is_target_start_pose() -> None:
+    require(TARGET_H, "robot_target_start_at_current_pose", "start-at-current-pose API")
+    require(TARGET_C, "enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms)", "direct wait-detect start")
+    assert "TARGET_PRE_POSITION" not in TARGET_C, "target must not repeat selected-view pre-position"
+    assert "robot_send_reset_event" not in TARGET_C, "target substate must not reset"
 
 
-def test_wait_detect_repeats_ready_status_until_vision_arrives() -> None:
-    wait_detect = case_body(TARGET_C, "case TARGET_WAIT_DETECT:", "case TARGET_ALIGN:")
-    require(TARGET_C, "uint32_t last_ready_status_ms;", "READY resend timestamp")
-    require(wait_detect, "TARGET_READY_STATUS_PERIOD_MS", "READY resend period in wait detect")
-    require(wait_detect, "jetson_send_status_u8(RA6_TO_JETSON_READY, 1u)", "READY resend in wait detect")
-    require(wait_detect, "s_target.last_ready_status_ms = now;", "READY resend timestamp update")
+def test_wait_detect_emits_ready_event_once() -> None:
+    wait_detect = case_body(TARGET_C, "case ROBOT_TARGET_STATE_WAIT_DETECT:",
+                            "case ROBOT_TARGET_STATE_ALIGN:")
+    require(wait_detect, "target_set_event(ROBOT_TARGET_EVENT_READY)", "READY event")
+    require(wait_detect, "s_target.ready_sent = true", "READY one-shot latch")
+    assert "jetson_send_status" not in TARGET_C, "workflow must own protocol replies"
 
 
 if __name__ == "__main__":
     test_robot_visual_servo_api_exists()
     test_robot_visual_servo_runtime_exists()
     test_target_visual_servo_params_and_calls_exist()
-    test_pre_position_ready_uses_coarse_auto_completion()
-    test_wait_detect_repeats_ready_status_until_vision_arrives()
+    test_selected_view_is_target_start_pose()
+    test_wait_detect_emits_ready_event_once()
     print("visual servo static checks passed")

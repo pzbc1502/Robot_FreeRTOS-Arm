@@ -208,9 +208,9 @@ static int robot_gripper_grasp_handle(float *param)
 static int robot_laser_on_handle(float *param)
 {
 	(void)param;
-	BSP_Laser_On();
-	LOG("laser_on\r\n");
-	return pdPASS;
+	BSP_Laser_Off();
+	LOG("laser_on rejected: formal workflow safety gate required.\r\n");
+	return pdFAIL;
 }
 
 static int robot_laser_off_handle(float *param)
@@ -224,19 +224,17 @@ static int robot_laser_off_handle(float *param)
 static int robot_target_enable_handle(float *param)
 {
 	(void)param;
-	if (!robot_target_enable_request()) {
-		LOG("target_enable rejected: pose invalid, please soft_reset first.\r\n");
-		return pdFAIL;
-	}
-	LOG("target_enable\r\n");
-	return pdPASS;
+	BSP_Laser_Off();
+	LOG("target_enable rejected: use formal WORKFLOW_CTRL and TARGET_CTRL.\r\n");
+	return pdFAIL;
 }
 
 static int robot_target_disable_handle(float *param)
 {
 	(void)param;
+	BSP_Laser_Off();
 	robot_target_disable_request();
-	LOG("target_disable\r\n");
+	LOG("target_disable: target substate held, laser forced off.\r\n");
 	return pdPASS;
 }
 

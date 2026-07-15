@@ -26,27 +26,30 @@ def _function_body(source: str, name: str) -> str:
     return source[start:idx - 1]
 
 
-def test_joints_sync_waits_for_position_confirm() -> None:
-    body = _function_body(_read(ROBOT_C), "robot_joints_sync_to")
-    assert "robot_joint_wait_target" in body
-    assert "robot_joint_stop" in body
+def test_single_joint_commands_wait_for_position_confirm() -> None:
+    source = _read(ROBOT_C)
+    for event_name in ("ROBOT_JOINT_REL_ROTATE", "ROBOT_JOINT_ABS_ROTATE"):
+        body = source.split(f"case {event_name}:", 1)[1].split("break;", 1)[0]
+        assert "robot_joint_wait_target" in body
+        assert "robot_joint_stop" in body
 
 
-def test_control_doc_has_no_stale_settle_period_description() -> None:
+def test_control_doc_records_fixed_settle_window() -> None:
     doc = _read(DOC)
     assert "ROBOT_PID_SETTLE_PERIODS`（10，通用终点稳定）均保留不变" not in doc
-    assert "ROBOT_PID_SETTLE_PERIODS`（150，通用终点自适应稳定上限）" in doc
+    assert "`ROBOT_PID_SETTLE_PERIODS=10`" in doc
+    assert "`100ms`" in doc
 
 
-def test_control_doc_names_time_func_move_for_pid_return_fix() -> None:
-    doc = _read(DOC)
-    section = doc.split("#### 4.9.5", 1)[1].split("### 4.10", 1)[0]
-    assert "robot_time_func_move()" in section
-    assert "robot_time_func_path_interpolation()` 原来的判断" not in section
+def test_time_func_uses_final_position_confirm() -> None:
+    source = _read(ROBOT_C)
+    body = _function_body(source, "robot_time_func_move")
+    assert "robot_auto_final_confirm" in body
+    assert "ROBOT_STATUS_POSE_DEGRADED" in body
 
 
 if __name__ == "__main__":
-    test_joints_sync_waits_for_position_confirm()
-    test_control_doc_has_no_stale_settle_period_description()
-    test_control_doc_names_time_func_move_for_pid_return_fix()
+    test_single_joint_commands_wait_for_position_confirm()
+    test_control_doc_records_fixed_settle_window()
+    test_time_func_uses_final_position_confirm()
     print("robot 4.9 static checks passed")

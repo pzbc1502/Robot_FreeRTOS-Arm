@@ -38,7 +38,9 @@ def test_time_func_updates_pose_only_after_final_confirm() -> None:
 
 
 def test_document_marks_49_done() -> None:
-    require(DOC, "| 4.9  | 位置模式到位确认       | 已完成", "4.9 completed status")
+    status_line = next(line for line in DOC.splitlines() if line.startswith("| 4.9"))
+    require(status_line, "到位确认", "4.9 arrival confirmation status")
+    require(status_line, "已完成", "4.9 completed status")
     require(DOC, "robot_joint_wait_target", "document joint wait helper")
     require(DOC, "robot_auto_final_confirm", "document auto final confirm")
 
@@ -46,7 +48,7 @@ def test_document_marks_49_done() -> None:
 def test_settle_tail_remains_fixed_short_window() -> None:
     """当前可用版本保留固定 10 周期末端稳定段，不引入自适应稳定逻辑。"""
     pid_run = ROBOT_C.split("static int robot_pid_run(", 1)[1].split("static void robot_joints_sync_to", 1)[0]
-    settle_tail = pid_run.split("前馈清零", 1)[1].split("robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);", 1)[0]
+    settle_tail = pid_run.split("前馈清零", 1)[1].split("if (sample_count > 0)", 1)[0]
 
     require(settle_tail, "for (int k = 0; k < ROBOT_PID_SETTLE_PERIODS; k++)",
             "fixed settle loop")
@@ -84,12 +86,13 @@ def test_pid_run_failure_also_degrades_pose() -> None:
         func = ROBOT_C.split(anchor, 1)[1].split(end, 1)[0]
         call_index = func.index("robot_pid_run(")
         if_index = func.index("if (ret == 0)", call_index)
-        else_head = func.rsplit("} else {", 1)[1]
+        else_head = func.split("PID aborted before the final target", 1)[1][:500]
         require(else_head, "ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID)",
                 f"{anchor}: else branch clears POSE_VALID")
         require(else_head, "ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED)",
                 f"{anchor}: else branch sets POSE_DEGRADED")
-        assert if_index < func.index(else_head), "else branch must follow the ret==0 check"
+        assert if_index < func.index("PID aborted before the final target"), \
+            "PID failure branch must follow the ret==0 check"
 
 
 if __name__ == "__main__":

@@ -438,6 +438,16 @@
               <FilePath>.\APP\robot_capture.h</FilePath>
             </File>
             <File>
+              <FileName>robot_workflow.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\APP\robot_workflow.c</FilePath>
+            </File>
+            <File>
+              <FileName>robot_workflow.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\APP\robot_workflow.h</FilePath>
+            </File>
+            <File>
               <FileName>robot_chassis_app.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\APP\robot_chassis_app.c</FilePath>

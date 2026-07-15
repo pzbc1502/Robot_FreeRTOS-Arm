@@ -8,20 +8,21 @@
 extern "C" {
 #endif
 
-typedef struct
+typedef enum
 {
-    uint32_t now_ms;
-    bool has_distance;
-    bool distance_valid;
-    uint16_t distance_mm;
-    bool estop_active;
-    bool limit_triggered;
-} robot_capture_obs_t;
+    ROBOT_CAPTURE_RESULT_NONE = 0,
+    ROBOT_CAPTURE_RESULT_RUNNING,
+    ROBOT_CAPTURE_RESULT_OK,
+    ROBOT_CAPTURE_RESULT_FAILED,
+    ROBOT_CAPTURE_RESULT_ABORTED,
+} robot_capture_result_t;
 
 void robot_capture_init(void);
 bool robot_capture_request(uint8_t action, uint8_t point_id);
-void robot_capture_step(const robot_capture_obs_t *obs);
+void robot_capture_step(uint32_t now_ms);
+void robot_capture_cancel(void);
 bool robot_capture_is_active(void);
+robot_capture_result_t robot_capture_result_consume(uint8_t *action, uint8_t *point_id);
 
 #ifdef __cplusplus
 }

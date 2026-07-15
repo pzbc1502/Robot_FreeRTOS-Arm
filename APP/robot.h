@@ -234,6 +234,7 @@ typedef enum
     ROBOT_RESET_RESULT_RUNNING,
     ROBOT_RESET_RESULT_OK,
     ROBOT_RESET_RESULT_FAILED,
+    ROBOT_RESET_RESULT_ABORTED,
 } robot_reset_result_t;
 
 /* 关节索引枚举 */
@@ -260,6 +261,7 @@ struct robot_event
 {
     enum robot_event_type type; /* 事件类型 */
     uint8_t joint_id;           /* 关节 ID (如适用) */
+    uint32_t generation;        /* 安全中止代际：旧代际运动事件不得继续执行 */
     float param[6];             /* 事件参数 (角度、坐标等) */
 };
 
@@ -301,6 +303,7 @@ void robot_visual_servo_stop(void);
 void robot_visual_servo_set_velocity(float vx, float vy, float vz);
 bool robot_is_visual_servo_active(void);
 void robot_motion_abort(void);
+bool robot_motion_abort_latched(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
 int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);

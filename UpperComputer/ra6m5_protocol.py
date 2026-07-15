@@ -20,8 +20,33 @@ JETSON_MSG_TARGET_CTRL = 0x02
 JETSON_MSG_VISION_ERROR = 0x03
 JETSON_MSG_CAPTURE_CTRL = 0x04
 JETSON_MSG_SAFE_DISTANCE = 0x05
+JETSON_MSG_WORKFLOW_CTRL = 0x06
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
+
+EVENT_READY = 0x01
+EVENT_ALIGN_DONE = 0x02
+EVENT_OUTPUT = 0x03
+EVENT_TARGET_CTRL = 0x04
+EVENT_SAFE_DISTANCE = 0x06
+EVENT_VISION_STATE = 0x07
+EVENT_CAPTURE_POINT = 0x10
+EVENT_CAPTURE_HOME = 0x11
+EVENT_SELECTED_VIEW = 0x12
+EVENT_WORKFLOW = 0x20
+EVENT_COMMAND_ACK = 0x21
+
+WORKFLOW_START = 0x01
+WORKFLOW_FINISH = 0x02
+WORKFLOW_ABORT = 0x03
+WORKFLOW_START_ACCEPTED = 0x01
+WORKFLOW_MEASURE_READY = 0x02
+WORKFLOW_SAFE_LATCHED = 0x03
+WORKFLOW_RETREAT_WAIT_RESTART = 0x04
+WORKFLOW_RETURN_HOME_DONE = 0x05
+WORKFLOW_ABORTED_HOLD = 0x06
+WORKFLOW_FAULT_HOLD = 0x07
+WORKFLOW_RETREAT_STEP_READY = 0x08
 
 RA6_SOF = 0xCC
 RA6_EOF = 0xDD
@@ -43,12 +68,28 @@ STATUS_NAMES = {
     (0x12, 0x01): "TARGET_PRESTART_LEFT",
     (0x12, 0x02): "TARGET_PRESTART_FRONT",
     (0x12, 0x03): "TARGET_PRESTART_RIGHT",
+    (EVENT_WORKFLOW, WORKFLOW_START_ACCEPTED): "WORKFLOW_START_ACCEPTED",
+    (EVENT_WORKFLOW, WORKFLOW_MEASURE_READY): "WORKFLOW_MEASURE_READY",
+    (EVENT_WORKFLOW, WORKFLOW_SAFE_LATCHED): "WORKFLOW_SAFE_LATCHED",
+    (EVENT_WORKFLOW, WORKFLOW_RETREAT_WAIT_RESTART): "WORKFLOW_RETREAT_WAIT_RESTART",
+    (EVENT_WORKFLOW, WORKFLOW_RETURN_HOME_DONE): "WORKFLOW_RETURN_HOME_DONE",
+    (EVENT_WORKFLOW, WORKFLOW_ABORTED_HOLD): "WORKFLOW_ABORTED_HOLD",
+    (EVENT_WORKFLOW, WORKFLOW_FAULT_HOLD): "WORKFLOW_FAULT_HOLD",
+    (EVENT_WORKFLOW, WORKFLOW_RETREAT_STEP_READY): "WORKFLOW_RETREAT_STEP_READY",
+    (EVENT_COMMAND_ACK, 0x00): "COMMAND_ACK",
+    (EVENT_COMMAND_ACK, 0x01): "COMMAND_ACK",
     (0xFE, 0x03): "INVALID_PARAM",
     (0xFE, 0x05): "BUSY",
     (0xFE, 0x07): "HEARTBEAT_TIMEOUT",
     (0xFE, 0x08): "SAFETY_ERROR",
     (0xFE, 0x01): "ERROR",
     (0xFE, 0x09): "SAFE_DISTANCE_TOO_CLOSE",
+    (0xFE, 0x0A): "VISION_LOST",
+    (0xFE, 0x0B): "SOFT_RESET_FAILED",
+    (0xFE, 0x0C): "INVALID_STATE",
+    (0xFE, 0x0D): "SEQ_CONFLICT",
+    (0xFE, 0x0E): "TARGET_GATE_DENIED",
+    (0xFE, 0x0F): "MOTION_ABORTED",
 }
 
 
@@ -58,6 +99,11 @@ class Ra6Status:
     func: int
     value: int
     name: str
+    seq: int | None = None
+    event: int | None = None
+    error: int = 0
+    msg_type: int | None = None
+    is_formal: bool = False
 
 
 def bytes_to_hex(data: bytes) -> str:
@@ -133,8 +179,33 @@ def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -
     return build_unified_frame(JETSON_MSG_SAFE_DISTANCE, seq, payload)
 
 
-def _status_from_func_value(raw: bytes, func: int, value: int) -> Ra6Status:
-    return Ra6Status(raw=raw, func=func, value=value, name=STATUS_NAMES.get((func, value), "UNKNOWN"))
+def build_unified_workflow_control_frame(action: int, seq: int) -> bytes:
+    if action not in (WORKFLOW_START, WORKFLOW_FINISH, WORKFLOW_ABORT):
+        raise ValueError("workflow action must be START, FINISH, or ABORT")
+    return build_unified_frame(JETSON_MSG_WORKFLOW_CTRL, seq, bytes([action]))
+
+
+def _status_from_func_value(
+    raw: bytes,
+    func: int,
+    value: int,
+    *,
+    seq: int | None = None,
+    error: int = 0,
+    msg_type: int | None = None,
+    is_formal: bool = False,
+) -> Ra6Status:
+    return Ra6Status(
+        raw=raw,
+        func=func,
+        value=value,
+        name=STATUS_NAMES.get((func, value), "UNKNOWN"),
+        seq=seq,
+        event=func,
+        error=error,
+        msg_type=msg_type,
+        is_formal=is_formal,
+    )
 
 
 def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
@@ -166,11 +237,32 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
                 consumed = idx
                 continue
             msg_type = raw[3]
+            seq = raw[4]
             payload = raw[6:6 + payload_len]
-            if msg_type == JETSON_MSG_STATUS and len(payload) >= 3:
-                frames.append(_status_from_func_value(raw, payload[0], payload[1]))
+            if msg_type == JETSON_MSG_STATUS and len(payload) == 3:
+                frames.append(
+                    _status_from_func_value(
+                        raw,
+                        payload[0],
+                        payload[1],
+                        seq=seq,
+                        error=payload[2],
+                        msg_type=msg_type,
+                        is_formal=True,
+                    )
+                )
             elif msg_type == JETSON_MSG_ERROR and len(payload) >= 1:
-                frames.append(_status_from_func_value(raw, 0xFE, payload[0]))
+                frames.append(
+                    _status_from_func_value(
+                        raw,
+                        0xFE,
+                        payload[0],
+                        seq=seq,
+                        error=payload[0],
+                        msg_type=msg_type,
+                        is_formal=True,
+                    )
+                )
             idx += total_len
             consumed = idx
             continue
@@ -212,6 +304,7 @@ def self_test() -> None:
     assert build_unified_capture_control_frame(0x03, 3, 7) == build_unified_frame(0x04, 7, bytes([0x03, 0x03]))
     assert build_unified_capture_control_frame(0x04, 0, 8) == build_unified_frame(0x04, 8, bytes([0x04, 0x00]))
     assert build_unified_safe_distance_frame(120, True, 4) == build_unified_frame(0x05, 4, bytes.fromhex("78 00 01"))
+    assert build_unified_workflow_control_frame(WORKFLOW_START, 5) == build_unified_frame(0x06, 5, b"\x01")
     assert build_arm_command(" soft_reset ") == b"soft_reset\r\n"
     frames = parse_ra6_status_frames(bytes.fromhex("00 CC 04 01 DD 99 CC 03 00 DD"))
     assert [(item.func, item.value, item.name) for item in frames] == [
@@ -222,6 +315,10 @@ def self_test() -> None:
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(unified)] == [
         (0x02, 0x01, "ALIGN_DONE"),
     ]
+    formal_status = parse_ra6_status_frames(
+        build_unified_frame(JETSON_MSG_STATUS, 0x31, bytes([EVENT_COMMAND_ACK, 0x01, 0x00]))
+    )[0]
+    assert (formal_status.seq, formal_status.event, formal_status.error) == (0x31, EVENT_COMMAND_ACK, 0x00)
     safe_status = build_unified_frame(0x81, 8, bytes([0x06, 0x00, 0x00]))
     assert [(item.func, item.value, item.name) for item in parse_ra6_status_frames(safe_status)] == [
         (0x06, 0x00, "SAFE_DISTANCE_TOO_CLOSE"),

@@ -1,41 +1,26 @@
 #include "robot_target.h"
-#include "jetson_vision.h"
-#include "bsp_laser.h"
-#include "bsp_led.h"
 #include "bsp_uart.h"
 #include <math.h>
 #include <string.h>
 
-typedef enum
-{
-    TARGET_INIT = 0,
-    TARGET_PRE_POSITION,
-    TARGET_WAIT_DETECT,
-    TARGET_ALIGN,
-    TARGET_CONFIRM,
-    TARGET_OUTPUT,
-    TARGET_DONE,
-    TARGET_RECOVER,
-} target_state_t;
-
 typedef struct
 {
-    target_state_t state;
+    robot_target_state_t state;
+    robot_target_event_t event;
     uint32_t enter_ms;
     uint32_t last_step_ms;
     uint32_t last_vision_ms;
-    uint32_t last_distance_ms;
-    uint32_t last_ready_status_ms;
+    uint32_t fire_raw_change_ms;
     int16_t dcx;
     int16_t dcy;
-    uint16_t distance_mm;
     uint8_t stable_count;
     uint8_t confirm_stable_count;
     bool has_vision;
-    bool has_distance;
-    bool distance_valid;
-    bool distance_too_close;
-    struct position pre;
+    bool alignment_confirmed;
+    bool ready_sent;
+    bool fire_raw;
+    bool fire_debounced;
+    bool fire_release_seen;
     struct position target;
 } target_ctx_t;
 
@@ -43,7 +28,6 @@ volatile bool ROBOT_TARGET_ENABLED = false;
 volatile bool ROBOT_TARGET_FIRE_ENABLE = false;
 
 static target_ctx_t s_target;
-static bool s_target_preposition_ready_once = false;
 
 static float clampf_local(float value, float min_value, float max_value)
 {
@@ -58,79 +42,19 @@ static float clampf_local(float value, float min_value, float max_value)
     return value;
 }
 
-static const char *target_state_name(target_state_t state)
+static const char *target_state_name(robot_target_state_t state)
 {
     switch (state)
     {
-        case TARGET_INIT:         return "INIT";
-        case TARGET_PRE_POSITION: return "PRE_POSITION";
-        case TARGET_WAIT_DETECT:  return "WAIT_DETECT";
-        case TARGET_ALIGN:        return "ALIGN";
-        case TARGET_CONFIRM:      return "CONFIRM";
-        case TARGET_OUTPUT:       return "OUTPUT";
-        case TARGET_DONE:         return "DONE";
-        case TARGET_RECOVER:      return "RECOVER";
-        default:                  return "UNKNOWN";
+        case ROBOT_TARGET_STATE_INIT:        return "INIT";
+        case ROBOT_TARGET_STATE_WAIT_DETECT: return "WAIT_DETECT";
+        case ROBOT_TARGET_STATE_ALIGN:       return "ALIGN";
+        case ROBOT_TARGET_STATE_CONFIRM:     return "CONFIRM";
+        case ROBOT_TARGET_STATE_OUTPUT:      return "OUTPUT";
+        case ROBOT_TARGET_STATE_HOLD:        return "HOLD";
+        case ROBOT_TARGET_STATE_FAULT:       return "FAULT";
+        default:                             return "UNKNOWN";
     }
-}
-
-static bool robot_any_limit_triggered(void)
-{
-    for (uint32_t i = 0u; i < ROBOT_MAX_JOINT_NUM; i++)
-    {
-        if (ROBOT_STATUS_IS(g_robot.joints[i].status, ROBOT_STATUS_LIMIT_HAPPENED))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool vision_fresh(uint32_t now_ms)
-{
-    return s_target.has_vision && ((now_ms - s_target.last_vision_ms) <= TARGET_VISION_VALID_MS);
-}
-
-static bool safe_distance_fresh(uint32_t now_ms)
-{
-    return s_target.has_distance &&
-           s_target.distance_valid &&
-           ((now_ms - s_target.last_distance_ms) <= TARGET_SAFE_DISTANCE_VALID_MS);
-}
-
-static bool safe_distance_allows_output(uint32_t now_ms)
-{
-    return safe_distance_fresh(now_ms) && !s_target.distance_too_close;
-}
-
-static bool align_in_tolerance(void)
-{
-    return (fabsf((float)s_target.dcx) <= TARGET_ALIGN_TOL_PX) &&
-           (fabsf((float)s_target.dcy) <= TARGET_ALIGN_TOL_PX);
-}
-
-static void reset_alignment_counts(void)
-{
-    s_target.stable_count = 0u;
-    s_target.confirm_stable_count = 0u;
-}
-
-static void enter_state(target_state_t state, uint32_t now_ms)
-{
-    if (s_target.state != state)
-    {
-        LOG("[TARGET] %s -> %s\r\n", target_state_name(s_target.state), target_state_name(state));
-        reset_alignment_counts();
-    }
-    s_target.state = state;
-    s_target.enter_ms = now_ms;
-}
-
-static void force_laser_off(void)
-{
-    BSP_Laser_Off();
-    RED_LED_OFF;
-    BLUE_LED_OFF;
 }
 
 static void target_stop_visual_servo(void)
@@ -147,7 +71,79 @@ static void target_hold_visual_servo(void)
 #endif
 }
 
+static void target_set_event(robot_target_event_t event)
+{
+    if (s_target.event == ROBOT_TARGET_EVENT_NONE)
+    {
+        s_target.event = event;
+    }
+}
+
+static void reset_alignment_counts(void)
+{
+    s_target.stable_count = 0u;
+    s_target.confirm_stable_count = 0u;
+    s_target.alignment_confirmed = false;
+}
+
+static void enter_state(robot_target_state_t state, uint32_t now_ms)
+{
+    if (s_target.state != state)
+    {
+        LOG("[TARGET] %s -> %s\r\n",
+            target_state_name(s_target.state), target_state_name(state));
+        reset_alignment_counts();
+    }
+    s_target.state = state;
+    s_target.enter_ms = now_ms;
+}
+
+static bool vision_fresh(uint32_t now_ms)
+{
+    return s_target.has_vision &&
+           ((now_ms - s_target.last_vision_ms) <= TARGET_VISION_VALID_MS);
+}
+
+static bool align_in_tolerance(void)
+{
+    return (fabsf((float)s_target.dcx) <= TARGET_ALIGN_TOL_PX) &&
+           (fabsf((float)s_target.dcy) <= TARGET_ALIGN_TOL_PX);
+}
+
+static void target_update_fire_button(bool pressed, uint32_t now_ms)
+{
+    if (pressed != s_target.fire_raw)
+    {
+        s_target.fire_raw = pressed;
+        s_target.fire_raw_change_ms = now_ms;
+    }
+
+    if ((now_ms - s_target.fire_raw_change_ms) >= TARGET_FIRE_KEY_DEBOUNCE_MS)
+    {
+        s_target.fire_debounced = s_target.fire_raw;
+        if (!s_target.fire_debounced)
+        {
+            s_target.fire_release_seen = true;
+        }
+    }
+}
+
+static bool target_fire_allowed(void)
+{
+    return (s_target.fire_release_seen && s_target.fire_debounced) ||
+           ROBOT_TARGET_FIRE_ENABLE;
+}
+
 #if TARGET_USE_VISUAL_SERVO
+static bool target_start_visual_servo(void)
+{
+    if (robot_is_visual_servo_active())
+    {
+        return true;
+    }
+    return robot_visual_servo_start() == pdPASS;
+}
+
 static void target_update_visual_servo_velocity(uint32_t now_ms)
 {
     float err_px = fmaxf(fabsf((float)s_target.dcx), fabsf((float)s_target.dcy));
@@ -163,337 +159,169 @@ static void target_update_visual_servo_velocity(uint32_t now_ms)
     LOG("[TARGET] visual servo vx=%.2f vz=%.2f dcx=%d dcy=%d\r\n",
         vx, vz, (int)s_target.dcx, (int)s_target.dcy);
 }
-#endif
-
-static void target_update_safe_distance(uint32_t now_ms, uint16_t distance_mm, bool valid)
+#else
+static bool target_send_alignment_step(uint32_t now_ms)
 {
-    bool was_too_close = s_target.distance_too_close;
-    bool had_distance = s_target.has_distance;
-
-    s_target.distance_mm = distance_mm;
-    s_target.distance_valid = valid;
-    s_target.last_distance_ms = now_ms;
-    s_target.has_distance = true;
-
-    if (valid)
+    if (((now_ms - s_target.last_step_ms) < TARGET_ALIGN_PERIOD_MS) || robot_is_auto_busy())
     {
-        if (distance_mm < TARGET_SAFE_DISTANCE_MM)
-        {
-            s_target.distance_too_close = true;
-        }
-        else if (distance_mm >= TARGET_SAFE_DISTANCE_RELEASE_MM)
-        {
-            s_target.distance_too_close = false;
-        }
+        return true;
     }
 
-    if ((s_target.distance_too_close != was_too_close) ||
-        (!had_distance && valid && !s_target.distance_too_close))
-    {
-        (void)jetson_send_status_u8(RA6_TO_JETSON_SAFE_DISTANCE,
-                                    s_target.distance_too_close ? 0u : 1u);
-        if (s_target.distance_too_close)
-        {
-            (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR,
-                                        JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE);
-        }
-    }
+    float err_px = fmaxf(fabsf((float)s_target.dcx), fabsf((float)s_target.dcy));
+    float step_limit = (err_px <= TARGET_ALIGN_TOL_PX_COARSE) ?
+                       TARGET_MAX_STEP_MM_FINE : TARGET_MAX_STEP_MM;
+    float dx = clampf_local((float)s_target.dcx * TARGET_KX_MM_PER_PX,
+                            -step_limit, step_limit);
+    float dz = clampf_local((float)s_target.dcy * TARGET_KY_MM_PER_PX,
+                            -step_limit, step_limit);
 
-    LOG("[TARGET] safe distance=%u valid=%u too_close=%u\r\n",
-        (unsigned)distance_mm,
-        valid ? 1u : 0u,
-        s_target.distance_too_close ? 1u : 0u);
-}
-
-static bool target_handle_safe_distance_guard(uint32_t now_ms)
-{
-    if (!s_target.distance_too_close)
+    s_target.target = g_robot.cur_pos;
+    s_target.target.x += dx;
+    s_target.target.z += dz;
+    if (robot_send_auto_event(&s_target.target) != pdPASS)
     {
         return false;
     }
-
-    force_laser_off();
-    reset_alignment_counts();
-
-    if (robot_is_auto_busy() && !robot_is_visual_servo_active())
-    {
-        robot_motion_abort();
-        LOG("[TARGET] safe distance too close, abort current motion distance=%u\r\n",
-            (unsigned)s_target.distance_mm);
-        enter_state(TARGET_RECOVER, now_ms);
-        return true;
-    }
-
-    if (!safe_distance_fresh(now_ms))
-    {
-        target_hold_visual_servo();
-        LOG("[TARGET] safe distance stale during retreat\r\n");
-        enter_state(TARGET_RECOVER, now_ms);
-        return true;
-    }
-
-    if (s_target.state == TARGET_OUTPUT)
-    {
-        (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
-        enter_state(TARGET_ALIGN, now_ms);
-    }
-
-#if TARGET_USE_VISUAL_SERVO
-    if (!robot_is_visual_servo_active())
-    {
-        if (robot_visual_servo_start() != pdPASS)
-        {
-            LOG("[TARGET] safe distance retreat start failed\r\n");
-            enter_state(TARGET_RECOVER, now_ms);
-            return true;
-        }
-    }
-    robot_visual_servo_set_velocity(0.0f, TARGET_SAFE_RETREAT_SPEED_MM_S, 0.0f);
     s_target.last_step_ms = now_ms;
-    LOG("[TARGET] safe retreat vy=%.2f distance=%u\r\n",
-        TARGET_SAFE_RETREAT_SPEED_MM_S,
-        (unsigned)s_target.distance_mm);
-#endif
     return true;
 }
-
-static bool send_target_auto(const struct position *pos)
-{
-    struct position local = *pos;
-    return (robot_send_auto_event(&local) == pdPASS);
-}
+#endif
 
 void robot_target_init(void)
 {
     memset(&s_target, 0, sizeof(s_target));
-    s_target.pre.x = TARGET_PRE_X;
-    s_target.pre.y = TARGET_PRE_Y;
-    s_target.pre.z = TARGET_PRE_Z;
-    s_target.target = s_target.pre;
-    s_target.state = TARGET_INIT;
-    s_target.has_distance = false;
-    s_target.distance_valid = false;
-    s_target.distance_too_close = false;
+    s_target.state = ROBOT_TARGET_STATE_INIT;
     target_stop_visual_servo();
-    force_laser_off();
+    ROBOT_TARGET_ENABLED = false;
+    ROBOT_TARGET_FIRE_ENABLE = false;
 }
 
-bool robot_target_enable_request(void)
+bool robot_target_start_at_current_pose(void)
 {
-    uint32_t now = HAL_GetTick();
+    uint32_t now_ms = HAL_GetTick();
 
     target_stop_visual_servo();
-    force_laser_off();
-    if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID))
+    if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID) ||
+        robot_is_auto_busy() || robot_motion_abort_latched())
     {
         ROBOT_TARGET_ENABLED = false;
         return false;
     }
 
-    s_target.target = s_target.pre;
-    s_target.last_step_ms = now;
+    s_target.event = ROBOT_TARGET_EVENT_NONE;
+    s_target.last_step_ms = now_ms;
     s_target.last_vision_ms = 0u;
     s_target.dcx = 0;
     s_target.dcy = 0;
     s_target.has_vision = false;
-    s_target.has_distance = false;
-    s_target.distance_valid = false;
-    s_target.distance_too_close = false;
-    s_target.distance_mm = 0u;
-    s_target.last_distance_ms = 0u;
-    s_target.last_ready_status_ms = 0u;
+    s_target.ready_sent = false;
+    s_target.fire_raw = true;
+    s_target.fire_debounced = true;
+    s_target.fire_raw_change_ms = now_ms;
+    s_target.fire_release_seen = false;
     reset_alignment_counts();
-    enter_state(TARGET_INIT, now);
-
     ROBOT_TARGET_ENABLED = true;
+    enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms);
     return true;
+}
+
+void robot_target_stop_hold(void)
+{
+    uint32_t now_ms = HAL_GetTick();
+    ROBOT_TARGET_ENABLED = false;
+    ROBOT_TARGET_FIRE_ENABLE = false;
+    target_stop_visual_servo();
+    enter_state(ROBOT_TARGET_STATE_HOLD, now_ms);
+}
+
+bool robot_target_enable_request(void)
+{
+    return robot_target_start_at_current_pose();
 }
 
 void robot_target_disable_request(void)
 {
-    ROBOT_TARGET_ENABLED = false;
-    ROBOT_TARGET_FIRE_ENABLE = false;
-    s_target_preposition_ready_once = false;
-    target_stop_visual_servo();
-    force_laser_off();
-    (void)robot_send_reset_event(false);
+    robot_target_stop_hold();
 }
 
 void robot_target_mark_preposition_ready_once(void)
 {
-    s_target_preposition_ready_once = true;
 }
 
 void robot_target_step(const target_obs_t *obs)
 {
-    uint32_t now = (obs != NULL) ? obs->now_ms : HAL_GetTick();
-    bool estop = (obs != NULL) && obs->estop_active;
-    bool limit = ((obs != NULL) && obs->limit_triggered) || robot_any_limit_triggered();
-    bool fire_allowed = ((obs != NULL) && obs->fire_button) || ROBOT_TARGET_FIRE_ENABLE;
+    uint32_t now_ms = (obs != NULL) ? obs->now_ms : HAL_GetTick();
     bool new_vision = (obs != NULL) && obs->has_vision;
-    bool new_distance = (obs != NULL) && obs->has_distance;
 
-    if (new_vision)
+    if (obs != NULL)
     {
-        s_target.dcx = obs->dcx;
-        s_target.dcy = obs->dcy;
-        s_target.last_vision_ms = now;
-        s_target.has_vision = true;
-        LOG("[TARGET] vision state=%s enabled=%u dcx=%d dcy=%d stable=%u\r\n",
-            target_state_name(s_target.state),
-            ROBOT_TARGET_ENABLED ? 1u : 0u,
-            (int)s_target.dcx,
-            (int)s_target.dcy,
-            (unsigned)s_target.stable_count);
+        target_update_fire_button(obs->fire_button, now_ms);
     }
 
     if (!ROBOT_TARGET_ENABLED)
     {
         target_stop_visual_servo();
-        force_laser_off();
-        enter_state(TARGET_INIT, now);
         return;
     }
 
-    if (new_distance)
+    if (new_vision)
     {
-        target_update_safe_distance(now, obs->distance_mm, obs->distance_valid);
-    }
-
-    if (estop || limit)
-    {
-        target_stop_visual_servo();
-        force_laser_off();
-        if (s_target.state != TARGET_RECOVER)
+        if (obs->vision_valid)
         {
-            (void)jetson_send_status_u8(RA6_TO_JETSON_ERROR, 1u);
+            s_target.dcx = obs->dcx;
+            s_target.dcy = obs->dcy;
+            s_target.last_vision_ms = now_ms;
+            s_target.has_vision = true;
+            LOG("[TARGET] vision state=%s dcx=%d dcy=%d stable=%u\r\n",
+                target_state_name(s_target.state), (int)s_target.dcx,
+                (int)s_target.dcy, (unsigned)s_target.stable_count);
         }
-        enter_state(TARGET_RECOVER, now);
-        return;
-    }
-
-    if (target_handle_safe_distance_guard(now))
-    {
-        return;
+        else
+        {
+            s_target.has_vision = false;
+            target_stop_visual_servo();
+            if ((s_target.state == ROBOT_TARGET_STATE_ALIGN) ||
+                (s_target.state == ROBOT_TARGET_STATE_CONFIRM) ||
+                (s_target.state == ROBOT_TARGET_STATE_OUTPUT))
+            {
+                target_set_event(ROBOT_TARGET_EVENT_VISION_LOST);
+                enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms);
+            }
+        }
     }
 
     switch (s_target.state)
     {
-        case TARGET_INIT:
+        case ROBOT_TARGET_STATE_WAIT_DETECT:
             target_stop_visual_servo();
-            force_laser_off();
-            reset_alignment_counts();
-            if (!safe_distance_fresh(now))
+            if (!s_target.ready_sent)
             {
-                break;
+                target_set_event(ROBOT_TARGET_EVENT_READY);
+                s_target.ready_sent = true;
             }
-            if (s_target_preposition_ready_once)
+            if (vision_fresh(now_ms))
             {
-                s_target_preposition_ready_once = false;
-                (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
-                s_target.last_ready_status_ms = now;
-                enter_state(TARGET_WAIT_DETECT, now);
-                break;
-            }
-            s_target.target = s_target.pre;
-            if (send_target_auto(&s_target.target))
-            {
-                enter_state(TARGET_PRE_POSITION, now);
-            }
-            break;
-
-        case TARGET_PRE_POSITION:
-            target_stop_visual_servo();
-            force_laser_off();
-            if (!safe_distance_fresh(now))
-            {
-                robot_motion_abort();
-                LOG("[TARGET] safe distance stale during pre-position, abort motion\r\n");
-                enter_state(TARGET_RECOVER, now);
-                break;
-            }
-            if ((now - s_target.enter_ms) >= TARGET_PRE_POSITION_TIMEOUT_MS)
-            {
-                robot_motion_abort();
-                LOG("[TARGET] pre-position timeout\r\n");
-                enter_state(TARGET_RECOVER, now);
-                break;
-            }
-
-            robot_auto_result_t auto_result = robot_auto_result_consume();
-            switch (auto_result)
-            {
-                case ROBOT_AUTO_RESULT_OK:
-                    (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
-                    s_target.last_ready_status_ms = now;
-                    enter_state(TARGET_WAIT_DETECT, now);
-                    break;
-
-                case ROBOT_AUTO_RESULT_FAILED:
-                    LOG("[TARGET] pre-position auto failed\r\n");
-                    enter_state(TARGET_RECOVER, now);
-                    break;
-
-                case ROBOT_AUTO_RESULT_ABORTED:
-                    LOG("[TARGET] pre-position auto aborted\r\n");
-                    enter_state(TARGET_RECOVER, now);
-                    break;
-
-                default:
-                    break;
-            }
-            break;
-
-        case TARGET_WAIT_DETECT:
-            force_laser_off();
-            if ((now - s_target.last_ready_status_ms) >= TARGET_READY_STATUS_PERIOD_MS)
-            {
-                (void)jetson_send_status_u8(RA6_TO_JETSON_READY, 1u);
-                s_target.last_ready_status_ms = now;
-            }
-            if (vision_fresh(now))
-            {
+                target_set_event(ROBOT_TARGET_EVENT_VISION_RECOVERED);
 #if TARGET_USE_VISUAL_SERVO
-                if (robot_visual_servo_start() == pdPASS)
+                if (!target_start_visual_servo())
                 {
-                    enter_state(TARGET_ALIGN, now);
+                    target_set_event(ROBOT_TARGET_EVENT_FAULT);
+                    enter_state(ROBOT_TARGET_STATE_FAULT, now_ms);
+                    break;
                 }
-                else
-                {
-                    LOG("[TARGET] visual servo start failed\r\n");
-                    enter_state(TARGET_RECOVER, now);
-                }
-#else
-                enter_state(TARGET_ALIGN, now);
 #endif
+                enter_state(ROBOT_TARGET_STATE_ALIGN, now_ms);
             }
-            else
+            break;
+
+        case ROBOT_TARGET_STATE_ALIGN:
+            if (!vision_fresh(now_ms))
             {
                 target_stop_visual_servo();
-            }
-            break;
-
-        case TARGET_ALIGN:
-            force_laser_off();
-            if (!vision_fresh(now))
-            {
-                target_stop_visual_servo();
-                reset_alignment_counts();
-                enter_state(TARGET_RECOVER, now);
+                target_set_event(ROBOT_TARGET_EVENT_VISION_LOST);
+                enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms);
                 break;
             }
-
-#if TARGET_USE_VISUAL_SERVO
-            if (!robot_is_visual_servo_active())
-            {
-                if (robot_visual_servo_start() != pdPASS)
-                {
-                    LOG("[TARGET] visual servo restart failed\r\n");
-                    enter_state(TARGET_RECOVER, now);
-                    break;
-                }
-            }
-#endif
 
             if (align_in_tolerance())
             {
@@ -504,139 +332,112 @@ void robot_target_step(const target_obs_t *obs)
                 }
                 if (s_target.stable_count >= TARGET_ALIGN_STABLE_COUNT)
                 {
-                    (void)jetson_send_status_u8(RA6_TO_JETSON_ALIGN_DONE, 1u);
-                    enter_state(TARGET_CONFIRM, now);
+                    enter_state(ROBOT_TARGET_STATE_CONFIRM, now_ms);
                 }
                 break;
             }
 
             reset_alignment_counts();
 #if TARGET_USE_VISUAL_SERVO
+            if (!target_start_visual_servo())
+            {
+                target_set_event(ROBOT_TARGET_EVENT_FAULT);
+                enter_state(ROBOT_TARGET_STATE_FAULT, now_ms);
+                break;
+            }
             if (new_vision)
             {
-                target_update_visual_servo_velocity(now);
+                target_update_visual_servo_velocity(now_ms);
             }
 #else
-            if ((now - s_target.last_step_ms) >= TARGET_ALIGN_PERIOD_MS)
+            if (new_vision && !target_send_alignment_step(now_ms))
             {
-                if (robot_is_auto_busy())
-                {
-                    break;
-                }
-
-                float err_px = fmaxf(fabsf((float)s_target.dcx), fabsf((float)s_target.dcy));
-                float step_limit = (err_px <= TARGET_ALIGN_TOL_PX_COARSE) ?
-                                   TARGET_MAX_STEP_MM_FINE : TARGET_MAX_STEP_MM;
-                float dx = clampf_local((float)s_target.dcx * TARGET_KX_MM_PER_PX,
-                                        -step_limit, step_limit);
-                float dz = clampf_local((float)s_target.dcy * TARGET_KY_MM_PER_PX,
-                                        -step_limit, step_limit);
-
-                s_target.target = g_robot.cur_pos;
-                s_target.target.x += dx;
-                s_target.target.z += dz;
-                if (send_target_auto(&s_target.target))
-                {
-                    LOG("[TARGET] align step dx=%.2f dz=%.2f target=<%.2f %.2f %.2f>\r\n",
-                        dx, dz, s_target.target.x, s_target.target.y, s_target.target.z);
-                    s_target.last_step_ms = now;
-                }
-                else
-                {
-                    LOG("[TARGET] align auto failed target=<%.2f %.2f %.2f>\r\n",
-                        s_target.target.x, s_target.target.y, s_target.target.z);
-                }
+                target_set_event(ROBOT_TARGET_EVENT_FAULT);
+                enter_state(ROBOT_TARGET_STATE_FAULT, now_ms);
             }
 #endif
             break;
 
-        case TARGET_CONFIRM:
-            force_laser_off();
-            if (!vision_fresh(now))
+        case ROBOT_TARGET_STATE_CONFIRM:
+            target_hold_visual_servo();
+            if (!vision_fresh(now_ms))
             {
                 target_stop_visual_servo();
-                enter_state(TARGET_RECOVER, now);
+                target_set_event(ROBOT_TARGET_EVENT_VISION_LOST);
+                enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms);
                 break;
             }
             if (!align_in_tolerance())
             {
-                LOG("[TARGET] confirm lost alignment dcx=%d dcy=%d, back to ALIGN\r\n",
-                    (int)s_target.dcx, (int)s_target.dcy);
-                reset_alignment_counts();
-                enter_state(TARGET_ALIGN, now);
+                target_set_event(ROBOT_TARGET_EVENT_ALIGNMENT_LOST);
+                enter_state(ROBOT_TARGET_STATE_ALIGN, now_ms);
                 break;
             }
-            target_hold_visual_servo();
-            RED_LED_ON;
-            BLUE_LED_OFF;
-            if (new_vision && (s_target.confirm_stable_count < TARGET_CONFIRM_STABLE_COUNT))
+            if (new_vision && !s_target.alignment_confirmed &&
+                (s_target.confirm_stable_count < TARGET_CONFIRM_STABLE_COUNT))
             {
                 s_target.confirm_stable_count++;
-            }
-            if ((s_target.confirm_stable_count >= TARGET_CONFIRM_STABLE_COUNT) && fire_allowed)
-            {
-                if (!safe_distance_allows_output(now))
+                if (s_target.confirm_stable_count >= TARGET_CONFIRM_STABLE_COUNT)
                 {
-                    LOG("[TARGET] output blocked by safe distance distance=%u valid=%u\r\n",
-                        (unsigned)s_target.distance_mm,
-                        safe_distance_fresh(now) ? 1u : 0u);
-                    break;
+                    s_target.alignment_confirmed = true;
+                    target_set_event(ROBOT_TARGET_EVENT_ALIGN_DONE);
                 }
+            }
+            if (s_target.alignment_confirmed && target_fire_allowed())
+            {
                 target_stop_visual_servo();
-                (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 1u);
-                enter_state(TARGET_OUTPUT, now);
+                enter_state(ROBOT_TARGET_STATE_OUTPUT, now_ms);
             }
             break;
 
-        case TARGET_OUTPUT:
+        case ROBOT_TARGET_STATE_OUTPUT:
             target_stop_visual_servo();
-            if (!fire_allowed || !vision_fresh(now) || !safe_distance_allows_output(now))
+            if (!vision_fresh(now_ms))
             {
-                force_laser_off();
-                (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
-                enter_state(TARGET_DONE, now);
-                break;
+                target_set_event(ROBOT_TARGET_EVENT_VISION_LOST);
+                enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms);
             }
-            if (!align_in_tolerance())
+            else if (!align_in_tolerance())
             {
-                force_laser_off();
-                (void)jetson_send_status_u8(RA6_TO_JETSON_OUTPUT, 0u);
-                LOG("[TARGET] output lost alignment dcx=%d dcy=%d, done\r\n",
-                    (int)s_target.dcx, (int)s_target.dcy);
-                reset_alignment_counts();
-                enter_state(TARGET_DONE, now);
-                break;
+                target_set_event(ROBOT_TARGET_EVENT_ALIGNMENT_LOST);
+                enter_state(ROBOT_TARGET_STATE_ALIGN, now_ms);
             }
-            taskENTER_CRITICAL();
-            bool enabled_now = ROBOT_TARGET_ENABLED;
-            if (enabled_now)
+            else if (!target_fire_allowed() ||
+                     ((now_ms - s_target.enter_ms) >= TARGET_OUTPUT_MAX_MS))
             {
-                BSP_Laser_On();
-                RED_LED_ON;
-                BLUE_LED_ON;
-            }
-            taskEXIT_CRITICAL();
-            if (!enabled_now)
-            {
-                force_laser_off();
-                enter_state(TARGET_INIT, now);
+                target_set_event(ROBOT_TARGET_EVENT_HOLD);
+                enter_state(ROBOT_TARGET_STATE_HOLD, now_ms);
             }
             break;
 
-        case TARGET_DONE:
+        case ROBOT_TARGET_STATE_HOLD:
             target_stop_visual_servo();
-            force_laser_off();
             break;
 
-        case TARGET_RECOVER:
+        case ROBOT_TARGET_STATE_FAULT:
+            target_stop_visual_servo();
+            break;
+
+        case ROBOT_TARGET_STATE_INIT:
         default:
             target_stop_visual_servo();
-            force_laser_off();
-            if ((now - s_target.enter_ms) >= TARGET_ALIGN_PERIOD_MS)
-            {
-                reset_alignment_counts();
-                enter_state(TARGET_WAIT_DETECT, now);
-            }
             break;
     }
+}
+
+robot_target_event_t robot_target_event_consume(void)
+{
+    robot_target_event_t event = s_target.event;
+    s_target.event = ROBOT_TARGET_EVENT_NONE;
+    return event;
+}
+
+bool robot_target_output_requested(void)
+{
+    return ROBOT_TARGET_ENABLED && (s_target.state == ROBOT_TARGET_STATE_OUTPUT);
+}
+
+robot_target_state_t robot_target_state_get(void)
+{
+    return s_target.state;
 }

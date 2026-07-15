@@ -47,25 +47,45 @@ extern "C" {
 #define TARGET_ALIGN_TOL_PX_COARSE   (15.0f)     /* 粗/精定位切换阈值，单位 px */
 #define TARGET_MAX_STEP_MM_FINE      (0.8f)      /* 精定位阶段单次最大修正步长，单位 mm */
 #define TARGET_ALIGN_TOL_PX          (5.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
-#define TARGET_ALIGN_STABLE_COUNT    (3u)        /* 连续满足对准阈值的帧数，达到后进入确认状态 */
+#define TARGET_ALIGN_STABLE_COUNT    (3u)        /* 连续满足对准阈值的帧数，达到后进入确认状态 */  
 #define TARGET_CONFIRM_STABLE_COUNT  (4u)        /* 输出前二次确认所需连续新视觉帧数 */
 #define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */
 #define TARGET_VISION_VALID_MS       (500u)      /* 视觉数据有效期，超时后退出对准/输出 */
 #define TARGET_PRE_POSITION_TIMEOUT_MS (8000u)    /* 预定位最长等待时间，超时进入恢复 */
 #define TARGET_READY_STATUS_PERIOD_MS (300u)      /* 等待视觉误差时 READY 状态重发周期，单位 ms */
+#define TARGET_OUTPUT_MAX_MS          (10000u)    /* 单次激光输出硬上限，默认 10 秒 */
+#define TARGET_FIRE_KEY_DEBOUNCE_MS   (40u)       /* P000 按键去抖时间 */
 
+typedef enum
+{
+    ROBOT_TARGET_STATE_INIT = 0,
+    ROBOT_TARGET_STATE_WAIT_DETECT,
+    ROBOT_TARGET_STATE_ALIGN,
+    ROBOT_TARGET_STATE_CONFIRM,
+    ROBOT_TARGET_STATE_OUTPUT,
+    ROBOT_TARGET_STATE_HOLD,
+    ROBOT_TARGET_STATE_FAULT,
+} robot_target_state_t;
+
+typedef enum
+{
+    ROBOT_TARGET_EVENT_NONE = 0,
+    ROBOT_TARGET_EVENT_READY,
+    ROBOT_TARGET_EVENT_VISION_RECOVERED,
+    ROBOT_TARGET_EVENT_ALIGN_DONE,
+    ROBOT_TARGET_EVENT_VISION_LOST,
+    ROBOT_TARGET_EVENT_ALIGNMENT_LOST,
+    ROBOT_TARGET_EVENT_HOLD,
+    ROBOT_TARGET_EVENT_FAULT,
+} robot_target_event_t;
 
 typedef struct
 {
     bool has_vision;
+    bool vision_valid;
     int16_t dcx;
     int16_t dcy;
-    bool has_distance;
-    bool distance_valid;
-    uint16_t distance_mm;
     uint32_t now_ms;
-    bool estop_active;
-    bool limit_triggered;
     bool fire_button;
 } target_obs_t;
 
@@ -73,6 +93,11 @@ extern volatile bool ROBOT_TARGET_ENABLED;
 extern volatile bool ROBOT_TARGET_FIRE_ENABLE;
 
 void robot_target_init(void);
+bool robot_target_start_at_current_pose(void);
+void robot_target_stop_hold(void);
+robot_target_event_t robot_target_event_consume(void);
+bool robot_target_output_requested(void);
+robot_target_state_t robot_target_state_get(void);
 bool robot_target_enable_request(void);
 void robot_target_disable_request(void);
 void robot_target_mark_preposition_ready_once(void);
