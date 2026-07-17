@@ -15,7 +15,7 @@
 2. 协议选择“新协议 A5 5A + CRC16”。
 3. 在“比赛全流程模拟”中选择医生使用的视图，默认正视图。
 4. 模拟安全距离默认 120 mm，固件安全阈值当前为 100 mm；一键比赛模拟不接受低于 100 mm 的固定值。
-5. 视觉序列格式为“dcx,dcy:持续秒数”，例如“20,-15:2;8,-6:2;0,0:0”；最后的 0 表示持续发送直到流程离开视觉对准阶段。
+5. 视觉序列格式为“dcx,dcy:持续秒数”，例如“20,-15:2;8,-6:2;0,0:0”；最后的 0 表示持续发送到收到 `OUTPUT_OFF` 或流程结束。若写成 `0,0:8`，8 秒后会停止发送，RA6M5 将因 500 ms 无新视觉帧而报“视觉数据丢失”。
 6. 点击“开始一键比赛全流程”。
 
 上位机会自动执行：
@@ -36,12 +36,13 @@
     -> 完成并回 HOME
 ```
 
-
 界面会用中文显示当前阶段、人工操作、超时和 RA6M5 拒绝原因。正式流程固定使用 200 ms 心跳，每条控制命令都等待同 SEQ 的 COMMAND_ACK 和业务完成状态。
 
 三视图拍摄采用逐步驱动：每到一个拍摄点先等待 1 秒，再模拟 Jetson 完成拍照并下发下一点。当前 PC 一键流程使用固定安全距离，只验证“距离安全”的主流程；它不模拟距离过近后 RGB-D 重新测距和机械臂逐步退让。该异常分支必须由真实 Jetson 在每次退让后发送新的距离数据进行联调。
 
 P000 是真实激光输出许可，上位机不会模拟或绕过该按键。视觉对准完成后必须按住 P000 才可能输出，松开后激光关闭。
+
+板载状态灯用于现场确认定靶阶段：P003 点亮表示已经完成视觉对准、可以按住 P000；P503 点亮表示全部安全条件通过且 P801 已经实际输出。P003/P503 均为低电平点亮，视觉丢失、误差超限、松开 P000、流程终止或故障时会随状态熄灭。
 
 点击“终止并保持”、关闭 Jetson 串口、关闭上位机、切换回旧协议或发生通信错误时，上位机会请求 WORKFLOW ABORT。该操作关闭激光并让机械臂保持当前位置，不自动发送 soft_reset。恢复安全后重新点击“开始一键比赛全流程”，固件会先回 HOME。
 
@@ -55,14 +56,12 @@ P000 是真实激光输出许可，上位机不会模拟或绕过该按键。视
 python "Robot_FreeRTOS - Arm\UpperComputer\ra6m5_upper_console.py"
 ```
 
-
 自检：
 
 ```
 python "Robot_FreeRTOS - Arm\UpperComputer\ra6m5_upper_console.py" --self-test
     python "Robot_FreeRTOS - Arm\UpperComputer\ra6m5_upper_console.py" --gui-self-test
 ```
-
 
 ## 打包 EXE
 
@@ -71,6 +70,5 @@ python "Robot_FreeRTOS - Arm\UpperComputer\ra6m5_upper_console.py" --self-test
 ```
 python -m PyInstaller --noconfirm --clean RA6M5_Robot_Console.spec
 ```
-
 
 产物位于 UpperComputer\dist\RA6M5_Robot_Console.exe。

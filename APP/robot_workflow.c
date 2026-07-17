@@ -4,6 +4,7 @@
 #include "robot_target.h"
 #include "jetson_vision.h"
 #include "bsp_laser.h"
+#include "bsp_led.h"
 #include "bsp_uart.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -52,6 +53,7 @@ typedef struct
     uint32_t state_deadline_ms;
     bool distance_safe_latched;
     bool target_enabled;
+    bool target_aligned;
     bool fault_latched;
     bool laser_active;
     retreat_phase_t retreat_phase;
@@ -90,6 +92,16 @@ static const char *workflow_state_name(workflow_state_t state)
     }
 }
 
+static void workflow_update_target_indicators(void)
+{
+    bool ready = (s_workflow.state == FLOW_TARGET_ACTIVE) &&
+                 s_workflow.target_enabled && s_workflow.target_aligned;
+    bool output = ready && s_workflow.laser_active;
+
+    BSP_TargetReadyLed_Set(ready);
+    BSP_TargetOutputLed_Set(output);
+}
+
 static void workflow_enter(workflow_state_t state, uint32_t now_ms)
 {
     if (s_workflow.state != state)
@@ -99,6 +111,7 @@ static void workflow_enter(workflow_state_t state, uint32_t now_ms)
     }
     s_workflow.state = state;
     s_workflow.state_deadline_ms = now_ms;
+    workflow_update_target_indicators();
 }
 
 static bool workflow_any_limit_triggered(void)
@@ -267,6 +280,7 @@ static void workflow_force_laser_off(uint8_t error_code)
         s_workflow.laser_active = false;
         workflow_target_status(RA6_TO_JETSON_OUTPUT, 0u, error_code);
     }
+    workflow_update_target_indicators();
 }
 
 static void workflow_clear_round(void)
@@ -279,6 +293,8 @@ static void workflow_clear_round(void)
     s_workflow.retreat_steps = 0u;
     s_workflow.retreat_phase = RETREAT_PHASE_IDLE;
     s_workflow.target_enabled = false;
+    s_workflow.target_aligned = false;
+    workflow_update_target_indicators();
 }
 
 static void workflow_fault(uint8_t error_code, uint32_t now_ms)
@@ -392,6 +408,7 @@ static void workflow_apply_laser_gate(const robot_workflow_obs_t *obs)
 
         if (s_workflow.laser_active)
         {
+            workflow_update_target_indicators();
             workflow_target_status(RA6_TO_JETSON_OUTPUT, 1u, JETSON_ERROR_NONE);
         }
     }
@@ -551,6 +568,7 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
 
     if (obs->target_value == 0u)
     {
+        s_workflow.target_aligned = false;
         workflow_force_laser_off(JETSON_ERROR_NONE);
         robot_target_stop_hold();
         s_workflow.target_enabled = false;
@@ -594,6 +612,7 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
 
     s_workflow.target_seq = obs->target_seq;
     s_workflow.target_enabled = true;
+    s_workflow.target_aligned = false;
     workflow_enter(FLOW_TARGET_ACTIVE, obs->now_ms);
     command_ack(entry, true, JETSON_ERROR_NONE);
     workflow_target_status(RA6_TO_JETSON_TARGET_CTRL, 1u, JETSON_ERROR_NONE);
@@ -923,23 +942,28 @@ static void workflow_handle_target_event(uint32_t now_ms)
             break;
 
         case ROBOT_TARGET_EVENT_ALIGN_DONE:
+            s_workflow.target_aligned = true;
+            workflow_update_target_indicators();
             workflow_target_status(RA6_TO_JETSON_ALIGN_DONE, 1u,
                                    JETSON_ERROR_NONE);
             break;
 
         case ROBOT_TARGET_EVENT_VISION_LOST:
+            s_workflow.target_aligned = false;
             workflow_force_laser_off(JETSON_ERROR_VISION_LOST);
             workflow_target_status(RA6_TO_JETSON_VISION_STATE, 0u,
                                    JETSON_ERROR_VISION_LOST);
             break;
 
         case ROBOT_TARGET_EVENT_ALIGNMENT_LOST:
+            s_workflow.target_aligned = false;
             workflow_force_laser_off(JETSON_ERROR_NONE);
             workflow_target_status(RA6_TO_JETSON_ALIGN_DONE, 0u,
                                    JETSON_ERROR_NONE);
             break;
 
         case ROBOT_TARGET_EVENT_HOLD:
+            s_workflow.target_aligned = false;
             workflow_force_laser_off(JETSON_ERROR_NONE);
             workflow_enter(FLOW_TARGET_HOLD, now_ms);
             break;
@@ -1004,12 +1028,14 @@ void robot_workflow_init(void)
     robot_capture_init();
     robot_target_init();
     BSP_Laser_Off();
+    workflow_update_target_indicators();
 }
 
 void robot_workflow_step(const robot_workflow_obs_t *obs)
 {
     if (obs == NULL)
     {
+        s_workflow.target_aligned = false;
         workflow_force_laser_off(JETSON_ERROR_SAFETY);
         return;
     }
