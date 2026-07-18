@@ -1,0 +1,17 @@
+*** Using Compiler 'V6.24', folder: 'C:\Users\Administrator\AppData\Local\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'Target_1'
+Before Build - User command #1: cmd /c ""E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_launcher.bat" "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_version.txt" -nosplash --launcher.suppressErrors --generate --compiler ARMv6 --devicefamily ra "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\configuration.xml" 2> "%TEMP%\rasc_stderr.out" && echo. > "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\output.rasc""
+[INFO] Input file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\configuration.xml" is older than output file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\output.rasc". Skipping RASC invocation.
+APP/robot.c(201): warning: unused function 'robot_try_refresh_joints_feedback' [-Wunused-function]
+  201 | static bool robot_try_refresh_joints_feedback(uint8_t retry_times)
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+compiling robot.c...
+linking...
+Program Size: Code=82228 RO-data=10284 RW-data=768 ZI-data=90312  
+FromELF: creating hex file...
+After Build - User command #1: cmd /c ""E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_launcher.bat" "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_version.txt" -nosplash --launcher.suppressErrors --gensmartbundle --compiler ARMv6 --devicefamily ra "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\configuration.xml" "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\Objects\Robot_FreeRTOS.axf" 2> "%TEMP%\rasc_stderr.out""
+[INFO] Input file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\Objects\Robot_FreeRTOS.axf" is newer than output file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\Objects\Robot_FreeRTOS.sbd". Proceeding with RASC invocation...
+Generating Smart Bundle..
+".\Objects\Robot_FreeRTOS.axf" - 0 Error(s), 1 Warning(s).
+Build Time Elapsed:  00:00:11

@@ -22,6 +22,25 @@ extern CAN_Context_t g_can_context;
 #define ROBOT_MAX_PATH_SIZE   (800)
 #define ROBOT_VISUAL_SERVO_PERIOD_MS        (20U)
 #define ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT    (3U)
+#define ROBOT_VIEW_ARC_DURATION_MIN_MS       (4000U)
+#define ROBOT_VIEW_ARC_DURATION_MAX_MS (8000U)
+#define ROBOT_VIEW_ARC_ENTRY_DURATION_MS (2000U)
+#define ROBOT_VIEW_ARC_BASE_TOL_MM           (2.0f)
+#define ROBOT_VIEW_ARC_BASE_X_MM             (0.0f)
+#define ROBOT_VIEW_ARC_BASE_Y_MM             (-130.0f)
+#define ROBOT_VIEW_ARC_BASE_Z_MM             (-15.0f)
+#define ROBOT_VIEW_ARC_J0_INDEX              (0U)
+#define ROBOT_VIEW_ARC_J3_INDEX              (3U)
+#define ROBOT_VIEW_ARC_J4_INDEX              (4U)
+#define ROBOT_VIEW_ARC_LEFT_J0_DEG     (65.0f)
+#define ROBOT_VIEW_ARC_FRONT_J0_DEG    (90.0f)
+#define ROBOT_VIEW_ARC_RIGHT_J0_DEG    (115.0f)
+#define ROBOT_VIEW_ARC_LEFT_J3_DEG     (330.0f)
+#define ROBOT_VIEW_ARC_FRONT_J3_DEG    (360.0f)
+#define ROBOT_VIEW_ARC_RIGHT_J3_DEG    (395.0f)
+#define ROBOT_VIEW_ARC_LEFT_J4_DEG     (85.0f)
+#define ROBOT_VIEW_ARC_FRONT_J4_DEG    (80.0f)
+#define ROBOT_VIEW_ARC_RIGHT_J4_DEG    (80.0f)
 
 /* 静态路径/逆解缓冲区，robot_control_task 单线程使用，消除运行时 malloc */
 static struct position s_path_buf[ROBOT_MAX_PATH_SIZE];
@@ -107,6 +126,9 @@ static int robot_joint_compare_error(uint8_t joint_id, float raw_angle, float re
 static int robot_joint_stop(uint8_t joint_id);
 static void robot_joint_stop_all(uint8_t joint_num);
 static int time_func_circle(uint32_t time_ms, struct position *pos);
+static float robot_view_arc_smoothstep(float t);
+static float robot_view_arc_bezier(float start, float through, float end, float t);
+static int robot_view_arc_move(uint32_t duration_ms);
 static int robot_pid_run(struct position *path, int path_size, float *result);
 static bool robot_joint_wait_target(uint8_t joint_id, float target, float tol_deg, uint32_t timeout_ms);
 static bool robot_auto_final_confirm(float *result, int path_size, float tol_deg);
@@ -1335,6 +1357,7 @@ robot_reset_result_t robot_reset_result_consume(void)
 static void robot_auto_move_interpolation(struct robot_event *event)
 {
     int ret;
+    bool auto_ok = false;
 	// 生成直线插补路径（使用静态缓冲区，消除运行时 malloc）
 	int path_size = 0;
 	struct position *target_pos = (struct position*)event->param;
@@ -1404,10 +1427,12 @@ static void robot_auto_move_interpolation(struct robot_event *event)
             ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_VALID);
             ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
             robot_auto_result_set(ROBOT_AUTO_RESULT_OK);
+            auto_ok = true;
         } else {
             ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
             ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
             robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
+            LOG("[AUTO] failed: final confirmation\r\n");
         }
 	} else {
         /* PID aborted before the final target; old Cartesian pose is no longer trustworthy. */
@@ -1418,8 +1443,13 @@ static void robot_auto_move_interpolation(struct robot_event *event)
         } else {
             robot_auto_result_set(ROBOT_AUTO_RESULT_FAILED);
         }
+        LOG("[AUTO] failed: pid ret=%d\r\n", ret);
     }
     robot_auto_busy_clear();
+    if (auto_ok) {
+        LOG("[AUTO] finished target=<%.1f %.1f %.1f>\r\n",
+            target_pos->x, target_pos->y, target_pos->z);
+    }
 }
 
 static float robot_angle_normalize(float angle)
@@ -1604,6 +1634,150 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 	return 0;
 }
 
+static float robot_view_arc_smoothstep(float t)
+{
+    if (t <= 0.0f) {
+        return 0.0f;
+    }
+    if (t >= 1.0f) {
+        return 1.0f;
+    }
+    return t * t * t * (10.0f + t * (-15.0f + 6.0f * t));
+}
+
+static float robot_view_arc_bezier(float start, float through, float end, float t)
+{
+    float control = 2.0f * through - 0.5f * (start + end);
+    float inv = 1.0f - t;
+    return inv * inv * start + 2.0f * inv * t * control + t * t * end;
+}
+
+static bool robot_view_arc_canonicalize_target(float *target)
+{
+    for (uint8_t joint_id = 0u; joint_id < ROBOT_ARM_JOINT_NUM; joint_id++) {
+        float mapped = 0.0f;
+        float normalized = robot_angle_normalize(target[joint_id]);
+        if (robot_joint_compare_angle(joint_id, normalized, &mapped) != 0) {
+            LOG("[VIEW_ARC] target map failed joint=%u angle=%.2f\r\n",
+                (unsigned)joint_id, normalized);
+            return false;
+        }
+        target[joint_id] = mapped;
+    }
+    return true;
+}
+
+static int robot_view_arc_move(uint32_t duration_ms)
+{
+    int ret = 1;
+    int entry_size = (int)(ROBOT_VIEW_ARC_ENTRY_DURATION_MS /
+                           (uint32_t)ROBOT_INTERPOLATION_TIME_RESOLUTION);
+    int path_size = (int)(duration_ms / (uint32_t)ROBOT_INTERPOLATION_TIME_RESOLUTION);
+    float hold[ROBOT_MAX_JOINT_NUM] = {0};
+    uint32_t missing_mask = 0u;
+
+    ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+    ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+
+    if ((entry_size < 2) || (path_size < 2) || (path_size > ROBOT_MAX_PATH_SIZE)) {
+        LOG("[VIEW_ARC] failed: invalid path size entry=%d arc=%d\r\n",
+            entry_size, path_size);
+        goto finish;
+    }
+
+    if ((robot_update_all_angles(ROBOT_ARM_JOINT_NUM, &missing_mask, NULL) != 0) ||
+        (missing_mask != 0u)) {
+        LOG("[VIEW_ARC] failed: joint feedback missing mask=0x%02lX\r\n",
+            (unsigned long)missing_mask);
+        goto finish;
+    }
+
+    for (uint8_t joint_id = 0u; joint_id < ROBOT_MAX_JOINT_NUM; joint_id++) {
+        float mapped = 0.0f;
+        if (robot_joint_compare_angle(joint_id, g_robot.joints[joint_id].current_angle,
+                &mapped) != 0) {
+            LOG("[VIEW_ARC] failed: current angle map joint=%u\r\n",
+                (unsigned)joint_id);
+            goto finish;
+        }
+        hold[joint_id] = mapped;
+    }
+
+    LOG("[VIEW_ARC] entering left view\r\n");
+    for (int i = 0; i < entry_size; i++) {
+        float t = (float)i / (float)(entry_size - 1);
+        float s = robot_view_arc_smoothstep(t);
+        float *point = &s_result_buf[i * ROBOT_MAX_JOINT_NUM];
+        memcpy(point, hold, sizeof(hold));
+        point[ROBOT_VIEW_ARC_J0_INDEX] = robot_angle_normalize(
+            hold[ROBOT_VIEW_ARC_J0_INDEX] +
+            robot_angle_diff(hold[ROBOT_VIEW_ARC_J0_INDEX], ROBOT_VIEW_ARC_LEFT_J0_DEG) * s);
+        point[ROBOT_VIEW_ARC_J3_INDEX] = robot_angle_normalize(
+            hold[ROBOT_VIEW_ARC_J3_INDEX] +
+            robot_angle_diff(hold[ROBOT_VIEW_ARC_J3_INDEX], ROBOT_VIEW_ARC_LEFT_J3_DEG) * s);
+        point[ROBOT_VIEW_ARC_J4_INDEX] = robot_angle_normalize(
+            hold[ROBOT_VIEW_ARC_J4_INDEX] +
+            robot_angle_diff(hold[ROBOT_VIEW_ARC_J4_INDEX], ROBOT_VIEW_ARC_LEFT_J4_DEG) * s);
+    }
+    if (!robot_view_arc_canonicalize_target(
+            &s_result_buf[(entry_size - 1) * ROBOT_MAX_JOINT_NUM])) {
+        goto finish;
+    }
+
+    ret = robot_pid_run(NULL, entry_size, s_result_buf);
+    if ((ret != 0) ||
+        !robot_auto_final_confirm(s_result_buf, entry_size, ROBOT_JOINT_POS_CONFIRM_TOL_DEG)) {
+        LOG("[VIEW_ARC] failed while entering left view ret=%d\r\n", ret);
+        ret = 1;
+        goto finish;
+    }
+
+    LOG("[VIEW_ARC] left view reached, start arc duration=%lu ms\r\n",
+        (unsigned long)duration_ms);
+    for (int i = 0; i < path_size; i++) {
+        float t = (float)i / (float)(path_size - 1);
+        float s = robot_view_arc_smoothstep(t);
+        float *point = &s_result_buf[i * ROBOT_MAX_JOINT_NUM];
+        memcpy(point, hold, sizeof(hold));
+        point[ROBOT_VIEW_ARC_J0_INDEX] = robot_angle_normalize(robot_view_arc_bezier(
+            ROBOT_VIEW_ARC_LEFT_J0_DEG, ROBOT_VIEW_ARC_FRONT_J0_DEG,
+            ROBOT_VIEW_ARC_RIGHT_J0_DEG, s));
+        point[ROBOT_VIEW_ARC_J3_INDEX] = robot_angle_normalize(robot_view_arc_bezier(
+            ROBOT_VIEW_ARC_LEFT_J3_DEG, ROBOT_VIEW_ARC_FRONT_J3_DEG,
+            ROBOT_VIEW_ARC_RIGHT_J3_DEG, s));
+        point[ROBOT_VIEW_ARC_J4_INDEX] = robot_angle_normalize(robot_view_arc_bezier(
+            ROBOT_VIEW_ARC_LEFT_J4_DEG, ROBOT_VIEW_ARC_FRONT_J4_DEG,
+            ROBOT_VIEW_ARC_RIGHT_J4_DEG, s));
+    }
+    if (!robot_view_arc_canonicalize_target(
+            &s_result_buf[(path_size - 1) * ROBOT_MAX_JOINT_NUM])) {
+        ret = 1;
+        goto finish;
+    }
+
+    ret = robot_pid_run(NULL, path_size, s_result_buf);
+    if ((ret != 0) ||
+        !robot_auto_final_confirm(s_result_buf, path_size, ROBOT_JOINT_POS_CONFIRM_TOL_DEG)) {
+        LOG("[VIEW_ARC] failed during arc ret=%d\r\n", ret);
+        ret = 1;
+        goto finish;
+    }
+
+    ret = 0;
+
+finish:
+    ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+    ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+    robot_auto_busy_clear();
+    if (ret != 0) {
+        robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+        LOG("[VIEW_ARC] failed; soft_reset required\r\n");
+    } else {
+        LOG("[VIEW_ARC] finished\r\n");
+    }
+    return ret;
+}
+
 static void robot_joints_sync_to(struct robot_event *event)
 {
 	for (int i = 0; i < ROBOT_ARM_JOINT_NUM; i++) {
@@ -1695,6 +1869,10 @@ static void robot_control_task(void *arg)
 				LOG("ROBOT_TIME_FUNC_EVENT\n");
 				robot_time_func_move((uint32_t)(event.param[0]));
 				break;
+            case ROBOT_VIEW_ARC_EVENT:
+                LOG("ROBOT_VIEW_ARC_EVENT\r\n");
+                (void)robot_view_arc_move((uint32_t)event.param[0]);
+                break;
 			case ROBOT_HARD_RESET_EVENT:
 				LOG("ROBOT_HARD_RESET_EVENT\n");
 			{
@@ -2268,6 +2446,63 @@ int robot_send_time_func_event(float time_limit_ms, float radius_mm)
 	robot_event_stamp(&event);
 	event.param[0] = time_limit_ms;
 	return (int)xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+}
+
+int robot_send_view_arc_event(float duration_ms)
+{
+    BaseType_t queued;
+    uint32_t duration = (uint32_t)duration_ms;
+
+    if (g_robot.event_queue == NULL) {
+        return -1;
+    }
+    if (robot_motion_abort_is_requested()) {
+        LOG("reject view_arc: safety abort latched, soft_reset required\r\n");
+        return -1;
+    }
+    if (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID)) {
+        LOG("reject view_arc: pose invalid, soft_reset required\r\n");
+        return -1;
+    }
+    if ((duration < ROBOT_VIEW_ARC_DURATION_MIN_MS) ||
+        (duration > ROBOT_VIEW_ARC_DURATION_MAX_MS)) {
+        LOG("reject view_arc: duration must be %u..%u ms\r\n",
+            (unsigned)ROBOT_VIEW_ARC_DURATION_MIN_MS,
+            (unsigned)ROBOT_VIEW_ARC_DURATION_MAX_MS);
+        return -1;
+    }
+    if ((fabsf(g_robot.cur_pos.x - ROBOT_VIEW_ARC_BASE_X_MM) > ROBOT_VIEW_ARC_BASE_TOL_MM) ||
+        (fabsf(g_robot.cur_pos.y - ROBOT_VIEW_ARC_BASE_Y_MM) > ROBOT_VIEW_ARC_BASE_TOL_MM) ||
+        (fabsf(g_robot.cur_pos.z - ROBOT_VIEW_ARC_BASE_Z_MM) > ROBOT_VIEW_ARC_BASE_TOL_MM)) {
+        LOG("reject view_arc: move to base <%.1f %.1f %.1f> first, current=<%.1f %.1f %.1f>\r\n",
+            ROBOT_VIEW_ARC_BASE_X_MM, ROBOT_VIEW_ARC_BASE_Y_MM, ROBOT_VIEW_ARC_BASE_Z_MM,
+            g_robot.cur_pos.x, g_robot.cur_pos.y, g_robot.cur_pos.z);
+        return -1;
+    }
+
+    taskENTER_CRITICAL();
+    bool busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY) ||
+                ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+    if (!busy) {
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    }
+    taskEXIT_CRITICAL();
+
+    if (busy) {
+        LOG("reject view_arc: robot motion busy\r\n");
+        return -1;
+    }
+
+    struct robot_event event = {0};
+    event.type = ROBOT_VIEW_ARC_EVENT;
+    robot_event_stamp(&event);
+    event.param[0] = (float)duration;
+    queued = xQueueSendToBack(g_robot.event_queue, &event, ROBOT_CMD_QUEUE_TIMEOUT);
+    if (queued != pdPASS) {
+        robot_auto_busy_clear();
+        LOG("reject view_arc: event queue full\r\n");
+    }
+    return (int)queued;
 }
 
 int robot_send_read_all_event(void)

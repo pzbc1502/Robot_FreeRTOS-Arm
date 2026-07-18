@@ -23,6 +23,8 @@ static int robot_laser_off_handle(float *param);
 static int robot_target_enable_handle(float *param);
 static int robot_target_disable_handle(float *param);
 static int robot_time_func_handle(float *param);
+static int robot_view_arc_handle(float *param);
+static int robot_motion_abort_handle(float *param);
 
 
 void robot_mqtt_handle(struct robot_cmd *cmd)
@@ -99,6 +101,21 @@ static int robot_time_func_handle(float *param)
 	float radius_mm = (param[1] > 0.0f) ? param[1] : 15.0f;
 	LOG("time_func %.0f ms radius %.1f mm\r\n", time_ms, radius_mm);
 	return robot_send_time_func_event(time_ms, radius_mm);
+}
+
+static int robot_view_arc_handle(float *param)
+{
+    float duration_ms = (param[0] > 0.0f) ? param[0] : 8000.0f;
+    LOG("view_arc %.0f ms\r\n", duration_ms);
+    return robot_send_view_arc_event(duration_ms);
+}
+
+static int robot_motion_abort_handle(float *param)
+{
+    (void)param;
+    robot_motion_abort();
+    LOG("motion_abort latched; soft_reset required\r\n");
+    return pdPASS;
 }
 
 static int robot_hard_reset_handle(float *param)
@@ -248,10 +265,12 @@ static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	{"abs_rotate",  robot_abs_rotate_handle},
 	{"rel_rotate",  robot_rel_rotate_handle},
 	{"auto",        robot_auto_handle},
+    {"view_arc",   robot_view_arc_handle},
 	{"circle",      robot_time_func_handle},
 	{"time_func",   robot_time_func_handle},
 	{"hard_reset",  robot_hard_reset_handle},
 	{"soft_reset",  robot_soft_reset_handle},
+    {"motion_abort", robot_motion_abort_handle},
     {"read_all",    robot_read_all_handle},
 	{"zero",        robot_zero_handle},
 

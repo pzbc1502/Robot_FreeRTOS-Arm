@@ -208,6 +208,7 @@ enum robot_event_type
     ROBOT_VISUAL_SERVO_EVENT,       /* visual servo event for target alignment */
     ROBOT_JOINTS_SYNC_EVENT,        /* 关节同步事件：强制同步所有关节状态 */
     ROBOT_READ_ALL_EVENT,           /* 批量读取 J1~J5 当前角度 */
+    ROBOT_VIEW_ARC_EVENT,           /* 独立演示：平滑经过左、正、右三视图 */
 };
 
 typedef enum
@@ -305,6 +306,7 @@ bool robot_is_visual_servo_active(void);
 void robot_motion_abort(void);
 bool robot_motion_abort_latched(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
+int robot_send_view_arc_event(float duration_ms);
 int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);
 

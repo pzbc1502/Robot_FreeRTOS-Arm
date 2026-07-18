@@ -749,6 +749,22 @@ class QtUpperConsole(QMainWindow):
         self.safe_distance_thread: threading.Thread | None = None
         self.demo_stop = threading.Event()
         self.automatic_demo_lock = threading.Lock()
+        self.arm_rx_buffer = bytearray()
+        self.arm_events = {
+            name: threading.Event()
+            for name in (
+                "SOFT_RESET_PASS",
+                "SOFT_RESET_FAIL",
+                "AUTO_FINISHED",
+                "AUTO_FAILED",
+                "VIEW_ARC_FINISHED",
+                "VIEW_ARC_FAILED",
+                "MOTION_ABORTED",
+            )
+        }
+        self.view_arc_stop = threading.Event()
+        self.view_arc_stop.set()
+        self.view_arc_thread: threading.Thread | None = None
         self.automatic_demo_owner: str | None = None
         self.formal_status_mailbox = FormalStatusMailbox()
         self.formal_workflow_stop = threading.Event()
@@ -859,6 +875,15 @@ class QtUpperConsole(QMainWindow):
         row.addWidget(self.circle_time)
         row.addWidget(self.circle_radius)
         row.addWidget(self._button("发送", self.send_circle))
+        layout.addLayout(row)
+
+        self.view_arc_time = QLineEdit("8000")
+        row = QHBoxLayout()
+        row.addWidget(QLabel("三视图弧线"))
+        row.addWidget(self.view_arc_time)
+        row.addWidget(QLabel("ms"))
+        row.addWidget(self._button("一键三视图弧线", self.start_view_arc_demo))
+        row.addWidget(self._button("停止弧线", self.stop_view_arc_demo))
         layout.addLayout(row)
 
         self.custom_cmd = QLineEdit()
@@ -1601,6 +1626,7 @@ class QtUpperConsole(QMainWindow):
             channel.open(port, int(self.baud_edit.text()))
             self._set_status(key, f"已打开 {port}")
             if channel is self.arm:
+                self.arm_rx_buffer.clear()
                 self._clear_arm_runtime_status()
             elif channel is self.jetson:
                 self._clear_target_runtime_status(clear_target=True)
@@ -1621,6 +1647,10 @@ class QtUpperConsole(QMainWindow):
             self.stop_periodic_vision()
             self.stop_heartbeat()
             self.stop_safe_distance()
+        elif channel is self.arm:
+            if self.view_arc_thread is not None and self.view_arc_thread.is_alive():
+                self.stop_view_arc_demo()
+            self.arm_rx_buffer.clear()
         channel.close()
         self._set_status("ARM_PORT" if channel is self.arm else "JETSON_PORT", "已关闭")
         if channel is self.arm:
@@ -1656,6 +1686,129 @@ class QtUpperConsole(QMainWindow):
 
     def send_circle(self) -> None:
         self.send_arm_command(f"circle {self.circle_time.text()} {self.circle_radius.text()}")
+
+    def _clear_arm_events(self, names: tuple[str, ...]) -> None:
+        for name in names:
+            self.arm_events[name].clear()
+
+    def _wait_arm_event(
+        self,
+        success_name: str,
+        failure_names: tuple[str, ...],
+        timeout_s: float,
+    ) -> str:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            if self.view_arc_stop.is_set():
+                return "stopped"
+            if self.arm_events[success_name].is_set():
+                return "ok"
+            for name in failure_names:
+                if self.arm_events[name].is_set():
+                    return name.lower()
+            time.sleep(0.05)
+        return "timeout"
+
+    def _run_view_arc_stage(
+        self,
+        command: str,
+        success_name: str,
+        failure_names: tuple[str, ...],
+        timeout_s: float,
+        prompt: str,
+    ) -> bool:
+        names = (success_name,) + failure_names
+        self._clear_arm_events(names)
+        self.emit_log("VIEW_ARC", "STAGE", prompt)
+        self.send_arm_command(command)
+        result = self._wait_arm_event(success_name, failure_names, timeout_s)
+        if result == "ok":
+            return True
+        self.emit_log(
+            "VIEW_ARC",
+            "ERROR",
+            f"{prompt}未完成，结果={result}，已终止后续动作。",
+        )
+        return False
+
+    def _view_arc_demo_loop(self, duration_ms: int) -> bool:
+        if not self._run_view_arc_stage(
+            "soft_reset",
+            "SOFT_RESET_PASS",
+            ("SOFT_RESET_FAIL", "MOTION_ABORTED"),
+            50.0,
+            "正在回 HOME",
+        ):
+            return False
+        if not self._run_view_arc_stage(
+            "auto 0 -130 -15",
+            "AUTO_FINISHED",
+            ("AUTO_FAILED", "MOTION_ABORTED"),
+            30.0,
+            "正在前往三视图公共位",
+        ):
+            return False
+        if not self._run_view_arc_stage(
+            f"view_arc {duration_ms}",
+            "VIEW_ARC_FINISHED",
+            ("VIEW_ARC_FAILED", "MOTION_ABORTED"),
+            duration_ms / 1000.0 + 15.0,
+            "正在平滑经过左、正、右视图",
+        ):
+            return False
+        self.emit_log(
+            "VIEW_ARC",
+            "INFO",
+            "三视图弧线完成，机械臂保持右视图；下一次 AUTO 前请先执行 soft_reset。",
+        )
+        return True
+
+    def _view_arc_demo_thread_main(self, duration_ms: int) -> None:
+        completed = False
+        try:
+            completed = self._view_arc_demo_loop(duration_ms)
+        finally:
+            if not completed and not self.view_arc_stop.is_set():
+                self.send_arm_command("motion_abort")
+                self.send_arm_command("laser_off")
+                self.emit_log("VIEW_ARC", "SAFETY", "弧线流程异常，已锁存停止并关闭激光。")
+            self.view_arc_stop.set()
+            self._release_automatic_demo("view_arc")
+
+    def start_view_arc_demo(self) -> None:
+        if not self.arm.is_open():
+            self.emit_log("VIEW_ARC", "ERROR", "ARM串口未打开，无法启动三视图弧线。")
+            return
+        try:
+            duration_ms = int(self.view_arc_time.text())
+        except ValueError:
+            self.emit_log("VIEW_ARC", "ERROR", "弧线时间必须是 4000～8000 ms 的整数。")
+            return
+        if not 4000 <= duration_ms <= 8000:
+            self.emit_log("VIEW_ARC", "ERROR", "弧线时间必须在 4000～8000 ms。")
+            return
+        if self.formal_workflow_active:
+            self.emit_log("VIEW_ARC", "WARN", "比赛全流程运行中，不能启动独立弧线演示。")
+            return
+        if not self._acquire_automatic_demo("view_arc"):
+            self.emit_log("VIEW_ARC", "WARN", "另一个自动演示正在运行，不能启动三视图弧线。")
+            return
+
+        self.view_arc_stop.clear()
+        self._clear_arm_events(tuple(self.arm_events))
+        self.view_arc_thread = threading.Thread(
+            target=self._view_arc_demo_thread_main,
+            args=(duration_ms,),
+            daemon=True,
+        )
+        self.view_arc_thread.start()
+        self.emit_log("VIEW_ARC", "INFO", f"一键三视图弧线已启动，轨迹时间 {duration_ms} ms。")
+
+    def stop_view_arc_demo(self) -> None:
+        self.view_arc_stop.set()
+        self.send_arm_command("motion_abort")
+        self.send_arm_command("laser_off")
+        self.emit_log("VIEW_ARC", "SAFETY", "已请求停止弧线并关闭激光；恢复运动前必须 soft_reset。")
 
     def send_history_command(self) -> None:
         self.send_arm_command(self.arm_history.currentText())
@@ -1959,18 +2112,24 @@ class QtUpperConsole(QMainWindow):
         self.stop_periodic_vision()
         self.stop_heartbeat()
         self.stop_safe_distance()
+        self.view_arc_stop.set()
+        self.send_arm_command("motion_abort")
         self.send_arm_command("target_disable")
         self.send_arm_command("laser_off")
-        self.emit_log("APP", "SAFETY", "已停止视觉发送，并发送 target_disable / laser_off")
+        self.emit_log("APP", "SAFETY", "已锁存停止运动、停止视觉发送，并关闭定靶和激光")
 
     def on_serial_data(self, source: str, data: bytes) -> None:
         if source == "ARM":
-            text = data.decode("utf-8", errors="replace")
-            for line in text.replace("\r", "\n").split("\n"):
-                line = line.strip()
+            self.arm_rx_buffer.extend(data)
+            normalized = bytes(self.arm_rx_buffer).replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+            parts = normalized.split(b"\n")
+            self.arm_rx_buffer = bytearray(parts.pop())
+            for raw_line in parts:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if line:
+                    self._update_arm_status(line)
                 if line and should_display_arm_line(line):
                     self.emit_log("ARM", "RX", line)
-                    self._update_arm_status(line)
         else:
             self.emit_log("JETSON", "RX", bytes_to_hex(data))
             self.jetson_rx_buffer.extend(data)
@@ -1995,9 +2154,28 @@ class QtUpperConsole(QMainWindow):
     def _update_arm_status(self, line: str) -> None:
         lower = line.lower()
         if "soft reset final verify pass" in lower:
+            self.arm_events["SOFT_RESET_PASS"].set()
             self._set_status("POSE_VALID", "YES")
+        elif "soft reset final verify fail" in lower or "soft reset failed" in lower:
+            self.arm_events["SOFT_RESET_FAIL"].set()
+            self._set_status("POSE_VALID", "NO")
         elif "pose invalid" in lower or "final fail" in lower:
             self._set_status("POSE_VALID", "NO")
+        if "[auto] finished" in lower:
+            self.arm_events["AUTO_FINISHED"].set()
+        if (
+            "reject auto" in lower
+            or "[auto] failed" in lower
+            or "robot_auto_move_interpolation robot kinematics inverse failed" in lower
+            or "scurve path generation failed" in lower
+        ):
+            self.arm_events["AUTO_FAILED"].set()
+        if "[view_arc] finished" in lower:
+            self.arm_events["VIEW_ARC_FINISHED"].set()
+        if "[view_arc] failed" in lower or "reject view_arc" in lower:
+            self.arm_events["VIEW_ARC_FAILED"].set()
+        if "motion_abort latched" in lower or "pid run aborted by safety request" in lower:
+            self.arm_events["MOTION_ABORTED"].set()
         if "state=confirm" in lower:
             self._set_status("CONFIRMING", "YES", "yellow")
         elif "state=output" in lower or "state=done" in lower or "state=recover" in lower:
@@ -2152,6 +2330,8 @@ class QtUpperConsole(QMainWindow):
             self._stop_formal_vision()
             self._send_formal_abort_best_effort()
         self.demo_stop.set()
+        if self.view_arc_thread is not None and self.view_arc_thread.is_alive():
+            self.stop_view_arc_demo()
         self.stop_periodic_vision()
         self.stop_heartbeat()
         self.stop_safe_distance()
