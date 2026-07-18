@@ -112,6 +112,7 @@ bool jetson_is_link_alive(uint32_t now_ms);
 bool jetson_send_status(uint8_t seq, uint8_t event, uint8_t value, uint8_t error_code);
 bool jetson_send_error(uint8_t seq, uint8_t error_code);
 bool jetson_send_status_u8(uint8_t func, uint8_t value);
+void jetson_notify_rx_char_from_isr(uint8_t byte);
 void jetson_notify_tx_complete_from_isr(void);
 
 #ifdef __cplusplus

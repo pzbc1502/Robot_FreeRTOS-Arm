@@ -10,7 +10,8 @@
 #include "task.h"
 #include <string.h>
 
-#define WORKFLOW_COMMAND_CACHE_SIZE (8u)
+#define WORKFLOW_COMMAND_CACHE_SIZE   (8u)
+#define WORKFLOW_COMMAND_CACHE_TTL_MS (3000u)
 
 typedef enum
 {
@@ -28,6 +29,7 @@ typedef struct
     uint8_t len;
     uint8_t payload[2];
     uint32_t age;
+    uint32_t received_ms;
     bool ack_valid;
     uint8_t ack_value;
     uint8_t ack_error;
@@ -44,6 +46,7 @@ typedef struct
     uint8_t capture_next_point;
     uint8_t capture_done_mask;
     uint8_t safe_sample_count;
+    uint8_t safe_sample_seqs[ROBOT_WORKFLOW_SAFE_STABLE_COUNT];
     uint8_t retreat_steps;
     uint8_t workflow_seq;
     uint8_t target_seq;
@@ -100,6 +103,24 @@ static void workflow_update_target_indicators(void)
 
     BSP_TargetReadyLed_Set(ready);
     BSP_TargetOutputLed_Set(output);
+}
+
+static void workflow_clear_safe_samples(void)
+{
+    s_workflow.safe_sample_count = 0u;
+    memset(s_workflow.safe_sample_seqs, 0, sizeof(s_workflow.safe_sample_seqs));
+}
+
+static bool workflow_safe_seq_seen(uint8_t seq)
+{
+    for (uint8_t i = 0u; i < s_workflow.safe_sample_count; i++)
+    {
+        if (s_workflow.safe_sample_seqs[i] == seq)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void workflow_enter(workflow_state_t state, uint32_t now_ms)
@@ -177,9 +198,16 @@ static void command_replay(const command_cache_entry_t *entry)
 
 static command_cache_entry_t *command_prepare(uint8_t type, uint8_t seq,
                                                const uint8_t *payload, uint8_t len,
-                                               command_prepare_result_t *result)
+                                               command_prepare_result_t *result,
+                                               uint32_t now_ms)
 {
     command_cache_entry_t *entry = command_find(type, seq);
+    if ((entry != NULL) &&
+        ((uint32_t)(now_ms - entry->received_ms) > WORKFLOW_COMMAND_CACHE_TTL_MS))
+    {
+        memset(entry, 0, sizeof(*entry));
+        entry = NULL;
+    }
     if (entry != NULL)
     {
         if (command_payload_equal(entry, payload, len))
@@ -224,6 +252,7 @@ static command_cache_entry_t *command_prepare(uint8_t type, uint8_t seq,
         memcpy(entry->payload, payload, len);
     }
     entry->age = ++s_command_cache_age;
+    entry->received_ms = now_ms;
     *result = COMMAND_NEW;
     return entry;
 }
@@ -289,7 +318,7 @@ static void workflow_clear_round(void)
     s_workflow.selected_view_id = 0u;
     s_workflow.capture_next_point = 1u;
     s_workflow.capture_done_mask = 0u;
-    s_workflow.safe_sample_count = 0u;
+    workflow_clear_safe_samples();
     s_workflow.retreat_steps = 0u;
     s_workflow.retreat_phase = RETREAT_PHASE_IDLE;
     s_workflow.target_enabled = false;
@@ -450,7 +479,7 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
     command_cache_entry_t *entry = command_prepare(JETSON_MSG_WORKFLOW_CTRL,
                                                     obs->workflow_seq,
                                                     payload, sizeof(payload),
-                                                    &prepare);
+                                                    &prepare, obs->now_ms);
     if (prepare != COMMAND_NEW)
     {
         return;
@@ -554,7 +583,7 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
     command_cache_entry_t *entry = command_prepare(JETSON_MSG_TARGET_CTRL,
                                                     obs->target_seq,
                                                     payload, sizeof(payload),
-                                                    &prepare);
+                                                    &prepare, obs->now_ms);
     if (prepare != COMMAND_NEW)
     {
         return false;
@@ -626,7 +655,7 @@ static void workflow_handle_capture_command(const robot_workflow_obs_t *obs)
     command_cache_entry_t *entry = command_prepare(JETSON_MSG_CAPTURE_CTRL,
                                                     obs->capture_seq,
                                                     payload, sizeof(payload),
-                                                    &prepare);
+                                                    &prepare, obs->now_ms);
     if (prepare != COMMAND_NEW)
     {
         return;
@@ -796,7 +825,7 @@ static void workflow_handle_reset_and_motion_results(uint32_t now_ms)
         robot_auto_result_t result = robot_auto_result_consume();
         if (result == ROBOT_AUTO_RESULT_OK)
         {
-            s_workflow.safe_sample_count = 0u;
+            workflow_clear_safe_samples();
             workflow_enter(FLOW_WAIT_SAFE_DISTANCE, now_ms);
             workflow_status(JETSON_WORKFLOW_MEASURE_POSITION_READY,
                             JETSON_ERROR_NONE);
@@ -822,20 +851,46 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
         return;
     }
 
+    if (obs->distance_seq == 0u)
+    {
+        workflow_clear_safe_samples();
+        LOG("[SAFE] zero seq rejected\r\n");
+        (void)jetson_send_error(0u, JETSON_ERROR_INVALID_PARAM);
+        return;
+    }
+
     if (s_workflow.state == FLOW_WAIT_SAFE_DISTANCE)
     {
         if (!obs->distance_valid)
         {
-            s_workflow.safe_sample_count = 0u;
+            workflow_clear_safe_samples();
+            LOG("[SAFE] seq=%u invalid, streak cleared\r\n",
+                (unsigned)obs->distance_seq);
             return;
         }
 
         if (obs->distance_mm >= ROBOT_WORKFLOW_SAFE_DISTANCE_MM)
         {
+            if (workflow_safe_seq_seen(obs->distance_seq))
+            {
+                LOG("[SAFE] duplicate seq=%u ignored streak=%u\r\n",
+                    (unsigned)obs->distance_seq,
+                    (unsigned)s_workflow.safe_sample_count);
+                return;
+            }
+
             if (s_workflow.safe_sample_count < ROBOT_WORKFLOW_SAFE_STABLE_COUNT)
             {
+                s_workflow.safe_sample_seqs[s_workflow.safe_sample_count] =
+                    obs->distance_seq;
                 s_workflow.safe_sample_count++;
             }
+            LOG("[SAFE] seq=%u mm=%u streak=%u/%u\r\n",
+                (unsigned)obs->distance_seq,
+                (unsigned)obs->distance_mm,
+                (unsigned)s_workflow.safe_sample_count,
+                (unsigned)ROBOT_WORKFLOW_SAFE_STABLE_COUNT);
+
             if (s_workflow.safe_sample_count >= ROBOT_WORKFLOW_SAFE_STABLE_COUNT)
             {
                 s_workflow.distance_safe_latched = true;
@@ -849,7 +904,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
             return;
         }
 
-        s_workflow.safe_sample_count = 0u;
+        workflow_clear_safe_samples();
         s_workflow.distance_safe_latched = false;
         (void)jetson_send_status(obs->distance_seq,
                                  RA6_TO_JETSON_SAFE_DISTANCE, 0u,
@@ -869,6 +924,8 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
     }
     if (!obs->distance_valid)
     {
+        LOG("[SAFE] retreat measurement seq=%u invalid\r\n",
+            (unsigned)obs->distance_seq);
         return;
     }
 
@@ -880,18 +937,23 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
         s_workflow.retreat_phase = RETREAT_PHASE_DONE;
         workflow_status(JETSON_WORKFLOW_RETREAT_DONE_WAIT_RESTART,
                         JETSON_ERROR_NONE);
+        LOG("[SAFE] retreat complete steps=%u mm=%u, wait restart\r\n",
+            (unsigned)s_workflow.retreat_steps,
+            (unsigned)obs->distance_mm);
         return;
     }
 
     (void)jetson_send_status(obs->distance_seq,
                              RA6_TO_JETSON_SAFE_DISTANCE, 0u,
                              JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE);
+    LOG("[SAFE] retreat still close step=%u mm=%u\r\n",
+        (unsigned)s_workflow.retreat_steps,
+        (unsigned)obs->distance_mm);
     if (!workflow_begin_retreat_step(obs->now_ms))
     {
         workflow_fault(JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE, obs->now_ms);
     }
 }
-
 static void workflow_handle_retreat_motion(uint32_t now_ms)
 {
     if ((s_workflow.state != FLOW_RETREAT_WAIT_RESTART) ||
@@ -988,7 +1050,7 @@ static void workflow_reject_pending_commands(const robot_workflow_obs_t *obs,
     {
         uint8_t payload[1] = {obs->workflow_action};
         entry = command_prepare(JETSON_MSG_WORKFLOW_CTRL, obs->workflow_seq,
-                                payload, sizeof(payload), &prepare);
+                                payload, sizeof(payload), &prepare, obs->now_ms);
         if (prepare == COMMAND_NEW)
         {
             command_ack(entry, false, error_code);
@@ -999,7 +1061,7 @@ static void workflow_reject_pending_commands(const robot_workflow_obs_t *obs,
         uint8_t payload[1] = {obs->target_value};
         prepare = COMMAND_NEW;
         entry = command_prepare(JETSON_MSG_TARGET_CTRL, obs->target_seq,
-                                payload, sizeof(payload), &prepare);
+                                payload, sizeof(payload), &prepare, obs->now_ms);
         if (prepare == COMMAND_NEW)
         {
             command_ack(entry, false, error_code);
@@ -1010,7 +1072,7 @@ static void workflow_reject_pending_commands(const robot_workflow_obs_t *obs,
         uint8_t payload[2] = {obs->capture_action, obs->capture_point_id};
         prepare = COMMAND_NEW;
         entry = command_prepare(JETSON_MSG_CAPTURE_CTRL, obs->capture_seq,
-                                payload, sizeof(payload), &prepare);
+                                payload, sizeof(payload), &prepare, obs->now_ms);
         if (prepare == COMMAND_NEW)
         {
             command_ack(entry, false, error_code);

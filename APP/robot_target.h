@@ -28,27 +28,21 @@ extern "C" {
 #endif
 
 //视觉伺服参数
-#define TARGET_VS_KX_MM_S_PER_PX     (0.35f)
-#define TARGET_VS_KZ_MM_S_PER_PX     (0.35f)
-#define TARGET_VS_MAX_SPEED_MM_S     (8.0f)
-#define TARGET_VS_FINE_MAX_SPEED_MM_S (3.0f)
-#define TARGET_VS_CMD_TIMEOUT_MS     (250u)
-#define TARGET_SAFE_DISTANCE_MM          (100u)
-#define TARGET_SAFE_DISTANCE_RELEASE_MM  (110u)
-#define TARGET_SAFE_DISTANCE_VALID_MS    (500u)
-#define TARGET_SAFE_RETREAT_SPEED_MM_S   (6.0f)
-
-
+#define TARGET_VS_KX_MM_S_PER_PX      (0.09f)
+#define TARGET_VS_KZ_MM_S_PER_PX      (-0.09f)
+#define TARGET_VS_MAX_SPEED_MM_S      (2.0f)
+#define TARGET_VS_FINE_MAX_SPEED_MM_S (0.5f)
+#define TARGET_VS_CMD_TIMEOUT_MS      (350u)
 
 //末端auto修正参数
 #define TARGET_KX_MM_PER_PX          (0.38f)    /* 视觉 dcx 到机械臂 X 小步修正的比例，单位 mm/px */
 #define TARGET_KY_MM_PER_PX          (0.35f)     /* 视觉 dcy 到机械臂 Z 小步修正的比例，单位 mm/px */
 #define TARGET_MAX_STEP_MM           (2.5f)      /* 单次视觉对准最大修正步长，单位 mm */
-#define TARGET_ALIGN_TOL_PX_COARSE   (15.0f)     /* 粗/精定位切换阈值，单位 px */
+#define TARGET_ALIGN_TOL_PX_COARSE   (30.0f)     /* 粗/精定位切换阈值，单位 px */
 #define TARGET_MAX_STEP_MM_FINE      (0.8f)      /* 精定位阶段单次最大修正步长，单位 mm */
-#define TARGET_ALIGN_TOL_PX          (5.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
+#define TARGET_ALIGN_TOL_PX          (12.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
 #define TARGET_ALIGN_STABLE_COUNT    (3u)        /* 连续满足对准阈值的帧数，达到后进入确认状态 */  
-#define TARGET_CONFIRM_STABLE_COUNT  (4u)        /* 输出前二次确认所需连续新视觉帧数 */
+#define TARGET_CONFIRM_STABLE_COUNT  (2u)        /* 输出前二次确认所需连续新视觉帧数，3+2 共 5 帧 */
 #define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */
 #define TARGET_VISION_VALID_MS       (500u)      /* 视觉数据有效期，超时后退出对准/输出 */
 #define TARGET_PRE_POSITION_TIMEOUT_MS (8000u)    /* 预定位最长等待时间，超时进入恢复 */

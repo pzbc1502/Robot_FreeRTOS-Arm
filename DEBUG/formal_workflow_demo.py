@@ -3,6 +3,7 @@ import datetime as dt
 from dataclasses import dataclass
 import pathlib
 import queue
+import secrets
 import struct
 import sys
 import threading
@@ -145,7 +146,7 @@ class Logger:
 
 class SequenceCounter:
     def __init__(self):
-        self.value = 1
+        self.value = secrets.randbelow(0xFF) + 1
         self.lock = threading.Lock()
 
     def next(self):
@@ -473,7 +474,7 @@ def parse_args():
     parser.add_argument("--debug-dir", type=pathlib.Path,
                         default=pathlib.Path(__file__).resolve().parent)
     parser.add_argument("--view-id", type=int, choices=(1, 2, 3), default=2)
-    parser.add_argument("--safe-distance-mm", type=int, default=120)
+    parser.add_argument("--safe-distance-mm", type=int, default=160)
     parser.add_argument("--heartbeat-period", type=float, default=0.2)
     parser.add_argument("--telemetry-period", type=float, default=0.2)
     parser.add_argument("--vision-sequence", default=DEFAULT_VISION_SEQUENCE)
@@ -486,7 +487,10 @@ def parse_args():
     parser.add_argument("--output-off-timeout", type=float, default=12.0)
     parser.add_argument("--auto-advance", action="store_true")
     parser.add_argument("--skip-final-reset", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not 150 <= args.safe_distance_mm <= 65535:
+        parser.error("--safe-distance-mm must be at least the firmware threshold of 150 mm")
+    return args
 
 
 def main():

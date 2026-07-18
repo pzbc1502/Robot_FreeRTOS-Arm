@@ -142,7 +142,7 @@ void robot_jetson_callback(uart_callback_args_t * p_args)
     switch (p_args->event)
     {
         case UART_EVENT_RX_CHAR:
-            /* Jetson RX uses DTC buffer polling in jetson_vision_process(). */
+            jetson_notify_rx_char_from_isr((uint8_t)p_args->data);
             break;
 
         case UART_EVENT_TX_COMPLETE:

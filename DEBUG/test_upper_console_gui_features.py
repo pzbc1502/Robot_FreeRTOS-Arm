@@ -166,7 +166,7 @@ def test_formal_workflow_controls_are_visible_with_safe_defaults() -> None:
         assert "开始一键比赛全流程" in texts
         assert "终止并保持" in texts
         assert window.workflow_view.currentData() == 2
-        assert window.workflow_safe_distance.text() == "120"
+        assert window.workflow_safe_distance.text() == "160"
         assert window.workflow_vision_sequence.text() == "20,-15:2;8,-6:2;0,0:0"
         assert window.workflow_stage.text() == "未运行"
     finally:
@@ -480,7 +480,7 @@ def test_formal_workflow_rejects_simulated_distance_below_firmware_threshold() -
         window.start_formal_workflow_demo()
         window._flush_logs()
 
-        assert "安全距离不得低于固件阈值 100 mm" in window.log_text.toPlainText()
+        assert "安全距离不得低于固件阈值 150 mm" in window.log_text.toPlainText()
     finally:
         window.close()
 

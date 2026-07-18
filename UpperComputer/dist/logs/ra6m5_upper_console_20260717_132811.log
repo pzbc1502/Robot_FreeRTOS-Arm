@@ -1,0 +1,10 @@
+[13:28:11.432] [APP-INFO] 已刷新串口: COM16, COM22, COM21, COM11
+[13:28:11.432] [APP-INFO] log file: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\dist\logs\ra6m5_upper_console_20260717_132811.log
+[13:28:18.138] [APP-INFO] 已刷新串口: COM16, COM22, COM21, COM11
+[13:28:18.327] [APP-INFO] 已刷新串口: COM16, COM22, COM21, COM11
+[13:28:18.792] [APP-INFO] 已刷新串口: COM16, COM22, COM21, COM11
+[13:28:21.155] [ARM-INFO] opened COM16 @ 115200
+[13:37:18.487] [ARM-INFO] 已关闭串口
+[13:37:19.494] [JETSON-INFO] 已停止周期视觉发送
+[13:37:19.494] [JETSON-INFO] heartbeat stopped
+[13:37:19.495] [JETSON-INFO] safe distance stopped

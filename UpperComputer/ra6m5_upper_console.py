@@ -37,7 +37,7 @@ SETTINGS_ORG = "RA6M5Robot"
 SETTINGS_APP = "UpperConsole"
 DEFAULT_DEMO_SEQUENCE = "30,-20:5;15,-10:5;8,-5:5;0,0:0"
 DEFAULT_DEMO_PERIOD_MS = "200"
-DEFAULT_WORKFLOW_SAFE_DISTANCE_MM = "120"
+DEFAULT_WORKFLOW_SAFE_DISTANCE_MM = "160"
 DEFAULT_WORKFLOW_VISION_SEQUENCE = "20,-15:2;8,-6:2;0,0:0"
 DEFAULT_SAFE_DISTANCE_SEQUENCE = "130:8;85:12;115:8"
 DEFAULT_CAPTURE_RECIPES = {
@@ -899,7 +899,7 @@ class QtUpperConsole(QMainWindow):
         self.safe_distance_enable = QCheckBox("安全距离保持")
         self.safe_distance_enable.setChecked(self._settings_bool("jetson/safe_distance_enable", False))
         self.safe_distance_enable.toggled.connect(self.on_safe_distance_toggled)
-        self.safe_distance_mm = QLineEdit(self._settings_text("jetson/safe_distance_mm", "120"))
+        self.safe_distance_mm = QLineEdit(self._settings_text("jetson/safe_distance_mm", "160"))
         self.safe_distance_valid = QCheckBox("有效")
         self.safe_distance_valid.setChecked(self._settings_bool("jetson/safe_distance_valid", True))
 
@@ -1193,8 +1193,8 @@ class QtUpperConsole(QMainWindow):
             return
         try:
             safe_distance_mm = int(self.workflow_safe_distance.text())
-            if not 100 <= safe_distance_mm <= 65535:
-                raise ValueError("安全距离不得低于固件阈值 100 mm")
+            if not 150 <= safe_distance_mm <= 65535:
+                raise ValueError("安全距离不得低于固件阈值 150 mm")
             view_id = int(self.workflow_view.currentData())
             if view_id not in (1, 2, 3):
                 raise ValueError("请选择左、正或右视图")

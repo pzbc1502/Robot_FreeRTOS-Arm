@@ -1,0 +1,12 @@
+[17:03:21.537] [APP-INFO] 已刷新串口: COM16, COM22, COM21, COM17
+[17:03:21.537] [APP-INFO] log file: logs\ra6m5_upper_console_20260717_170321.log
+[17:03:21.543] [ARM-ERROR] ARM串口未打开，命令未发送: soft_reset
+[17:03:21.545] [JETSON-INFO] 已停止周期视觉发送
+[17:03:21.545] [JETSON-INFO] heartbeat stopped
+[17:03:21.545] [JETSON-INFO] safe distance stopped
+[17:03:21.870] [APP-INFO] 已刷新串口: COM16, COM22, COM21, COM17
+[17:03:21.870] [APP-INFO] log file: logs\ra6m5_upper_console_20260717_170321.log
+[17:03:21.875] [ARM-ERROR] ARM串口未打开，命令未发送: soft_reset
+[17:03:21.878] [JETSON-INFO] 已停止周期视觉发送
+[17:03:21.880] [JETSON-INFO] heartbeat stopped
+[17:03:21.880] [JETSON-INFO] safe distance stopped

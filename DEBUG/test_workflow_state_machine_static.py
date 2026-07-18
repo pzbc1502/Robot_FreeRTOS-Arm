@@ -117,10 +117,50 @@ def test_vision_thread_has_one_business_dispatcher() -> None:
     assert "robot_target_step" not in service, "vision thread must not dispatch target directly"
 
 
+def test_competition_safety_parameters_are_final() -> None:
+    workflow_h = read("APP/robot_workflow.h")
+    target_h = read("APP/robot_target.h")
+
+    require(workflow_h, "ROBOT_WORKFLOW_SAFE_DISTANCE_MM       (150u)",
+            "150 mm safety threshold")
+    require(workflow_h, "ROBOT_WORKFLOW_RETREAT_STEP_MM        (20.0f)",
+            "20 mm retreat step")
+    require(workflow_h, "ROBOT_WORKFLOW_RETREAT_MAX_STEPS      (5u)",
+            "five-step retreat limit")
+    require(target_h, "TARGET_CONFIRM_STABLE_COUNT  (2u)",
+            "two-frame secondary alignment confirmation")
+
+
+def test_jetson_rx_uses_gapless_ring_buffer() -> None:
+    vision_h = read("Middle/jetson_vision.h")
+    vision_c = read("Middle/jetson_vision.c")
+    uart_c = read("USER_BSP/bsp_uart.c")
+
+    require(vision_h, "jetson_notify_rx_char_from_isr", "RX ISR byte API")
+    require(vision_c, "JETSON_RX_RING_SIZE", "Jetson RX ring")
+    require(vision_c, "parser_resync", "parser resynchronization helper")
+    require(uart_c, "jetson_notify_rx_char_from_isr((uint8_t)p_args->data)",
+            "RX_CHAR forwarding")
+    assert "R_SCI_UART_Read" not in vision_c, "Jetson RX must not rearm a finite DTC read"
+    assert "JETSON_TRANSFER_INSTANCE" not in vision_c, "Jetson RX must not poll DTC position"
+
+
+def test_safe_distance_and_command_seq_guards_exist() -> None:
+    workflow_c = read("APP/robot_workflow.c")
+
+    require(workflow_c, "WORKFLOW_COMMAND_CACHE_TTL_MS", "command cache TTL")
+    require(workflow_c, "safe_sample_seqs", "all safe-sample SEQs")
+    require(workflow_c, "workflow_safe_seq_seen", "safe SEQ duplicate check")
+    require(workflow_c, "obs->distance_seq == 0u", "zero SAFE SEQ rejection")
+
+
 if __name__ == "__main__":
     test_motion_abort_is_latched_and_generation_guarded()
     test_formal_protocol_has_workflow_seq_and_explicit_status()
     test_top_level_workflow_owns_competition_flow()
     test_capture_and_target_are_substate_executors()
     test_vision_thread_has_one_business_dispatcher()
+    test_competition_safety_parameters_are_final()
+    test_jetson_rx_uses_gapless_ring_buffer()
+    test_safe_distance_and_command_seq_guards_exist()
     print("workflow state-machine static checks passed")

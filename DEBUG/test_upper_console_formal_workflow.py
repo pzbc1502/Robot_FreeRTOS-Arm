@@ -76,7 +76,7 @@ def test_formal_workflow_runner_uses_strict_competition_sequence() -> None:
     )
     config = FormalWorkflowConfig(
         view_id=2,
-        safe_distance_mm=120,
+        safe_distance_mm=160,
         vision_steps=((20, -15, 2.0), (8, -6, 2.0), (0, 0, 0.0)),
     )
 
@@ -93,7 +93,7 @@ def test_formal_workflow_runner_uses_strict_competition_sequence() -> None:
         (JETSON_MSG_TARGET_CTRL, b"\x01"),
         (JETSON_MSG_WORKFLOW_CTRL, bytes([WORKFLOW_FINISH])),
     ]
-    assert distances == [120, 120, 120]
+    assert distances == [160, 160, 160]
     assert pauses.count(0.2) == 3
     assert pauses.count(1.0) == 3
     assert (EVENT_WORKFLOW, WORKFLOW_START_ACCEPTED, 1) in waits
@@ -169,7 +169,7 @@ def test_formal_workflow_runner_honors_stop_request() -> None:
         pause=lambda _seconds: None,
     )
     try:
-        runner.run(FormalWorkflowConfig(2, 120, ((0, 0, 0.0),)))
+        runner.run(FormalWorkflowConfig(2, 160, ((0, 0, 0.0),)))
     except FormalWorkflowStopped:
         pass
     else:
