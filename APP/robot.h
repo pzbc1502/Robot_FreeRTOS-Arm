@@ -69,7 +69,7 @@ extern "C" {
 #define ROBOT_INTERPOLATION_TIME_RESOLUTION (10)    /* 插补时间分辨率，单位 ms（与控制周期对齐，S曲线每点=1个控制周期） */
 /* S 曲线速度规划参数（参考 MechanicalArm_Code_V4） */
 #define SCURVE_VMAX     (180.0f)                              /* 最大速度 mm/s */
-#define SCURVE_AMAX     (300.0f)                              /* 最大加速度 mm/s² */
+#define SCURVE_AMAX     (250.0f)                              /* 最大加速度 mm/s² */
 #define SCURVE_OMEGA    (2.0f * SCURVE_AMAX / SCURVE_VMAX)   /* 角频率 rad/s ≈ 3.333 */
 #define SCURVE_T_ACCEL  (3.14159265f / SCURVE_OMEGA)          /* 加速段时长 s ≈ 0.9425 */
 #define SCURVE_S_ACCEL  (SCURVE_VMAX * SCURVE_T_ACCEL / 2.0f)/* 加速段位移 mm ≈ 141.76 */
