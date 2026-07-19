@@ -4523,3 +4523,5 @@
 [10:41:56.772] [ARM-RX] [JETSON_UART] rx_bytes=5853 frames_ok=484 crc_fail=0 overflow=0 tx_ok=26 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=235
 [10:41:57.772] [ARM-RX] [JETSON_UART] rx_bytes=5853 frames_ok=484 crc_fail=0 overflow=0 tx_ok=26 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=235
 [10:41:58.770] [ARM-RX] [JETSON_UART] rx_bytes=5853 frames_ok=484 crc_fail=0 overflow=0 tx_ok=26 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=235
+[10:41:59.771] [ARM-RX] [JETSON_UART] rx_bytes=5853 frames_ok=484 crc_fail=0 overflow=0 tx_ok=26 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=235
+[10:42:00.770] [ARM-RX] [JETSON_UART] rx_bytes=5853 frames_ok=484 crc_fail=0 overflow=0 tx_ok=26 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=235
