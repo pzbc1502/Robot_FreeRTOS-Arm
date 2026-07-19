@@ -1,0 +1,457 @@
+*** Using Compiler 'V6.24', folder: 'C:\Users\Administrator\AppData\Local\Keil_v5\ARM\ARMCLANG\Bin'
+Rebuild target 'Target_1'
+Before Build - User command #1: cmd /c ""E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_launcher.bat" "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_version.txt" -nosplash --launcher.suppressErrors --generate --compiler ARMv6 --devicefamily ra "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\configuration.xml" 2> "%TEMP%\rasc_stderr.out" && echo. > "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\output.rasc""
+[INFO] Input file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\configuration.xml" is older than output file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\output.rasc". Skipping RASC invocation.
+compiling hal_warmstart.c...
+compiling robot_chassis_app.c...
+compiling chassis.c...
+compiling crc16.c...
+compiling W800_mqtt.c...
+compiling robot_thread_entry.c...
+compiling vision_service_thread_entry.c...
+compiling robot_target.c...
+compiling esp8266.c...
+compiling robot_capture.c...
+compiling gripper.c...
+compiling robot_cmd.c...
+compiling jetson_vision.c...
+compiling robot_kinematics.c...
+MQTT/MqttKit.c(166): warning: comparison of integers of different signs: 'uint32' (aka 'unsigned int') and 'int' [-Wsign-compare]
+  166 |                 if(remain_len < ((uint16)msgPtr[0] << 8 | msgPtr[1]) + 2)
+      |                    ~~~~~~~~~~ ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(210): warning: implicit conversion loses integer precision: 'unsigned int' to 'int16' (aka 'short') [-Wimplicit-int-conversion]
+  210 |         int16 len = 0, devid_len = strlen(devid);
+      |                        ~~~~~~~~~   ^~~~~~~~~~~~~
+MQTT/MqttKit.c(227): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint8' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  227 |                 will_topic_len = strlen(will_topic);
+      |                                ~ ^~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(278): warning: implicit conversion loses integer precision: 'int32' (aka 'int') to 'int16' (aka 'short') [-Wimplicit-int-conversion]
+  278 |         len = MQTT_DumpLength(total_len - 5, mqttPacket->_data + mqttPacket->_len);
+      |             ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(285): warning: implicit conversion changes signedness: 'int16' (aka 'short') to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  285 |                 mqttPacket->_len += len;
+      |                                  ~~ ^~~
+MQTT/MqttKit.c(313): warning: implicit conversion changes signedness: 'int16' (aka 'short') to 'unsigned int' [-Wsign-conversion]
+  313 |         strncat((int8 *)mqttPacket->_data + mqttPacket->_len, devid, devid_len);
+      |         ~~~~~~~                                                      ^~~~~~~~~
+MQTT/MqttKit.c(314): warning: implicit conversion changes signedness: 'int16' (aka 'short') to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  314 |         mqttPacket->_len += devid_len;
+      |                          ~~ ^~~~~~~~~
+MQTT/MqttKit.c(324): warning: implicit conversion loses integer precision: 'unsigned int' to 'unsigned short' [-Wimplicit-int-conversion]
+  324 |                 mLen = strlen(will_topic);
+      |                      ~ ^~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(330): warning: implicit conversion loses integer precision: 'unsigned int' to 'unsigned short' [-Wimplicit-int-conversion]
+  330 |                 mLen = strlen(will_msg);
+      |                      ~ ^~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(340): warning: implicit conversion loses integer precision: 'unsigned int' to 'unsigned short' [-Wimplicit-int-conversion]
+  340 |                 unsigned short user_len = strlen(user);
+      |                                ~~~~~~~~   ^~~~~~~~~~~~
+MQTT/MqttKit.c(351): warning: implicit conversion loses integer precision: 'unsigned int' to 'unsigned short' [-Wimplicit-int-conversion]
+  351 |                 unsigned short psw_len = strlen(password);
+      |                                ~~~~~~~   ^~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(435): warning: implicit conversion changes signedness: 'int' to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  435 |         if(MQTT_PacketPublish(MQTT_PUBLISH_ID, "$dp", NULL, send_len + 3, MQTT_QOS_LEVEL1, 0, 1, mqttPacket) == 0)
+      |            ~~~~~~~~~~~~~~~~~~                               ~~~~~~~~~^~~
+MQTT/MqttKit.c(432): warning: unused parameter 'devid' [-Wunused-parameter]
+  432 | uint1 MQTT_PacketSaveData(const int8 *devid, int16 send_len, int8 *type_bin_head, uint8 type, MQTT_PACKET_STRUCTURE *mqttPacket)
+      |                                       ^
+MQTT/MqttKit.c(432): warning: unused parameter 'type_bin_head' [-Wunused-parameter]
+  432 | uint1 MQTT_PacketSaveData(const int8 *devid, int16 send_len, int8 *type_bin_head, uint8 type, MQTT_PACKET_STRUCTURE *mqttPacket)
+      |                                                                    ^
+MQTT/MqttKit.c(477): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint8' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  477 |         bin_head_len = strlen(bin_head);
+      |                      ~ ^~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(480): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  480 |         payload = (int8 *)MQTT_MallocBuffer(payload_size - file_len);
+      |                           ~~~~~~~~~~~~~~~~~ ~~~~~~~~~~~~~^~~~~~~~~~
+MQTT/MqttKit.c(500): warning: implicit conversion changes signedness: 'int32' (aka 'int') to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  500 |         if(MQTT_PacketPublish(MQTT_PUBLISH_ID, "$dp", payload, payload_size, MQTT_QOS_LEVEL1, 0, 1, mqttPacket) == 0)
+      |            ~~~~~~~~~~~~~~~~~~                                  ^~~~~~~~~~~~
+MQTT/MqttKit.c(544): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  544 |         *req_len = remain_len - 44;                                                     //<C3><FC><C1><U+ECE4><B6><C8> = ʣ<D3><U+0CE4><B6><C8>(remain_len) - 2 - 5($creq) - 1(\) - cmdid<B3><A4><B6><C8>
+      |                  ~ ~~~~~~~~~~~^~~~
+MQTT/MqttKit.c(575): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  575 |         uint16 cmdid_len = strlen(cmdid);
+      |                ~~~~~~~~~   ^~~~~~~~~~~~~
+MQTT/MqttKit.c(576): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  576 |         uint16 req_len = strlen(req);
+      |                ~~~~~~~   ^~~~~~~~~~~
+MQTT/MqttKit.c(576): warning: unused variable 'req_len' [-Wunused-variable]
+  576 |         uint16 req_len = strlen(req);
+      |                ^~~~~~~
+MQTT/MqttKit.c(646): warning: implicit conversion loses integer precision: 'int32' (aka 'int') to 'int16' (aka 'short') [-Wimplicit-int-conversion]
+  646 |         len = MQTT_DumpLength(remain_len, mqttPacket->_data + mqttPacket->_len);
+      |             ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(653): warning: implicit conversion changes signedness: 'int16' (aka 'short') to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  653 |                 mqttPacket->_len += len;
+      |                                  ~~ ^~~
+MQTT/MqttKit.c(756): warning: implicit conversion changes signedness: 'int' to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  756 |         remain_len = 2 + (topics_cnt << 1) + topic_len;
+      |                      ~~^~~~~~~~~~~~~~~~~~~ ~
+MQTT/MqttKit.c(769): warning: implicit conversion loses integer precision: 'int32' (aka 'int') to 'int16' (aka 'short') [-Wimplicit-int-conversion]
+  769 |         len = MQTT_DumpLength(remain_len, mqttPacket->_data + mqttPacket->_len);
+      |             ~ ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(776): warning: implicit conversion changes signedness: 'int16' (aka 'short') to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  776 |                 mqttPacket->_len += len;
+      |                                  ~~ ^~~
+MQTT/MqttKit.c(935): warning: implicit conversion changes signedness: 'int32' (aka 'int') to 'uint32' (aka 'unsigned int') [-Wsign-conversion]
+  935 |                 mqttPacket->_len += len;
+      |                                  ~~ ^~~
+MQTT/MqttKit.c(844): warning: unused parameter 'own' [-Wunused-parameter]
+  844 |                                                 enum MqttQosLevel qos, int32 retain, int32 own,
+      |                                                                                            ^
+MQTT/MqttKit.c(999): warning: implicit conversion loses integer precision: 'int' to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  999 |         *topic_len = (uint16)msgPtr[0] << 8 | msgPtr[1];
+      |                    ~ ~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+MQTT/MqttKit.c(1020): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+ 1020 |                         *payload_len = remain_len - 2 - *topic_len;                     //Ϊpayload<B7><D6><C5><E4><C4>ڴ<E6>
+      |                                      ~ ~~~~~~~~~~~~~~~^~~~~~~~~~~~
+MQTT/MqttKit.c(1039): warning: implicit conversion loses integer precision: 'int' to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+ 1039 |                         *pkt_id = (uint16)msgPtr[*topic_len + 2] << 8 | msgPtr[*topic_len + 3];
+      |                                 ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~
+MQTT/MqttKit.c(1050): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16' (aka 'unsigned short') [-Wimplicit-int-conversion]
+ 1050 |                         *payload_len = remain_len - 4 - *topic_len;
+      |                                      ~ ~~~~~~~~~~~~~~~^~~~~~~~~~~~
+32 warnings generated.
+compiling MqttKit.c...
+compiling robot_workflow.c...
+MQTT/onenet.c(67): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+   67 |                 ESP8266_SendData(mqttPacket._data, mqttPacket._len);                    //上传平台
+      |                 ~~~~~~~~~~~~~~~~                   ~~~~~~~~~~~^~~~
+MQTT/onenet.c(123): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  123 |                 ESP8266_SendData(mqttPacket._data, mqttPacket._len);                                    //向平台发送订阅请求
+      |                 ~~~~~~~~~~~~~~~~                   ~~~~~~~~~~~^~~~
+MQTT/onenet.c(151): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  151 |                 ESP8266_SendData(mqttPacket._data, mqttPacket._len);                                    //向平台发送订阅请求
+      |                 ~~~~~~~~~~~~~~~~                   ~~~~~~~~~~~^~~~
+MQTT/onenet.c(262): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  262 |                                         ESP8266_SendData(mqttPacket._data, mqttPacket._len);
+      |                                         ~~~~~~~~~~~~~~~~                   ~~~~~~~~~~~^~~~
+MQTT/onenet.c(277): warning: implicit conversion loses integer precision: 'uint32' (aka 'unsigned int') to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  277 |                                         ESP8266_SendData(mqttPacket._data, mqttPacket._len);
+      |                                         ~~~~~~~~~~~~~~~~                   ~~~~~~~~~~~^~~~
+5 warnings generated.
+compiling onenet.c...
+compiling bsp_led.c...
+compiling bsp_can.c...
+MQTT/cJSON.c(129): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  129 |         newbuffer=(char*)cJSON_malloc(newsize);
+      |                          ~~~~~~~~~~~~ ^~~~~~~
+MQTT/cJSON.c(131): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  131 |         if (newbuffer) memcpy(newbuffer,p->buffer,p->length);
+      |                        ~~~~~~                     ~~~^~~~~~
+MQTT/cJSON.c(143): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  143 |         return p->offset+strlen(str);
+      |         ~~~~~~ ~~~~~~~~~^~~~~~~~~~~~
+MQTT/cJSON.c(143): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  143 |         return p->offset+strlen(str);
+      |                ~~~^~~~~~~
+MQTT/cJSON.c(151): warning: comparing floating point with == or != is unsafe [-Wfloat-equal]
+  151 |         if (d==0)
+      |             ~^ ~
+MQTT/cJSON.c(199): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  199 |         out=(char*)cJSON_malloc(len+1); /* This is how long we need for the string, roughly. */
+      |                    ~~~~~~~~~~~~ ~~~^~
+MQTT/cJSON.c(235): warning: implicit conversion loses integer precision: 'unsigned int' to 'char' [-Wimplicit-int-conversion]
+  235 |                                                 case 1: *--ptr2 =(uc | firstByteMark[len]);
+      |                                                                 ~ ~~~^~~~~~~~~~~~~~~~~~~~
+MQTT/cJSON.c(261): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  261 |                 else            out=(char*)cJSON_malloc(len+3);
+      |                                            ~~~~~~~~~~~~ ~~~^~
+MQTT/cJSON.c(281): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  281 |         else    out=(char*)cJSON_malloc(len+3);
+      |                            ~~~~~~~~~~~~ ~~~^~
+MQTT/cJSON.c(348): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  348 |         p.buffer=(char*)cJSON_malloc(prebuffer);
+      |                         ~~~~~~~~~~~~ ^~~~~~~~~
+MQTT/cJSON.c(472): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  472 |                 entries=(char**)cJSON_malloc(numentries*sizeof(char*));
+      |                                              ^~~~~~~~~~~
+MQTT/cJSON.c(474): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  474 |                 memset(entries,0,numentries*sizeof(char*));
+      |                                  ^~~~~~~~~~~
+MQTT/cJSON.c(486): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  486 |                 if (!fail)      out=(char*)cJSON_malloc(len);
+      |                                            ~~~~~~~~~~~~ ^~~
+MQTT/cJSON.c(563): warning: operand of ? changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  563 |                 else    out=(char*)cJSON_malloc(fmt?depth+4:3);
+      |                                    ~~~~~~~~~~~~     ~~~~~^~
+MQTT/cJSON.c(611): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  611 |                 entries=(char**)cJSON_malloc(numentries*sizeof(char*));
+      |                                              ^~~~~~~~~~~
+MQTT/cJSON.c(613): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  613 |                 names=(char**)cJSON_malloc(numentries*sizeof(char*));
+      |                                            ^~~~~~~~~~~
+MQTT/cJSON.c(615): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  615 |                 memset(entries,0,sizeof(char*)*numentries);
+      |                                               ~^~~~~~~~~~
+MQTT/cJSON.c(616): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  616 |                 memset(names,0,sizeof(char*)*numentries);
+      |                                             ~^~~~~~~~~~
+MQTT/cJSON.c(624): warning: operand of ? changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  624 |                         if (str && ret) len+=strlen(ret)+strlen(str)+2+(fmt?2+depth:0); else fail=1;
+      |                                                                       ~     ~^~~~~~
+MQTT/cJSON.c(629): warning: implicit conversion changes signedness: 'int' to 'size_t' (aka 'unsigned int') [-Wsign-conversion]
+  629 |                 if (!fail)      out=(char*)cJSON_malloc(len);
+      |                                            ~~~~~~~~~~~~ ^~~
+20 warnings generated.
+compiling cJSON.c...
+compiling bsp_laser.c...
+compiling Emm_V5.c...
+compiling usb_descriptor.c...
+compiling bsp_usb_cdc.c...
+compiling bsp_uart.c...
+USER_BSP/libemqtt.c(67): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+   67 |                 uint8_t offset = *(buf+1+rlb)<<8;       // topic UTF MSB
+      |                         ~~~~~~   ~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(70): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+   70 |                 id = *(buf+offset)<<8;                          // id MSB
+      |                    ~ ~~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(77): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+   77 |             id = *(buf+1+rlb)<<8;       // id MSB
+      |                ~ ~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(105): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  105 |         len = *(buf+1+rlb)<<8;  // MSB of topic UTF
+      |             ~ ~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(136): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  136 |         uint8_t offset = (*(buf+1+rlb))<<8;     // topic UTF MSB
+      |                 ~~~~~~   ~~~~~~~~~~~~~~^~~
+USER_BSP/libemqtt.c(218): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  218 |     clientidlen = strlen(broker->clientid);
+      |                 ~ ^~~~~~~~~~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(219): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  219 |     usernamelen = strlen(broker->username);
+      |                 ~ ^~~~~~~~~~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(220): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  220 |     passwordlen = strlen(broker->password);
+      |                 ~ ^~~~~~~~~~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(238): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  238 |     remainLen = sizeof(var_header)+payload_len;
+      |               ~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(263): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  263 |     packet = (uint8_t*)malloc( fixed_headerLen+sizeof(var_header)+payload_len );
+      |                                ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(269): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  269 |     packetLen = fixed_headerLen+sizeof(var_header)+payload_len ;
+      |               ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(269): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  269 |     packetLen = fixed_headerLen+sizeof(var_header)+payload_len ;
+      |                 ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(270): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  270 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(271): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  271 |     memcpy(packet, fixed_header, fixed_headerLen);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(297): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  297 |     ret = broker->mqttsend(broker->socketid, packet, packetLen);
+      |           ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(316): warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+  316 |     if(broker->mqttsend(broker->socketid, packet, sizeof(packet)) < sizeof(packet)) {
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(330): warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+  330 |     if(broker->mqttsend(broker->socketid, packet, sizeof(packet)) < sizeof(packet)) {
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(348): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  348 |     uint16_t topiclen = strlen(topic);
+      |              ~~~~~~~~   ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(382): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  382 |     memset(var_header, 0, var_headerLen);
+      |     ~~~~~~                ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(401): warning: implicit conversion loses integer precision: 'int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  401 |     remainLen = var_headerLen+msgLen;
+      |               ~ ~~~~~~~~~~~~~^~~~~~~
+USER_BSP/libemqtt.c(409): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  409 |     fixed_header = (uint8_t *)malloc( fixed_headerLen );
+      |                               ~~~~~~  ^~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(424): warning: implicit conversion loses integer precision: 'uint16_t' (aka 'unsigned short') to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  424 |         fixed_header[1] = remainLen;
+      |                         ~ ^~~~~~~~~
+USER_BSP/libemqtt.c(430): warning: implicit conversion loses integer precision: 'int' to 'uint8_t' (aka 'unsigned char') [-Wimplicit-int-conversion]
+  430 |         fixed_header[2] = remainLen / 128;
+      |                         ~ ~~~~~~~~~~^~~~~
+USER_BSP/libemqtt.c(435): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  435 |     uint8_t *packet = malloc(packetLen);
+      |                       ~~~~~~ ^~~~~~~~~
+USER_BSP/libemqtt.c(442): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  442 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(443): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  443 |     memcpy(packet, fixed_header, fixed_headerLen);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(444): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  444 |     memcpy(packet+fixed_headerLen, var_header, var_headerLen);
+      |     ~~~~~~                                     ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(445): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  445 |     memcpy(packet+fixed_headerLen+var_headerLen, msg, msgLen);
+      |     ~~~~~~                                            ^~~~~~
+USER_BSP/libemqtt.c(448): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  448 |     if(broker->mqttsend(broker->socketid, packet, packetLen ) < packetLen) {
+      |        ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(472): warning: comparison of integers of different signs: 'int' and 'unsigned int' [-Wsign-compare]
+  472 |     if(broker->mqttsend(broker->socketid, packet, sizeof(packet)) < sizeof(packet)) {
+      |        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^ ~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(498): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  498 |     uint16_t topiclen = strlen(topic);
+      |              ~~~~~~~~   ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(528): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  528 |     memset(utf_topic, 0, utf_topicLen);
+      |     ~~~~~~               ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(538): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  538 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                        ~~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(538): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  538 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                                                        ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(543): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  543 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |               ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(543): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  543 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                                    ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(543): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  543 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                   ~^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(544): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  544 |     packet = (uint8_t*)malloc( packetLen );
+      |                        ~~~~~~  ^~~~~~~~~
+USER_BSP/libemqtt.c(550): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  550 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(551): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  551 |     memcpy(packet, fixed_header, fixed_header_len);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(553): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  553 |     memcpy(packet+fixed_header_len+sizeof(var_header), utf_topic, utf_topicLen);
+      |     ~~~~~~                                                        ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(558): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  558 |     if(broker->mqttsend(broker->socketid, packet, packetLen) < packetLen) {
+      |        ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(571): warning: implicit conversion loses integer precision: 'unsigned int' to 'uint16_t' (aka 'unsigned short') [-Wimplicit-int-conversion]
+  571 |     uint16_t topiclen = strlen(topic);
+      |              ~~~~~~~~   ^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(598): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  598 |     memset(utf_topic, 0, utf_topicLen);
+      |     ~~~~~~               ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(608): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  608 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                        ~~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(608): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  608 |     fixed_header_len = encode_length(sizeof(var_header)+utf_topicLen, &fixed_header[1]);
+      |                                                        ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(611): warning: implicit conversion changes signedness: 'unsigned int' to 'int' [-Wsign-conversion]
+  611 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |               ~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+USER_BSP/libemqtt.c(611): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  611 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                                    ~^~~~~~~~~~~~
+USER_BSP/libemqtt.c(611): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  611 |     packetLen = sizeof(var_header)+fixed_header_len+utf_topicLen;
+      |                                   ~^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(612): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  612 |     packet = (uint8_t*)malloc( packetLen );
+      |                        ~~~~~~  ^~~~~~~~~
+USER_BSP/libemqtt.c(618): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  618 |     memset(packet, 0, packetLen);
+      |     ~~~~~~            ^~~~~~~~~
+USER_BSP/libemqtt.c(619): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  619 |     memcpy(packet, fixed_header, fixed_header_len);
+      |     ~~~~~~                       ^~~~~~~~~~~~~~~~
+USER_BSP/libemqtt.c(621): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  621 |     memcpy(packet+fixed_header_len+sizeof(var_header), utf_topic, utf_topicLen);
+      |     ~~~~~~                                                        ^~~~~~~~~~~~
+USER_BSP/libemqtt.c(624): warning: implicit conversion changes signedness: 'int' to 'unsigned int' [-Wsign-conversion]
+  624 |     if(broker->mqttsend(broker->socketid, packet, packetLen) < packetLen) {
+      |        ~~~~~~                                     ^~~~~~~~~
+USER_BSP/libemqtt.c(635): warning: unused parameter 'broker' [-Wunused-parameter]
+  635 | void mqtt_login( mqtt_broker_handle_t* broker )
+      |                                        ^
+55 warnings generated.
+compiling libemqtt.c...
+compiling list.c...
+compiling bsp_dht11.c...
+APP/robot.c(201): warning: unused function 'robot_try_refresh_joints_feedback' [-Wunused-function]
+  201 | static bool robot_try_refresh_joints_feedback(uint8_t retry_times)
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+compiling robot.c...
+compiling event_groups.c...
+compiling heap_4.c...
+compiling queue.c...
+compiling stream_buffer.c...
+compiling timers.c...
+compiling tasks.c...
+compiling startup.c...
+compiling system.c...
+compiling bsp_delay.c...
+compiling bsp_common.c...
+compiling bsp_group_irq.c...
+compiling bsp_clocks.c...
+compiling bsp_guard.c...
+compiling bsp_io.c...
+compiling bsp_ipc.c...
+compiling bsp_sbrk.c...
+compiling bsp_irq.c...
+compiling bsp_ospi_b.c...
+compiling bsp_macl.c...
+compiling bsp_register_protection.c...
+compiling bsp_sdram.c...
+compiling bsp_security.c...
+compiling bsp_linker.c...
+compiling r_dtc.c...
+compiling r_dmac.c...
+compiling r_icu.c...
+compiling r_ioport.c...
+compiling r_canfd.c...
+compiling r_sci_uart.c...
+compiling r_usb_hbc.c...
+compiling r_usb_hcontrolrw.c...
+compiling r_usb_clibusbip.c...
+compiling r_usb_cdataio.c...
+compiling r_usb_cstd_rtos.c...
+compiling r_usb_hdriver.c...
+compiling r_usb_basic.c...
+compiling r_usb_hhubsys.c...
+compiling r_usb_hintfifo.c...
+compiling r_usb_hinthandler_usbip1.c...
+compiling r_usb_hinthandler_usbip0.c...
+compiling r_usb_hlibusbip.c...
+compiling r_usb_hscheduler.c...
+compiling r_usb_hsignal.c...
+compiling r_usb_hmanager.c...
+compiling r_usb_pcontrolrw.c...
+compiling r_usb_pintfifo.c...
+compiling r_usb_hstdfunction.c...
+compiling r_usb_pinthandler_usbip0.c...
+compiling r_usb_psignal.c...
+compiling r_usb_pbc.c...
+compiling r_usb_pstdfunction.c...
+compiling r_usb_creg_abs.c...
+compiling r_usb_pdriver.c...
+compiling r_usb_pstdrequest.c...
+compiling r_usb_plibusbip.c...
+compiling r_usb_dma.c...
+compiling r_usb_hostelectrical.c...
+compiling r_usb_hreg_access.c...
+compiling r_usb_hreg_abs.c...
+compiling r_usb_mcu.c...
+compiling r_usb_creg_access.c...
+compiling r_usb_preg_abs.c...
+compiling r_usb_preg_access.c...
+compiling common_data.c...
+compiling main.c...
+compiling port.c...
+compiling r_usb_pcdc_driver.c...
+compiling pin_data.c...
+compiling hal_data.c...
+compiling vector_data.c...
+compiling robot_thread.c...
+compiling vision_service_thread.c...
+linking...
+Program Size: Code=82228 RO-data=10284 RW-data=768 ZI-data=90312  
+FromELF: creating hex file...
+After Build - User command #1: cmd /c ""E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_launcher.bat" "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\rasc_version.txt" -nosplash --launcher.suppressErrors --gensmartbundle --compiler ARMv6 --devicefamily ra "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\configuration.xml" "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\Objects\Robot_FreeRTOS.axf" 2> "%TEMP%\rasc_stderr.out""
+[INFO] Input file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\Objects\Robot_FreeRTOS.axf" is newer than output file "E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\Objects\Robot_FreeRTOS.sbd". Proceeding with RASC invocation...
+Generating Smart Bundle..
+".\Objects\Robot_FreeRTOS.axf" - 0 Error(s), 113 Warning(s).
+Build Time Elapsed:  00:00:15

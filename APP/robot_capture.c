@@ -46,9 +46,9 @@ typedef struct
 static const capture_step_t s_left_steps[] =
 {
     { CAPTURE_STEP_AUTO, 0u, 0.0f },
-    { CAPTURE_STEP_ABS,  0u, 65.0f },
+    { CAPTURE_STEP_ABS,  0u, 70.0f },
     { CAPTURE_STEP_ABS,  3u, 330.0f },
-    { CAPTURE_STEP_ABS,  4u, 85.0f },
+    { CAPTURE_STEP_ABS,  4u, 88.0f },
     { CAPTURE_STEP_DONE, 0u, 0.0f },
 };
 
@@ -57,7 +57,7 @@ static const capture_step_t s_front_steps[] =
     { CAPTURE_STEP_AUTO, 0u, 0.0f },
     { CAPTURE_STEP_ABS,  0u, 90.0f },
     { CAPTURE_STEP_ABS,  3u, 0.0f },
-    { CAPTURE_STEP_ABS,  4u, 80.0f },
+    { CAPTURE_STEP_ABS,  4u, 83.0f },
     { CAPTURE_STEP_DONE, 0u, 0.0f },
 };
 
@@ -66,7 +66,7 @@ static const capture_step_t s_right_steps[] =
     { CAPTURE_STEP_AUTO, 0u, 0.0f },
     { CAPTURE_STEP_ABS,  0u, 115.0f },
     { CAPTURE_STEP_ABS,  3u, 35.0f },
-    { CAPTURE_STEP_ABS,  4u, 80.0f },
+    { CAPTURE_STEP_ABS,  4u, 85.0f },
     { CAPTURE_STEP_DONE, 0u, 0.0f },
 };
 
