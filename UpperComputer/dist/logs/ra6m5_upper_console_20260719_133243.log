@@ -1,0 +1,699 @@
+[14:46:52.428] [ARM-RX] [JETSON_RX] vision seq=58 valid=1 dcx=26 dcy=11
+[14:46:52.428] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:46:52.429] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:46:52.429] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:52.491] [ARM-RX] robot visual servo stopped
+[14:46:52.553] [ARM-RX] [JETSON_UART] rx_bytes=40068 frames_ok=3309 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=59
+[14:46:52.553] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:52.554] [ARM-RX] robot visual servo start
+[14:46:52.554] [ARM-RX] [JETSON_RX] vision seq=60 valid=1 dcx=26 dcy=10
+[14:46:52.555] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:52.555] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:52.615] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:52.616] [ARM-RX] robot visual servo stopped
+[14:46:52.616] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:52.616] [ARM-RX] robot visual servo start
+[14:46:52.738] [ARM-RX] [JETSON_RX] vision seq=62 valid=1 dcx=26 dcy=10
+[14:46:52.739] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:52.740] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:52.799] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:52.801] [ARM-RX] robot visual servo stopped
+[14:46:52.801] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:52.802] [ARM-RX] robot visual servo start
+[14:46:52.860] [ARM-RX] [JETSON_RX] vision seq=64 valid=1 dcx=26 dcy=10
+[14:46:52.862] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:52.862] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:52.923] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:52.923] [ARM-RX] robot visual servo stopped
+[14:46:52.923] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:52.925] [ARM-RX] robot visual servo start
+[14:46:53.048] [ARM-RX] [JETSON_RX] vision seq=66 valid=1 dcx=25 dcy=10
+[14:46:53.048] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=10 stable=0
+[14:46:53.049] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=10
+[14:46:53.111] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:53.111] [ARM-RX] robot visual servo stopped
+[14:46:53.112] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:53.112] [ARM-RX] robot visual servo start
+[14:46:53.235] [ARM-RX] [JETSON_RX] vision seq=68 valid=1 dcx=26 dcy=10
+[14:46:53.236] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:53.237] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:53.297] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:53.298] [ARM-RX] robot visual servo stopped
+[14:46:53.298] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:53.299] [ARM-RX] robot visual servo start
+[14:46:53.359] [ARM-RX] [JETSON_RX] vision seq=70 valid=1 dcx=26 dcy=10
+[14:46:53.363] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:53.421] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:53.423] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:53.423] [ARM-RX] robot visual servo stopped
+[14:46:53.482] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:53.483] [ARM-RX] robot visual servo start
+[14:46:53.484] [ARM-RX] [JETSON_UART] rx_bytes=40218 frames_ok=3321 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=71
+[14:46:53.544] [ARM-RX] [JETSON_RX] vision seq=72 valid=1 dcx=26 dcy=10
+[14:46:53.544] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:53.545] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:53.606] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:53.607] [ARM-RX] robot visual servo stopped
+[14:46:53.607] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:53.608] [ARM-RX] robot visual servo start
+[14:46:53.791] [ARM-RX] [JETSON_RX] vision seq=75 valid=1 dcx=26 dcy=10
+[14:46:53.791] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:53.791] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:53.854] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:53.855] [ARM-RX] robot visual servo stopped
+[14:46:53.855] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:53.855] [ARM-RX] robot visual servo start
+[14:46:53.976] [ARM-RX] [JETSON_RX] vision seq=77 valid=1 dcx=26 dcy=10
+[14:46:53.977] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:53.977] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:53.978] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:53.978] [ARM-RX] robot visual servo stopped
+[14:46:53.978] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:54.042] [ARM-RX] robot visual servo start
+[14:46:54.103] [ARM-RX] [JETSON_RX] vision seq=79 valid=1 dcx=26 dcy=10
+[14:46:54.105] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:54.106] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:54.166] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:54.166] [ARM-RX] robot visual servo stopped
+[14:46:54.167] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:54.168] [ARM-RX] robot visual servo start
+[14:46:54.292] [ARM-RX] [JETSON_RX] vision seq=81 valid=1 dcx=26 dcy=10
+[14:46:54.293] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:54.294] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:54.353] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:54.354] [ARM-RX] robot visual servo stopped
+[14:46:54.355] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:54.356] [ARM-RX] robot visual servo start
+[14:46:54.415] [ARM-RX] [JETSON_RX] vision seq=83 valid=1 dcx=26 dcy=10
+[14:46:54.473] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:54.473] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:54.474] [ARM-RX] [JETSON_UART] rx_bytes=40368 frames_ok=3333 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x03 last_seq=83
+[14:46:54.525] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:54.527] [ARM-RX] robot visual servo stopped
+[14:46:54.528] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:54.529] [ARM-RX] robot visual servo start
+[14:46:54.588] [ARM-RX] [JETSON_RX] vision seq=85 valid=1 dcx=26 dcy=10
+[14:46:54.596] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:54.597] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:54.650] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:54.651] [ARM-RX] robot visual servo stopped
+[14:46:54.651] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:54.653] [ARM-RX] robot visual servo start
+[14:46:54.774] [ARM-RX] [JETSON_RX] vision seq=87 valid=1 dcx=26 dcy=10
+[14:46:54.774] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:54.777] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:54.837] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:54.837] [ARM-RX] robot visual servo stopped
+[14:46:54.838] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:54.838] [ARM-RX] robot visual servo start
+[14:46:54.899] [ARM-RX] [JETSON_RX] vision seq=89 valid=1 dcx=26 dcy=10
+[14:46:54.960] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:54.961] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:55.023] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:55.026] [ARM-RX] robot visual servo stopped
+[14:46:55.027] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:55.028] [ARM-RX] robot visual servo start
+[14:46:55.211] [ARM-RX] [JETSON_RX] vision seq=91 valid=1 dcx=27 dcy=9
+[14:46:55.212] [ARM-RX] [TARGET] vision state=ALIGN dcx=27 dcy=9 stable=0
+[14:46:55.214] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=27 dcy=9
+[14:46:55.274] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:55.275] [ARM-RX] robot visual servo stopped
+[14:46:55.275] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:55.276] [ARM-RX] robot visual servo start
+[14:46:55.335] [ARM-RX] [JETSON_RX] vision seq=93 valid=1 dcx=26 dcy=10
+[14:46:55.335] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:55.335] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:55.397] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:55.397] [ARM-RX] robot visual servo stopped
+[14:46:55.399] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:55.401] [ARM-RX] robot visual servo start
+[14:46:55.460] [ARM-RX] [JETSON_UART] rx_bytes=40505 frames_ok=3344 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=94
+[14:46:55.523] [ARM-RX] [JETSON_RX] vision seq=95 valid=1 dcx=26 dcy=10
+[14:46:55.523] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:55.523] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:55.584] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:55.584] [ARM-RX] robot visual servo stopped
+[14:46:55.586] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:55.586] [ARM-RX] robot visual servo start
+[14:46:55.710] [ARM-RX] [JETSON_RX] vision seq=97 valid=1 dcx=26 dcy=10
+[14:46:55.711] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:55.712] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:55.712] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:55.713] [ARM-RX] robot visual servo stopped
+[14:46:55.772] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:55.772] [ARM-RX] robot visual servo start
+[14:46:55.834] [ARM-RX] [JETSON_RX] vision seq=99 valid=1 dcx=26 dcy=10
+[14:46:55.834] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:55.834] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:55.897] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:55.897] [ARM-RX] robot visual servo stopped
+[14:46:55.898] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:55.899] [ARM-RX] robot visual servo start
+[14:46:56.022] [ARM-RX] [JETSON_RX] vision seq=101 valid=1 dcx=25 dcy=11
+[14:46:56.022] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=11 stable=0
+[14:46:56.023] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=11
+[14:46:56.085] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:56.085] [ARM-RX] robot visual servo stopped
+[14:46:56.086] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:56.088] [ARM-RX] robot visual servo start
+[14:46:56.209] [ARM-RX] [JETSON_RX] vision seq=103 valid=1 dcx=26 dcy=10
+[14:46:56.209] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:56.209] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:56.271] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:56.272] [ARM-RX] robot visual servo stopped
+[14:46:56.274] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:56.277] [ARM-RX] robot visual servo start
+[14:46:56.397] [ARM-RX] [JETSON_RX] vision seq=106 valid=1 dcx=26 dcy=10
+[14:46:56.399] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:56.400] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:56.459] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:56.460] [ARM-RX] robot visual servo stopped
+[14:46:56.460] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:56.461] [ARM-RX] robot visual servo start
+[14:46:56.521] [ARM-RX] [JETSON_UART] rx_bytes=40655 frames_ok=3356 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x03 last_seq=106
+[14:46:56.583] [ARM-RX] [JETSON_RX] vision seq=108 valid=1 dcx=26 dcy=10
+[14:46:56.583] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:56.584] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:56.647] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:56.647] [ARM-RX] robot visual servo stopped
+[14:46:56.649] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:56.649] [ARM-RX] robot visual servo start
+[14:46:56.708] [ARM-RX] [JETSON_RX] vision seq=110 valid=1 dcx=26 dcy=10
+[14:46:56.708] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:56.708] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:56.771] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:56.772] [ARM-RX] robot visual servo stopped
+[14:46:56.772] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:56.772] [ARM-RX] robot visual servo start
+[14:46:56.895] [ARM-RX] [JETSON_RX] vision seq=112 valid=1 dcx=27 dcy=10
+[14:46:56.895] [ARM-RX] [TARGET] vision state=ALIGN dcx=27 dcy=10 stable=0
+[14:46:56.895] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=27 dcy=10
+[14:46:56.956] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:56.957] [ARM-RX] robot visual servo stopped
+[14:46:56.958] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:56.959] [ARM-RX] robot visual servo start
+[14:46:57.081] [ARM-RX] [JETSON_RX] vision seq=114 valid=1 dcx=26 dcy=10
+[14:46:57.081] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:57.082] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:57.143] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:57.144] [ARM-RX] robot visual servo stopped
+[14:46:57.144] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:57.145] [ARM-RX] robot visual servo start
+[14:46:57.252] [ARM-RX] [JETSON_RX] vision seq=116 valid=1 dcx=25 dcy=11
+[14:46:57.253] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=11 stable=0
+[14:46:57.253] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=11
+[14:46:57.254] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:57.255] [ARM-RX] robot visual servo stopped
+[14:46:57.315] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:57.317] [ARM-RX] robot visual servo start
+[14:46:57.378] [ARM-RX] [JETSON_RX] vision seq=118 valid=1 dcx=26 dcy=10
+[14:46:57.378] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:57.379] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:57.439] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:57.439] [ARM-RX] robot visual servo stopped
+[14:46:57.439] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:57.440] [ARM-RX] robot visual servo start
+[14:46:57.502] [ARM-RX] [JETSON_UART] rx_bytes=40805 frames_ok=3368 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x03 last_seq=118
+[14:46:57.563] [ARM-RX] [JETSON_RX] vision seq=120 valid=1 dcx=26 dcy=10
+[14:46:57.564] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:57.564] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:57.627] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:57.628] [ARM-RX] robot visual servo stopped
+[14:46:57.630] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:57.630] [ARM-RX] robot visual servo start
+[14:46:57.691] [ARM-RX] [JETSON_RX] vision seq=122 valid=1 dcx=26 dcy=10
+[14:46:57.753] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:57.753] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:57.753] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:57.754] [ARM-RX] robot visual servo stopped
+[14:46:57.754] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:57.754] [ARM-RX] robot visual servo start
+[14:46:58.001] [ARM-RX] [JETSON_RX] vision seq=124 valid=1 dcx=26 dcy=11
+[14:46:58.002] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:46:58.002] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:46:58.063] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:58.063] [ARM-RX] robot visual servo stopped
+[14:46:58.063] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:58.064] [ARM-RX] robot visual servo start
+[14:46:58.190] [ARM-RX] [JETSON_RX] vision seq=126 valid=1 dcx=26 dcy=10
+[14:46:58.191] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:58.191] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:58.252] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:58.255] [ARM-RX] robot visual servo stopped
+[14:46:58.256] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:58.256] [ARM-RX] robot visual servo start
+[14:46:58.315] [ARM-RX] [JETSON_RX] vision seq=128 valid=1 dcx=26 dcy=10
+[14:46:58.316] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:58.317] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:58.376] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:58.378] [ARM-RX] robot visual servo stopped
+[14:46:58.379] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:58.379] [ARM-RX] robot visual servo start
+[14:46:58.503] [ARM-RX] [JETSON_UART] rx_bytes=40942 frames_ok=3379 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=129
+[14:46:58.628] [ARM-RX] [JETSON_RX] vision seq=131 valid=1 dcx=26 dcy=10
+[14:46:58.628] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:58.630] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:58.631] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:58.631] [ARM-RX] robot visual servo stopped
+[14:46:58.692] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:58.693] [ARM-RX] robot visual servo start
+[14:46:58.754] [ARM-RX] [JETSON_RX] vision seq=133 valid=1 dcx=26 dcy=10
+[14:46:58.754] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:58.754] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:58.818] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:58.820] [ARM-RX] robot visual servo stopped
+[14:46:58.820] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:58.820] [ARM-RX] robot visual servo start
+[14:46:58.943] [ARM-RX] [JETSON_RX] vision seq=135 valid=1 dcx=26 dcy=10
+[14:46:58.943] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:58.943] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:59.004] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.006] [ARM-RX] robot visual servo stopped
+[14:46:59.008] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.008] [ARM-RX] robot visual servo start
+[14:46:59.067] [ARM-RX] [JETSON_RX] vision seq=137 valid=1 dcx=26 dcy=10
+[14:46:59.067] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:59.128] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:59.128] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.128] [ARM-RX] robot visual servo stopped
+[14:46:59.129] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.129] [ARM-RX] robot visual servo start
+[14:46:59.252] [ARM-RX] [JETSON_RX] vision seq=139 valid=1 dcx=26 dcy=10
+[14:46:59.252] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:59.253] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:59.315] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.316] [ARM-RX] robot visual servo stopped
+[14:46:59.316] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.318] [ARM-RX] robot visual servo start
+[14:46:59.438] [ARM-RX] [JETSON_RX] vision seq=141 valid=1 dcx=26 dcy=10
+[14:46:59.439] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:59.439] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:59.484] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.485] [ARM-RX] robot visual servo stopped
+[14:46:59.485] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.485] [ARM-RX] robot visual servo start
+[14:46:59.548] [ARM-RX] [JETSON_UART] rx_bytes=41104 frames_ok=3392 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=142
+[14:46:59.549] [ARM-RX] [JETSON_RX] vision seq=143 valid=1 dcx=25 dcy=11
+[14:46:59.611] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=11 stable=0
+[14:46:59.612] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=11
+[14:46:59.613] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.614] [ARM-RX] robot visual servo stopped
+[14:46:59.614] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.614] [ARM-RX] robot visual servo start
+[14:46:59.737] [ARM-RX] [JETSON_RX] vision seq=145 valid=1 dcx=26 dcy=10
+[14:46:59.738] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:59.742] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:59.800] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.801] [ARM-RX] robot visual servo stopped
+[14:46:59.802] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.803] [ARM-RX] robot visual servo start
+[14:46:59.927] [ARM-RX] [JETSON_RX] vision seq=147 valid=1 dcx=26 dcy=10
+[14:46:59.927] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:46:59.929] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:46:59.990] [ARM-RX] robot visual servo inverse failed, stop.
+[14:46:59.991] [ARM-RX] robot visual servo stopped
+[14:46:59.991] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:46:59.994] [ARM-RX] robot visual servo start
+[14:47:00.051] [ARM-RX] [JETSON_RX] vision seq=149 valid=1 dcx=26 dcy=10
+[14:47:00.051] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:00.051] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:00.113] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:00.113] [ARM-RX] robot visual servo stopped
+[14:47:00.114] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:00.114] [ARM-RX] robot visual servo start
+[14:47:00.238] [ARM-RX] [JETSON_RX] vision seq=151 valid=1 dcx=26 dcy=9
+[14:47:00.239] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=9 stable=0
+[14:47:00.240] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=9
+[14:47:00.300] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:00.301] [ARM-RX] robot visual servo stopped
+[14:47:00.302] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:00.302] [ARM-RX] robot visual servo start
+[14:47:00.362] [ARM-RX] [JETSON_RX] vision seq=153 valid=1 dcx=26 dcy=9
+[14:47:00.363] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=9 stable=0
+[14:47:00.365] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=9
+[14:47:00.425] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:00.426] [ARM-RX] robot visual servo stopped
+[14:47:00.426] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:00.428] [ARM-RX] robot visual servo start
+[14:47:00.552] [ARM-RX] [JETSON_UART] rx_bytes=41254 frames_ok=3404 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=154
+[14:47:00.553] [ARM-RX] [JETSON_RX] vision seq=155 valid=1 dcx=25 dcy=11
+[14:47:00.553] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=11 stable=0
+[14:47:00.554] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=11
+[14:47:00.615] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:00.615] [ARM-RX] robot visual servo stopped
+[14:47:00.616] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:00.616] [ARM-RX] robot visual servo start
+[14:47:00.677] [ARM-RX] [JETSON_RX] vision seq=157 valid=1 dcx=26 dcy=11
+[14:47:00.740] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:00.741] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:47:00.741] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:00.803] [ARM-RX] robot visual servo stopped
+[14:47:00.804] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:00.806] [ARM-RX] robot visual servo start
+[14:47:00.867] [ARM-RX] [JETSON_RX] vision seq=159 valid=1 dcx=27 dcy=9
+[14:47:00.868] [ARM-RX] [TARGET] vision state=ALIGN dcx=27 dcy=9 stable=0
+[14:47:00.869] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=27 dcy=9
+[14:47:00.930] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:00.932] [ARM-RX] robot visual servo stopped
+[14:47:00.933] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:00.933] [ARM-RX] robot visual servo start
+[14:47:01.055] [ARM-RX] [JETSON_RX] vision seq=161 valid=1 dcx=26 dcy=11
+[14:47:01.055] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:01.056] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:47:01.057] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:01.058] [ARM-RX] robot visual servo stopped
+[14:47:01.117] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:01.118] [ARM-RX] robot visual servo start
+[14:47:01.178] [ARM-RX] [JETSON_RX] vision seq=163 valid=1 dcx=26 dcy=11
+[14:47:01.179] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:01.180] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:47:01.241] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:01.242] [ARM-RX] robot visual servo stopped
+[14:47:01.243] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:01.243] [ARM-RX] robot visual servo start
+[14:47:01.366] [ARM-RX] [JETSON_RX] vision seq=165 valid=1 dcx=25 dcy=11
+[14:47:01.366] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=11 stable=0
+[14:47:01.367] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=11
+[14:47:01.428] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:01.429] [ARM-RX] robot visual servo stopped
+[14:47:01.429] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:01.429] [ARM-RX] robot visual servo start
+[14:47:01.553] [ARM-RX] [JETSON_UART] rx_bytes=41404 frames_ok=3416 crc_fail=0 overflow=0 tx_ok=103 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=166
+[14:47:01.860] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:01.860] [ARM-RX] robot visual servo stopped
+[14:47:02.106] [ARM-RX] [JETSON_RX] vision seq=170 valid=0 dcx=0 dcy=0
+[14:47:02.231] [ARM-RX] [JETSON_RX] vision seq=172 valid=1 dcx=26 dcy=11
+[14:47:02.231] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=11 stable=0
+[14:47:02.231] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:02.231] [ARM-RX] robot visual servo start
+[14:47:02.231] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:02.419] [ARM-RX] [JETSON_RX] vision seq=174 valid=1 dcx=26 dcy=11
+[14:47:02.419] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:02.420] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:47:02.484] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:02.485] [ARM-RX] robot visual servo stopped
+[14:47:02.485] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:02.486] [ARM-RX] robot visual servo start
+[14:47:02.547] [ARM-RX] [JETSON_UART] rx_bytes=41515 frames_ok=3425 crc_fail=0 overflow=0 tx_ok=105 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=175
+[14:47:02.610] [ARM-RX] [JETSON_RX] vision seq=176 valid=1 dcx=26 dcy=10
+[14:47:02.610] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:02.611] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:02.672] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:02.674] [ARM-RX] robot visual servo stopped
+[14:47:02.674] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:02.675] [ARM-RX] robot visual servo start
+[14:47:02.735] [ARM-RX] [JETSON_RX] vision seq=178 valid=1 dcx=25 dcy=11
+[14:47:02.735] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=11 stable=0
+[14:47:02.800] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=11
+[14:47:02.800] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:02.801] [ARM-RX] robot visual servo stopped
+[14:47:02.801] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:02.801] [ARM-RX] robot visual servo start
+[14:47:02.921] [ARM-RX] [JETSON_RX] vision seq=180 valid=1 dcx=26 dcy=10
+[14:47:02.921] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:02.922] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:02.983] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:02.983] [ARM-RX] robot visual servo stopped
+[14:47:02.984] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:02.985] [ARM-RX] robot visual servo start
+[14:47:03.107] [ARM-RX] [JETSON_RX] vision seq=183 valid=1 dcx=26 dcy=9
+[14:47:03.174] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=9 stable=0
+[14:47:03.175] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=9
+[14:47:03.175] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:03.175] [ARM-RX] robot visual servo stopped
+[14:47:03.176] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:03.176] [ARM-RX] robot visual servo start
+[14:47:03.545] [ARM-RX] [JETSON_UART] rx_bytes=41639 frames_ok=3435 crc_fail=0 overflow=0 tx_ok=105 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=185
+[14:47:03.607] [ARM-RX] [JETSON_RX] vision seq=187 valid=0 dcx=0 dcy=0
+[14:47:03.608] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:03.608] [ARM-RX] robot visual servo stopped
+[14:47:03.852] [ARM-RX] [JETSON_RX] vision seq=189 valid=1 dcx=26 dcy=10
+[14:47:03.853] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=10 stable=0
+[14:47:03.853] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:03.854] [ARM-RX] robot visual servo start
+[14:47:03.855] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:04.051] [ARM-RX] [JETSON_RX] vision seq=191 valid=1 dcx=26 dcy=10
+[14:47:04.052] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:04.052] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:04.111] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:04.112] [ARM-RX] robot visual servo stopped
+[14:47:04.112] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:04.112] [ARM-RX] robot visual servo start
+[14:47:04.229] [ARM-RX] [JETSON_RX] vision seq=193 valid=1 dcx=26 dcy=10
+[14:47:04.230] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:04.230] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:04.231] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:04.232] [ARM-RX] robot visual servo stopped
+[14:47:04.297] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:04.297] [ARM-RX] robot visual servo start
+[14:47:04.534] [ARM-RX] [JETSON_UART] rx_bytes=41763 frames_ok=3445 crc_fail=0 overflow=0 tx_ok=107 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=195
+[14:47:04.595] [ARM-RX] [JETSON_RX] vision seq=197 valid=1 dcx=26 dcy=10
+[14:47:04.595] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:04.596] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:04.665] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:04.665] [ARM-RX] robot visual servo stopped
+[14:47:04.666] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:04.666] [ARM-RX] robot visual servo start
+[14:47:04.791] [ARM-RX] [JETSON_RX] vision seq=199 valid=1 dcx=26 dcy=10
+[14:47:04.791] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:04.792] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:04.854] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:04.854] [ARM-RX] robot visual servo stopped
+[14:47:04.856] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:04.856] [ARM-RX] robot visual servo start
+[14:47:04.916] [ARM-RX] [JETSON_RX] vision seq=201 valid=1 dcx=26 dcy=10
+[14:47:04.979] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:04.980] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:04.980] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:04.981] [ARM-RX] robot visual servo stopped
+[14:47:04.981] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:04.981] [ARM-RX] robot visual servo start
+[14:47:05.105] [ARM-RX] [JETSON_RX] vision seq=203 valid=1 dcx=26 dcy=10
+[14:47:05.105] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:05.107] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:05.170] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:05.171] [ARM-RX] robot visual servo stopped
+[14:47:05.172] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:05.172] [ARM-RX] robot visual servo start
+[14:47:05.281] [ARM-RX] [JETSON_RX] vision seq=205 valid=1 dcx=25 dcy=10
+[14:47:05.281] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=10 stable=0
+[14:47:05.281] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=10
+[14:47:05.340] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:05.341] [ARM-RX] robot visual servo stopped
+[14:47:05.341] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:05.341] [ARM-RX] robot visual servo start
+[14:47:05.400] [ARM-RX] [JETSON_RX] vision seq=207 valid=1 dcx=25 dcy=10
+[14:47:05.462] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=10 stable=0
+[14:47:05.464] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=10
+[14:47:05.465] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:05.527] [ARM-RX] robot visual servo stopped
+[14:47:05.527] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:05.528] [ARM-RX] robot visual servo start
+[14:47:05.529] [ARM-RX] [JETSON_UART] rx_bytes=41925 frames_ok=3458 crc_fail=0 overflow=0 tx_ok=107 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=208
+[14:47:05.651] [ARM-RX] [JETSON_RX] vision seq=209 valid=1 dcx=25 dcy=10
+[14:47:05.652] [ARM-RX] [TARGET] vision state=ALIGN dcx=25 dcy=10 stable=0
+[14:47:05.652] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=25 dcy=10
+[14:47:05.714] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:05.715] [ARM-RX] robot visual servo stopped
+[14:47:05.716] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:05.717] [ARM-RX] robot visual servo start
+[14:47:05.839] [ARM-RX] [JETSON_RX] vision seq=212 valid=1 dcx=27 dcy=11
+[14:47:05.840] [ARM-RX] [TARGET] vision state=ALIGN dcx=27 dcy=11 stable=0
+[14:47:05.840] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=27 dcy=11
+[14:47:05.904] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:05.904] [ARM-RX] robot visual servo stopped
+[14:47:05.904] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:05.906] [ARM-RX] robot visual servo start
+[14:47:06.380] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:06.380] [ARM-RX] robot visual servo stopped
+[14:47:06.380] [ARM-RX] [JETSON_RX] vision seq=216 valid=0 dcx=0 dcy=0
+[14:47:06.567] [ARM-RX] [JETSON_RX] vision seq=218 valid=0 dcx=0 dcy=0
+[14:47:06.569] [ARM-RX] [JETSON_UART] rx_bytes=42049 frames_ok=3468 crc_fail=0 overflow=0 tx_ok=108 tx_start_fail=0 tx_timeout=0 last_type=0x03 last_seq=218
+[14:47:06.693] [ARM-RX] [JETSON_RX] vision seq=220 valid=1 dcx=26 dcy=10
+[14:47:06.693] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=10 stable=0
+[14:47:06.694] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:06.694] [ARM-RX] robot visual servo start
+[14:47:06.756] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:06.881] [ARM-RX] [JETSON_RX] vision seq=222 valid=1 dcx=26 dcy=10
+[14:47:06.882] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:06.883] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:06.944] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:06.945] [ARM-RX] robot visual servo stopped
+[14:47:06.946] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:06.946] [ARM-RX] robot visual servo start
+[14:47:07.130] [ARM-RX] [JETSON_RX] vision seq=224 valid=1 dcx=26 dcy=10
+[14:47:07.132] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:07.133] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:07.134] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:07.193] [ARM-RX] robot visual servo stopped
+[14:47:07.193] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:07.195] [ARM-RX] robot visual servo start
+[14:47:07.256] [ARM-RX] [JETSON_RX] vision seq=226 valid=1 dcx=27 dcy=10
+[14:47:07.256] [ARM-RX] [TARGET] vision state=ALIGN dcx=27 dcy=10 stable=0
+[14:47:07.256] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=27 dcy=10
+[14:47:07.318] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:07.318] [ARM-RX] robot visual servo stopped
+[14:47:07.319] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:07.319] [ARM-RX] robot visual servo start
+[14:47:07.444] [ARM-RX] [JETSON_RX] vision seq=228 valid=1 dcx=26 dcy=11
+[14:47:07.444] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:07.444] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:47:07.506] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:07.506] [ARM-RX] robot visual servo stopped
+[14:47:07.507] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:07.507] [ARM-RX] robot visual servo start
+[14:47:07.568] [ARM-RX] [JETSON_UART] rx_bytes=42186 frames_ok=3479 crc_fail=0 overflow=0 tx_ok=109 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=229
+[14:47:07.880] [ARM-RX] [JETSON_RX] vision seq=232 valid=1 dcx=26 dcy=10
+[14:47:07.881] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:07.881] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:07.942] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:07.942] [ARM-RX] robot visual servo stopped
+[14:47:07.942] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:07.943] [ARM-RX] robot visual servo start
+[14:47:08.380] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:08.380] [ARM-RX] robot visual servo stopped
+[14:47:08.443] [ARM-RX] [JETSON_RX] vision seq=237 valid=1 dcx=26 dcy=10
+[14:47:08.506] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=10 stable=0
+[14:47:08.506] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:08.506] [ARM-RX] robot visual servo start
+[14:47:08.506] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:08.566] [ARM-RX] [JETSON_UART] rx_bytes=42284 frames_ok=3487 crc_fail=0 overflow=0 tx_ok=111 tx_start_fail=0 tx_timeout=0 last_type=0x03 last_seq=237
+[14:47:08.816] [ARM-RX] [JETSON_RX] vision seq=240 valid=0 dcx=0 dcy=0
+[14:47:08.818] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:08.878] [ARM-RX] robot visual servo stopped
+[14:47:09.003] [ARM-RX] [JETSON_RX] vision seq=242 valid=1 dcx=26 dcy=10
+[14:47:09.003] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=10 stable=0
+[14:47:09.003] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:09.004] [ARM-RX] robot visual servo start
+[14:47:09.004] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:09.189] [ARM-RX] [JETSON_RX] vision seq=244 valid=1 dcx=27 dcy=10
+[14:47:09.189] [ARM-RX] [TARGET] vision state=ALIGN dcx=27 dcy=10 stable=0
+[14:47:09.252] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=27 dcy=10
+[14:47:09.253] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:09.315] [ARM-RX] robot visual servo stopped
+[14:47:09.315] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:09.317] [ARM-RX] robot visual servo start
+[14:47:09.442] [ARM-RX] [JETSON_RX] vision seq=246 valid=1 dcx=26 dcy=10
+[14:47:09.442] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:09.443] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:09.505] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:09.505] [ARM-RX] robot visual servo stopped
+[14:47:09.507] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:09.508] [ARM-RX] robot visual servo start
+[14:47:09.567] [ARM-RX] [JETSON_UART] rx_bytes=42408 frames_ok=3497 crc_fail=0 overflow=0 tx_ok=113 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=247
+[14:47:09.626] [ARM-RX] [JETSON_RX] vision seq=248 valid=1 dcx=26 dcy=10
+[14:47:09.626] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:09.626] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:09.627] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:09.627] [ARM-RX] robot visual servo stopped
+[14:47:09.678] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:09.679] [ARM-RX] robot visual servo start
+[14:47:09.803] [ARM-RX] [JETSON_RX] vision seq=251 valid=1 dcx=26 dcy=10
+[14:47:09.803] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:09.804] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:09.804] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:09.805] [ARM-RX] robot visual servo stopped
+[14:47:09.867] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:09.867] [ARM-RX] robot visual servo start
+[14:47:09.931] [ARM-RX] [JETSON_RX] vision seq=253 valid=1 dcx=26 dcy=11
+[14:47:09.932] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:09.933] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
+[14:47:09.993] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:09.994] [ARM-RX] robot visual servo stopped
+[14:47:09.994] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:09.995] [ARM-RX] robot visual servo start
+[14:47:10.241] [ARM-RX] [JETSON_RX] vision seq=255 valid=1 dcx=26 dcy=10
+[14:47:10.242] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:10.242] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:10.304] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:10.304] [ARM-RX] robot visual servo stopped
+[14:47:10.305] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:10.307] [ARM-RX] robot visual servo start
+[14:47:10.367] [ARM-RX] [JETSON_RX] vision seq=2 valid=1 dcx=26 dcy=10
+[14:47:10.367] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:10.429] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:10.430] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:10.490] [ARM-RX] robot visual servo stopped
+[14:47:10.490] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:10.492] [ARM-RX] robot visual servo start
+[14:47:10.551] [ARM-RX] [JETSON_UART] rx_bytes=42545 frames_ok=3508 crc_fail=0 overflow=0 tx_ok=113 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=3
+[14:47:10.864] [ARM-RX] [JETSON_RX] vision seq=6 valid=0 dcx=0 dcy=0
+[14:47:10.864] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:10.864] [ARM-RX] robot visual servo stopped
+[14:47:11.173] [ARM-RX] [JETSON_RX] vision seq=9 valid=1 dcx=26 dcy=10
+[14:47:11.174] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=10 stable=0
+[14:47:11.176] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:11.177] [ARM-RX] robot visual servo start
+[14:47:11.236] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:11.360] [ARM-RX] [JETSON_RX] vision seq=11 valid=1 dcx=26 dcy=10
+[14:47:11.360] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:11.360] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:11.423] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:11.424] [ARM-RX] robot visual servo stopped
+[14:47:11.424] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:11.426] [ARM-RX] robot visual servo start
+[14:47:11.537] [ARM-RX] [JETSON_RX] vision seq=13 valid=1 dcx=26 dcy=10
+[14:47:11.537] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:11.538] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:11.596] [ARM-RX] [JETSON_UART] rx_bytes=42669 frames_ok=3518 crc_fail=0 overflow=0 tx_ok=115 tx_start_fail=0 tx_timeout=0 last_type=0x03 last_seq=13
+[14:47:11.596] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:11.598] [ARM-RX] robot visual servo stopped
+[14:47:11.599] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:11.600] [ARM-RX] robot visual servo start
+[14:47:11.844] [ARM-RX] [JETSON_RX] vision seq=16 valid=1 dcx=26 dcy=10
+[14:47:11.844] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:11.845] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:11.907] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:11.907] [ARM-RX] robot visual servo stopped
+[14:47:11.908] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:11.908] [ARM-RX] robot visual servo start
+[14:47:11.970] [ARM-RX] [JETSON_RX] vision seq=18 valid=1 dcx=26 dcy=10
+[14:47:12.032] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:12.032] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:12.032] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:12.094] [ARM-RX] robot visual servo stopped
+[14:47:12.094] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:12.095] [ARM-RX] robot visual servo start
+[14:47:12.157] [ARM-RX] [JETSON_RX] vision seq=20 valid=1 dcx=26 dcy=10
+[14:47:12.158] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:12.159] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:12.219] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:12.219] [ARM-RX] robot visual servo stopped
+[14:47:12.220] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:12.220] [ARM-RX] robot visual servo start
+[14:47:12.532] [ARM-RX] [JETSON_RX] vision seq=23 valid=0 dcx=0 dcy=0
+[14:47:12.532] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:12.532] [ARM-RX] robot visual servo stopped
+[14:47:12.595] [ARM-RX] [JETSON_UART] rx_bytes=42805 frames_ok=3529 crc_fail=0 overflow=0 tx_ok=116 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=24
+[14:47:13.091] [ARM-RX] [JETSON_RX] vision seq=28 valid=1 dcx=27 dcy=10
+[14:47:13.091] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=27 dcy=10 stable=0
+[14:47:13.092] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:13.093] [ARM-RX] robot visual servo start
+[14:47:13.093] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:13.400] [ARM-RX] [JETSON_RX] vision seq=31 valid=1 dcx=26 dcy=10
+[14:47:13.461] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:13.461] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:13.462] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:13.523] [ARM-RX] robot visual servo stopped
+[14:47:13.525] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:13.525] [ARM-RX] robot visual servo start
+[14:47:13.585] [ARM-RX] [JETSON_UART] rx_bytes=42903 frames_ok=3537 crc_fail=0 overflow=0 tx_ok=117 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=32
+[14:47:13.774] [ARM-RX] [JETSON_RX] vision seq=34 valid=1 dcx=26 dcy=10
+[14:47:13.775] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=10 stable=0
+[14:47:13.836] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=10
+[14:47:13.836] [ARM-RX] robot visual servo inverse failed, stop.
+[14:47:13.898] [ARM-RX] robot visual servo stopped
+[14:47:13.899] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:13.899] [ARM-RX] robot visual servo start
+[14:47:14.333] [ARM-RX] [TARGET] ALIGN -> WAIT_DETECT
+[14:47:14.334] [ARM-RX] robot visual servo stopped
+[14:47:14.335] [ARM-RX] [JETSON_RX] vision seq=38 valid=0 dcx=0 dcy=0
+[14:47:14.519] [ARM-RX] [JETSON_RX] vision seq=40 valid=1 dcx=26 dcy=10
+[14:47:14.520] [ARM-RX] [TARGET] vision state=WAIT_DETECT dcx=26 dcy=10 stable=0
+[14:47:14.520] [ARM-RX] ROBOT_VISUAL_SERVO_EVENT
+[14:47:14.521] [ARM-RX] robot visual servo start
+[14:47:14.522] [ARM-RX] [TARGET] WAIT_DETECT -> ALIGN
+[14:47:14.582] [ARM-RX] [JETSON_UART] rx_bytes=43014 frames_ok=3546 crc_fail=0 overflow=0 tx_ok=119 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=41
+[14:47:14.645] [ARM-RX] [JETSON_RX] vision seq=42 valid=1 dcx=26 dcy=11
+[14:47:14.645] [ARM-RX] [TARGET] vision state=ALIGN dcx=26 dcy=11 stable=0
+[14:47:14.646] [ARM-RX] [TARGET] visual servo vx=0.50 vz=-0.50 dcx=26 dcy=11
