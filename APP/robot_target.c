@@ -208,6 +208,7 @@ bool robot_target_start_at_current_pose(void)
         return false;
     }
 
+    robot_visual_servo_fault_clear();
     s_target.event = ROBOT_TARGET_EVENT_NONE;
     s_target.last_step_ms = now_ms;
     s_target.last_vision_ms = 0u;
@@ -261,6 +262,17 @@ void robot_target_step(const target_obs_t *obs)
     if (!ROBOT_TARGET_ENABLED)
     {
         target_stop_visual_servo();
+        return;
+    }
+
+    if (robot_visual_servo_fault_get() != ROBOT_VISUAL_SERVO_FAULT_NONE)
+    {
+        target_stop_visual_servo();
+        if (s_target.state != ROBOT_TARGET_STATE_FAULT)
+        {
+            target_set_event(ROBOT_TARGET_EVENT_FAULT);
+            enter_state(ROBOT_TARGET_STATE_FAULT, now_ms);
+        }
         return;
     }
 

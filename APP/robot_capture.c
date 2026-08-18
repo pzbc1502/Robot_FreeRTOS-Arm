@@ -48,7 +48,7 @@ static const capture_step_t s_left_steps[] =
     { CAPTURE_STEP_AUTO, 0u, 0.0f },
     { CAPTURE_STEP_ABS,  0u, 70.0f },
     { CAPTURE_STEP_ABS,  3u, 330.0f },
-    { CAPTURE_STEP_ABS,  4u, 88.0f },
+    { CAPTURE_STEP_ABS,  4u, 86.0f },
     { CAPTURE_STEP_DONE, 0u, 0.0f },
 };
 

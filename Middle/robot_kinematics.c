@@ -36,6 +36,23 @@ static inline float __robot_pow4f(float x)
 	return x2 * x2;
 }
 
+static void robot_kinematics_matrix_multiply(const float a[4][4],
+                                             const float b[4][4],
+                                             float out[4][4])
+{
+	float result[4][4] = {0};
+
+	for (uint8_t row = 0u; row < 4u; row++) {
+		for (uint8_t col = 0u; col < 4u; col++) {
+			for (uint8_t k = 0u; k < 4u; k++) {
+				result[row][col] += a[row][k] * b[k][col];
+			}
+		}
+	}
+
+	memcpy(out, result, sizeof(result));
+}
+
 static inline uint32_t __robot_all_invalid_mask(void)
 {
 	return (uint32_t)((1u << ROBOT_KINEMATICS_RESULT_NUM) - 1u);
@@ -561,6 +578,69 @@ void robot_kinematics_joint_angle_update_by_id(uint32_t joint_id ,float angle)
 		return;	
 	}
 	g_current_joint_angle[joint_id] = angle;
+}
+
+int robot_kinematics_forward(const float joint_angle[ROBOT_MAX_JOINT_NUM],
+                             float T_out[4][4])
+{
+	float total[4][4] = {
+		{1.0f, 0.0f, 0.0f, 0.0f},
+		{0.0f, 1.0f, 0.0f, 0.0f},
+		{0.0f, 0.0f, 1.0f, 0.0f},
+		{0.0f, 0.0f, 0.0f, 1.0f},
+	};
+
+	if ((joint_angle == NULL) || (T_out == NULL)) {
+		return -1;
+	}
+
+	for (uint8_t i = 0u; i < ROBOT_MAX_JOINT_NUM; i++) {
+		/* J6 is the gripper. Keep its fixed frame rotation, but exclude its motion and offset. */
+		float theta_deg = (i == ROBOT_JOINT_6) ? 0.0f : joint_angle[i];
+		float theta;
+		float a;
+		float alpha;
+		float d;
+		float ct;
+		float st;
+		float ca;
+		float sa;
+
+		if (!isfinite(theta_deg)) {
+			return -1;
+		}
+
+		theta = theta_deg * ((float)M_PI / 180.0f);
+		a = D_H[i][0];
+		alpha = D_H[i][1];
+		d = (i == ROBOT_JOINT_6) ? 0.0f : D_H[i][2];
+		ct = cosf(theta);
+		st = sinf(theta);
+		ca = cosf(alpha);
+		sa = sinf(alpha);
+
+		float link[4][4] = {
+			{ct,      -st,       0.0f, a},
+			{st * ca,  ct * ca, -sa,  -d * sa},
+			{st * sa,  ct * sa,  ca,   d * ca},
+			{0.0f,     0.0f,     0.0f, 1.0f},
+		};
+		float next[4][4] = {0};
+
+		robot_kinematics_matrix_multiply(total, link, next);
+		memcpy(total, next, sizeof(total));
+	}
+
+	for (uint8_t row = 0u; row < 4u; row++) {
+		for (uint8_t col = 0u; col < 4u; col++) {
+			if (!isfinite(total[row][col])) {
+				return -1;
+			}
+		}
+	}
+
+	memcpy(T_out, total, sizeof(total));
+	return 0;
 }
 
 /**

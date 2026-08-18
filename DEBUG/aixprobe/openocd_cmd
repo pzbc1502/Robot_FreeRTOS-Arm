@@ -1,0 +1,1 @@
+openocd -f interface/cmsis-dap.cfg -c "cmsis-dap vid_pid 0x1a86 0x8011" -c "transport select swd" -f /etc/ailink/target/renesas_ra6m5.cfg -c "bindto 0.0.0.0" -c "gdb port 3333"

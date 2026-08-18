@@ -238,6 +238,14 @@ typedef enum
     ROBOT_RESET_RESULT_ABORTED,
 } robot_reset_result_t;
 
+typedef enum
+{
+    ROBOT_VISUAL_SERVO_FAULT_NONE = 0,
+    ROBOT_VISUAL_SERVO_FAULT_FEEDBACK,
+    ROBOT_VISUAL_SERVO_FAULT_FK,
+    ROBOT_VISUAL_SERVO_FAULT_IK,
+} robot_visual_servo_fault_t;
+
 /* 关节索引枚举 */
 enum
 {
@@ -303,6 +311,8 @@ int robot_visual_servo_start(void);
 void robot_visual_servo_stop(void);
 void robot_visual_servo_set_velocity(float vx, float vy, float vz);
 bool robot_is_visual_servo_active(void);
+robot_visual_servo_fault_t robot_visual_servo_fault_get(void);
+void robot_visual_servo_fault_clear(void);
 void robot_motion_abort(void);
 bool robot_motion_abort_latched(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);

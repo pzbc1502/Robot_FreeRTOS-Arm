@@ -40,7 +40,7 @@ extern "C" {
 #define TARGET_MAX_STEP_MM           (2.5f)      /* 单次视觉对准最大修正步长，单位 mm */
 #define TARGET_ALIGN_TOL_PX_COARSE   (30.0f)     /* 粗/精定位切换阈值，单位 px */
 #define TARGET_MAX_STEP_MM_FINE      (0.8f)      /* 精定位阶段单次最大修正步长，单位 mm */
-#define TARGET_ALIGN_TOL_PX          (6.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
+#define TARGET_ALIGN_TOL_PX          (2.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
 #define TARGET_ALIGN_STABLE_COUNT    (3u)        /* 连续满足对准阈值的帧数，达到后进入确认状态 */  
 #define TARGET_CONFIRM_STABLE_COUNT  (2u)        /* 输出前二次确认所需连续新视觉帧数，3+2 共 5 帧 */
 #define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */

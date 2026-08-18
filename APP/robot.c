@@ -21,6 +21,10 @@ extern CAN_Context_t g_can_context;
 /* 最大插补路径点数：工作空间对角线约 500mm，分辨率 1mm，留 10% 余量 */
 #define ROBOT_MAX_PATH_SIZE   (800)
 #define ROBOT_VISUAL_SERVO_PERIOD_MS        (20U)
+#define ROBOT_VISUAL_SERVO_FEEDBACK_RETRY_COUNT (3U)
+#define ROBOT_VISUAL_SERVO_FEEDBACK_RETRY_DELAY_MS (10U)
+#define ROBOT_VISUAL_SERVO_FEEDBACK_FAIL_LIMIT (3U)
+#define ROBOT_VISUAL_SERVO_FK_IK_TOL_DEG    (3.0f)
 #define ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT    (3U)
 #define ROBOT_VIEW_ARC_DURATION_MIN_MS       (4000U)
 #define ROBOT_VIEW_ARC_DURATION_MAX_MS (8000U)
@@ -53,6 +57,7 @@ typedef struct
     float vz;
     uint32_t last_update_ms;
     bool stop_requested;
+    robot_visual_servo_fault_t fault;
 } robot_visual_servo_ctrl_t;
 
 /* FreeRTOS 安全钩子 ---------------------------------------------------- */
@@ -132,13 +137,18 @@ static int robot_view_arc_move(uint32_t duration_ms);
 static int robot_pid_run(struct position *path, int path_size, float *result);
 static bool robot_joint_wait_target(uint8_t joint_id, float target, float tol_deg, uint32_t timeout_ms);
 static bool robot_auto_final_confirm(float *result, int path_size, float tol_deg);
-static void robot_pid_one_period(float *target_angle, float *feedforward, float *total_error, int joint_num);
+static bool robot_pid_one_period
+    (float *target_angle, float *feedforward, float *total_error,
+     int joint_num, bool require_fresh_feedback);
 static int robot_pid_remote(void);
 static int robot_mqtt_joints_sync(void);
 static void robot_read_all_debug(void);
 static void robot_joint_stop_from_isr(uint8_t joint_id);
 static void robot_set_home_pose_valid(void);
 static int robot_visual_servo_run(void);
+static void robot_visual_servo_fault_set(robot_visual_servo_fault_t fault);
+static bool robot_visual_servo_sync_actual_pose(float T_cmd[4][4]);
+static void robot_visual_servo_wait_period(uint32_t *next_tick);
 static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_joint, float *bad_err);
 static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
 static float robot_angle_normalize(float angle);
@@ -147,7 +157,10 @@ static bool robot_motion_abort_is_requested(void);
 static void robot_motion_abort_clear(void);
 static void robot_event_stamp(struct robot_event *event);
 static bool robot_event_is_stale(const struct robot_event *event);
+static void robot_joint_velocity_send_locked(uint32_t joint_id, float velocity, uint8_t acceleration);
 static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration);
+static bool robot_joint_velocity_batch_nowait(const float *velocity, uint8_t joint_num, uint8_t acceleration);
+static bool robot_joint_velocity_zero_all(uint8_t joint_num);
 static void robot_auto_busy_set(void);
 static void robot_auto_busy_clear(void);
 
@@ -266,6 +279,25 @@ uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acc
 
 /* PID 控制循环专用：发送速度命令但不等待回包（fire-and-forget）。
  * 参考 MechanicalArm Motor_VelControl，仅发送，靠下一周期读角度闭环校正。 */
+static void robot_joint_velocity_send_locked(uint32_t joint_id, float velocity,
+                                              uint8_t acceleration)
+{
+    if (joint_id >= ROBOT_MAX_JOINT_NUM) {
+        return;
+    }
+
+    struct joint *joint = &g_robot.joints[joint_id];
+    uint8_t dir = (velocity > 0.0f) ? (uint8_t)joint->postive_direction
+                                    : (uint8_t)(!joint->postive_direction);
+    uint8_t addr = (uint8_t)(joint_id + 1u);
+    uint16_t rpm = (uint16_t)fabsf(velocity * 60.0f *
+                                   joint->reduction_ratio / 360.0f);
+
+    ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_LIMIT_ENABLE);
+    joint->velocity = velocity;
+    Emm_V5_Vel_Control(addr, dir, rpm, acceleration, false);
+}
+
 static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration)
 {
     if (joint_id >= ROBOT_MAX_JOINT_NUM) {
@@ -286,6 +318,38 @@ static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8
     }
     Emm_V5_Vel_Control(addr, dir, rpm, acceleration, false);
     BSP_CAN_Unlock();
+}
+
+static bool robot_joint_velocity_batch_nowait(const float *velocity,
+                                               uint8_t joint_num,
+                                               uint8_t acceleration)
+{
+    uint8_t arm_joint_num = (joint_num > ROBOT_ARM_JOINT_NUM)
+                          ? ROBOT_ARM_JOINT_NUM : joint_num;
+
+    if (velocity == NULL) {
+        return false;
+    }
+    if (arm_joint_num == 0u) {
+        return true;
+    }
+    if (!BSP_CAN_Lock(20u)) {
+        return false;
+    }
+
+    for (uint8_t joint_id = 0u; joint_id < arm_joint_num; joint_id++) {
+        robot_joint_velocity_send_locked(joint_id, velocity[joint_id], acceleration);
+    }
+    BSP_CAN_Unlock();
+    return true;
+}
+
+static bool robot_joint_velocity_zero_all(uint8_t joint_num)
+{
+    const float zero_velocity[ROBOT_ARM_JOINT_NUM] = {0};
+
+    return robot_joint_velocity_batch_nowait(zero_velocity, joint_num,
+                                             ROBOT_JOINT_DEFAULT_ACCELERATION);
 }
 
 /* 控制单关节旋转（支持相对与绝对两种模式） */
@@ -1601,7 +1665,7 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
 
 		/* 每个路径点恰好执行一个控制周期(one_period 自带 10ms 节拍)，
 		 * 不再用外层 while 二次定时，避免跳点/重复导致的冲击与抖动 */
-		robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);
+		(void)robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM, false);
 		sample_count++;
 
 		if ((p % 10) == 0) {
@@ -1619,7 +1683,7 @@ static int robot_pid_run(struct position *path, int path_size, float *result)
             robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
             return 2;
         }
-		robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);
+		(void)robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM, false);
 		sample_count++;
 	}
 
@@ -1930,30 +1994,237 @@ static void robot_read_all_debug(void)
     }
 }
 
-static void robot_pid_one_period(float *target_angle, float *feedforward, float *total_error, int joint_num)
+static bool robot_pid_one_period(float *target_angle, float *feedforward, float *total_error,
+                                 int joint_num, bool require_fresh_feedback)
 {
-	if (robot_motion_abort_is_requested()) {
-		return;
-	}
-	uint32_t pid_end_time = xTaskGetTickCount() + ROBOT_PID_PERIOD;
-	(void)robot_update_all_angles((uint8_t)joint_num, NULL, NULL);
-	for (int j = 0; j < joint_num; j++) {
-		if (robot_motion_abort_is_requested()) {
-			break;
-		}
-		float error = robot_angle_diff(g_robot.joints[j].current_angle, target_angle[j]);
-		if (total_error != NULL) {
-			total_error[j] += fabsf(error);
-		}
-		float v = ROBOT_JOINT_FF_GAIN[j] * feedforward[j] + ROBOT_JOINT_KP[j] * error;
-		if (v >  ROBOT_FF_OUTPUT_LIMIT) v =  ROBOT_FF_OUTPUT_LIMIT;
-		if (v < -ROBOT_FF_OUTPUT_LIMIT) v = -ROBOT_FF_OUTPUT_LIMIT;
-		robot_joint_velocity_nowait((uint32_t)j, v, ROBOT_JOINT_DEFAULT_ACCELERATION);
-	}
-	uint32_t now = xTaskGetTickCount();
-	if (now < pid_end_time) {
-		vTaskDelay(pid_end_time - now);
-	}
+    uint32_t missing_mask = 0u;
+    bool period_ok = true;
+    float command_velocity[ROBOT_MAX_JOINT_NUM] = {0};
+
+    if ((joint_num <= 0) || (joint_num > ROBOT_ARM_JOINT_NUM) ||
+        (target_angle == NULL) || (feedforward == NULL) ||
+        robot_motion_abort_is_requested()) {
+        return false;
+    }
+
+    uint32_t pid_end_time = xTaskGetTickCount() + ROBOT_PID_PERIOD;
+    int feedback_result = robot_update_all_angles((uint8_t)joint_num,
+                                                  &missing_mask, NULL);
+    bool fresh_feedback = (feedback_result == 0) && (missing_mask == 0u);
+
+    if (require_fresh_feedback && !fresh_feedback) {
+        if (!robot_joint_velocity_zero_all((uint8_t)joint_num)) {
+            LOG("visual servo zero velocity CAN lock failed\r\n");
+            robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+        }
+        uint32_t now = xTaskGetTickCount();
+        if (now < pid_end_time) {
+            vTaskDelay(pid_end_time - now);
+        }
+        return false;
+    }
+
+    for (int j = 0; j < joint_num; j++) {
+        if (robot_motion_abort_is_requested()) {
+            period_ok = false;
+            break;
+        }
+
+        float error = robot_angle_diff(g_robot.joints[j].current_angle,
+                                       target_angle[j]);
+        if (total_error != NULL) {
+            total_error[j] += fabsf(error);
+        }
+
+        float velocity = ROBOT_JOINT_FF_GAIN[j] * feedforward[j] +
+                         ROBOT_JOINT_KP[j] * error;
+        if (velocity > ROBOT_FF_OUTPUT_LIMIT) {
+            velocity = ROBOT_FF_OUTPUT_LIMIT;
+        }
+        if (velocity < -ROBOT_FF_OUTPUT_LIMIT) {
+            velocity = -ROBOT_FF_OUTPUT_LIMIT;
+        }
+
+        command_velocity[j] = velocity;
+        if (!require_fresh_feedback) {
+            robot_joint_velocity_nowait((uint32_t)j, velocity,
+                                        ROBOT_JOINT_DEFAULT_ACCELERATION);
+        }
+    }
+
+    if (require_fresh_feedback) {
+        if (period_ok &&
+            !robot_joint_velocity_batch_nowait(command_velocity,
+                                                (uint8_t)joint_num,
+                                                ROBOT_JOINT_DEFAULT_ACCELERATION)) {
+            LOG("visual servo velocity batch CAN lock failed\r\n");
+            period_ok = false;
+        }
+        if (!period_ok &&
+            !robot_joint_velocity_zero_all((uint8_t)joint_num)) {
+            LOG("visual servo fallback zero velocity CAN lock failed\r\n");
+            robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+        }
+    }
+
+    uint32_t now = xTaskGetTickCount();
+    if (now < pid_end_time) {
+        vTaskDelay(pid_end_time - now);
+    }
+    return period_ok;
+}
+
+static void robot_visual_servo_fault_set(robot_visual_servo_fault_t fault)
+{
+    bool first_fault = false;
+
+    if (fault == ROBOT_VISUAL_SERVO_FAULT_NONE) {
+        return;
+    }
+
+    taskENTER_CRITICAL();
+    if (g_visual_servo.fault == ROBOT_VISUAL_SERVO_FAULT_NONE) {
+        g_visual_servo.fault = fault;
+        first_fault = true;
+    }
+    g_visual_servo.vx = 0.0f;
+    g_visual_servo.vy = 0.0f;
+    g_visual_servo.vz = 0.0f;
+    g_visual_servo.stop_requested = true;
+    taskEXIT_CRITICAL();
+
+    if (first_fault) {
+        LOG("robot visual servo fault latched: %u\r\n", (unsigned)fault);
+    }
+}
+
+robot_visual_servo_fault_t robot_visual_servo_fault_get(void)
+{
+    robot_visual_servo_fault_t fault;
+
+    taskENTER_CRITICAL();
+    fault = g_visual_servo.fault;
+    taskEXIT_CRITICAL();
+    return fault;
+}
+
+void robot_visual_servo_fault_clear(void)
+{
+    bool active;
+    bool busy;
+    robot_visual_servo_fault_t fault;
+
+    taskENTER_CRITICAL();
+    active = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+    busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    fault = g_visual_servo.fault;
+    if (!active && !busy) {
+        g_visual_servo.fault = ROBOT_VISUAL_SERVO_FAULT_NONE;
+    }
+    taskEXIT_CRITICAL();
+
+    if (active || busy) {
+        LOG("reject visual servo fault clear: active=%u busy=%u fault=%u\r\n",
+            (unsigned)active, (unsigned)busy, (unsigned)fault);
+    }
+}
+
+static bool robot_visual_servo_sync_actual_pose(float T_cmd[4][4])
+{
+    float measured[ROBOT_MAX_JOINT_NUM] = {0};
+    float verified[ROBOT_MAX_JOINT_NUM] = {0};
+    uint32_t missing_mask = 0u;
+    bool feedback_ok = false;
+    float worst_error = 0.0f;
+
+    if (T_cmd == NULL) {
+        robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FK);
+        robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+        return false;
+    }
+
+    for (uint8_t attempt = 0u;
+         attempt < ROBOT_VISUAL_SERVO_FEEDBACK_RETRY_COUNT;
+         attempt++) {
+        if (robot_motion_abort_is_requested()) {
+            robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+            return false;
+        }
+
+        missing_mask = 0u;
+        if ((robot_update_all_angles(ROBOT_ARM_JOINT_NUM,
+                                     &missing_mask, NULL) == 0) &&
+            (missing_mask == 0u)) {
+            feedback_ok = true;
+            break;
+        }
+
+        LOG("visual servo feedback sync failed attempt=%u missing=0x%02lX\r\n",
+            (unsigned)(attempt + 1u), (unsigned long)missing_mask);
+        if ((attempt + 1u) < ROBOT_VISUAL_SERVO_FEEDBACK_RETRY_COUNT) {
+            vTaskDelay(pdMS_TO_TICKS(ROBOT_VISUAL_SERVO_FEEDBACK_RETRY_DELAY_MS));
+        }
+    }
+
+    if (!feedback_ok) {
+        robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+        robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+        return false;
+    }
+
+    for (uint8_t joint_id = 0u; joint_id < ROBOT_ARM_JOINT_NUM; joint_id++) {
+        if (robot_joint_compare_angle(joint_id,
+                                      g_robot.joints[joint_id].current_angle,
+                                      &measured[joint_id]) != 0) {
+            LOG("visual servo feedback angle map failed joint=%u raw=%.2f\r\n",
+                (unsigned)joint_id,
+                g_robot.joints[joint_id].current_angle);
+            robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+            robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+            return false;
+        }
+    }
+    measured[ROBOT_JOINT_6] = 0.0f;
+
+    robot_kinematics_joint_angle_update(measured);
+    robot_kinematics_reset_branch_lock();
+
+    if (robot_kinematics_forward(measured, T_cmd) != 0) {
+        LOG("visual servo forward kinematics failed\r\n");
+        robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FK);
+        robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+        return false;
+    }
+
+    if (robot_kinematics_inverse((float *)T_cmd, verified, false) != 0) {
+        LOG("visual servo FK/IK consistency inverse failed\r\n");
+        robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FK);
+        robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+        return false;
+    }
+
+    for (uint8_t joint_id = 0u; joint_id < ROBOT_ARM_JOINT_NUM; joint_id++) {
+        float error = fabsf(robot_angle_diff(measured[joint_id], verified[joint_id]));
+
+        if (!isfinite(error) || (error > ROBOT_VISUAL_SERVO_FK_IK_TOL_DEG)) {
+            LOG("visual servo FK/IK mismatch joint=%u measured=%.2f solved=%.2f err=%.2f\r\n",
+                (unsigned)joint_id, measured[joint_id], verified[joint_id], error);
+            robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FK);
+            robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+            return false;
+        }
+        if (error > worst_error) {
+            worst_error = error;
+        }
+    }
+
+    memcpy(g_robot.T, T_cmd, sizeof(g_robot.T));
+    g_robot.cur_pos.x = T_cmd[0][3] - T_0_6_reset[0][3];
+    g_robot.cur_pos.y = T_cmd[1][3] - T_0_6_reset[1][3];
+    g_robot.cur_pos.z = T_cmd[2][3] - T_0_6_reset[2][3];
+    LOG("visual servo pose synced x=%.2f y=%.2f z=%.2f ik_err=%.2f\r\n",
+        g_robot.cur_pos.x, g_robot.cur_pos.y, g_robot.cur_pos.z, worst_error);
+    return true;
 }
 
 static float robot_visual_servo_clip_velocity(float velocity)
@@ -2000,6 +2271,10 @@ int robot_visual_servo_start(void)
 {
     BaseType_t queued;
     bool should_queue = false;
+    bool active;
+    bool busy;
+    bool stopping = false;
+    robot_visual_servo_fault_t fault;
     uint32_t now_ms = HAL_GetTick();
 
     if (g_robot.event_queue == NULL) {
@@ -2015,14 +2290,20 @@ int robot_visual_servo_start(void)
     }
 
     taskENTER_CRITICAL();
-    bool active = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
-    bool busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
-    if (active) {
-        g_visual_servo.vx = 0.0f;
-        g_visual_servo.vy = 0.0f;
-        g_visual_servo.vz = 0.0f;
-        g_visual_servo.last_update_ms = now_ms;
-        g_visual_servo.stop_requested = false;
+    fault = g_visual_servo.fault;
+    active = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
+    busy = ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
+    if (fault != ROBOT_VISUAL_SERVO_FAULT_NONE) {
+        should_queue = false;
+    } else if (active) {
+        if (g_visual_servo.stop_requested) {
+            stopping = true;
+        } else {
+            g_visual_servo.vx = 0.0f;
+            g_visual_servo.vy = 0.0f;
+            g_visual_servo.vz = 0.0f;
+            g_visual_servo.last_update_ms = now_ms;
+        }
     } else if (!busy) {
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
         ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
@@ -2035,7 +2316,15 @@ int robot_visual_servo_start(void)
     }
     taskEXIT_CRITICAL();
 
+    if (fault != ROBOT_VISUAL_SERVO_FAULT_NONE) {
+        LOG("reject visual servo: fault latched=%u\r\n", (unsigned)fault);
+        return -1;
+    }
     if (active) {
+        if (stopping) {
+            LOG("reject visual servo start: previous stop still pending\r\n");
+            return -1;
+        }
         return pdPASS;
     }
     if (busy) {
@@ -2056,30 +2345,43 @@ int robot_visual_servo_start(void)
     return (int)queued;
 }
 
+static void robot_visual_servo_wait_period(uint32_t *next_tick)
+{
+    if (next_tick == NULL) {
+        return;
+    }
+
+    uint32_t now_tick = xTaskGetTickCount();
+    if (now_tick < *next_tick) {
+        vTaskDelay(*next_tick - now_tick);
+    } else {
+        *next_tick = now_tick;
+    }
+}
+
 static int robot_visual_servo_run(void)
 {
     float target_angle[ROBOT_MAX_JOINT_NUM] = {0};
     float last_target[ROBOT_MAX_JOINT_NUM] = {0};
     float feedforward[ROBOT_MAX_JOINT_NUM] = {0};
     float result[ROBOT_MAX_JOINT_NUM] = {0};
-    float T[4][4] = {0};
+    float T_cmd[4][4] = {0};
+    float candidate_T[4][4] = {0};
     bool first_update = true;
     uint8_t ik_fail_count = 0u;
-    struct position pos = g_robot.cur_pos;
+    uint8_t feedback_fail_count = 0u;
+    const float dt = (float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f;
 
     LOG("robot visual servo start\r\n");
-    (void)robot_update_all_angles(ROBOT_ARM_JOINT_NUM, NULL, NULL);
-    for (int i = 0; i < ROBOT_MAX_JOINT_NUM; i++) {
-        robot_kinematics_joint_angle_update_by_id((uint32_t)i, g_robot.joints[i].current_angle);
+    if (!robot_visual_servo_sync_actual_pose(T_cmd)) {
+        LOG("robot visual servo start pose sync failed\r\n");
+        goto finish;
     }
-    robot_kinematics_reset_branch_lock();
 
-    float j6_hold_angle = g_robot.joints[ROBOT_JOINT_6].current_angle;
     uint32_t next_tick = xTaskGetTickCount();
 
     while (robot_is_visual_servo_active()) {
         float vx = 0.0f;
-        float vy = 0.0f;
         float vz = 0.0f;
         uint32_t last_update_ms = 0u;
         bool stop_requested = false;
@@ -2093,7 +2395,6 @@ static int robot_visual_servo_run(void)
 
         taskENTER_CRITICAL();
         vx = g_visual_servo.vx;
-        vy = g_visual_servo.vy;
         vz = g_visual_servo.vz;
         last_update_ms = g_visual_servo.last_update_ms;
         stop_requested = g_visual_servo.stop_requested;
@@ -2104,51 +2405,84 @@ static int robot_visual_servo_run(void)
         }
         if ((HAL_GetTick() - last_update_ms) > TARGET_VS_CMD_TIMEOUT_MS) {
             vx = 0.0f;
-            vy = 0.0f;
             vz = 0.0f;
         }
 
-        struct position next_pos = pos;
-        float dt = (float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f;
-        next_pos.x += vx * dt;
-        next_pos.y += vy * dt;
-        next_pos.z += vz * dt;
+        memcpy(candidate_T, T_cmd, sizeof(candidate_T));
+        candidate_T[0][3] += vx * dt;
+        candidate_T[2][3] += vz * dt;
 
-        robot_kinematics_cal_T(T_0_6_reset, T, &next_pos);
-        int ret = robot_kinematics_inverse((float *)T, result, false);
-        if (ret != 0) {
-            ik_fail_count++;
-            if (ik_fail_count >= ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT) {
-                LOG("robot visual servo inverse failed, stop.\r\n");
+        if (robot_kinematics_inverse((float *)candidate_T, result, false) != 0) {
+            feedback_fail_count = 0u;
+            if (!robot_joint_velocity_zero_all(ROBOT_ARM_JOINT_NUM)) {
+                LOG("robot visual servo IK zero velocity CAN lock failed\r\n");
+                robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
                 break;
             }
-        } else {
-            ik_fail_count = 0u;
-            result[ROBOT_JOINT_6] = j6_hold_angle;
-            robot_kinematics_joint_angle_update(result);
-            pos = next_pos;
-            g_robot.cur_pos = pos;
-
-            for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
-                target_angle[j] = robot_angle_normalize(result[j]);
-                if (first_update) {
-                    feedforward[j] = 0.0f;
-                } else {
-                    feedforward[j] = robot_angle_diff(last_target[j], target_angle[j])
-                                     / ((float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f);
-                }
-                last_target[j] = target_angle[j];
+            ik_fail_count++;
+            LOG("robot visual servo inverse failed count=%u/%u\r\n",
+                (unsigned)ik_fail_count,
+                (unsigned)ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT);
+            if (ik_fail_count >= ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT) {
+                robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_IK);
+                break;
             }
-            first_update = false;
-            robot_pid_one_period(target_angle, feedforward, NULL, ROBOT_ARM_JOINT_NUM);
+
+            robot_visual_servo_wait_period(&next_tick);
+            continue;
         }
 
-        uint32_t now_tick = xTaskGetTickCount();
-        if (now_tick < next_tick) {
-            vTaskDelay(next_tick - now_tick);
+        ik_fail_count = 0u;
+        result[ROBOT_JOINT_6] = 0.0f;
+        for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
+            target_angle[j] = robot_angle_normalize(result[j]);
+            if (first_update) {
+                feedforward[j] = 0.0f;
+            } else {
+                feedforward[j] = robot_angle_diff(last_target[j], target_angle[j]) / dt;
+            }
         }
+
+        if (!robot_pid_one_period(target_angle, feedforward, NULL,
+                                  ROBOT_ARM_JOINT_NUM, true)) {
+            if (robot_motion_abort_is_requested()) {
+                LOG("robot visual servo PID aborted by safety request\r\n");
+                break;
+            }
+            if (robot_visual_servo_fault_get() != ROBOT_VISUAL_SERVO_FAULT_NONE) {
+                break;
+            }
+
+            feedback_fail_count++;
+            LOG("robot visual servo feedback failed count=%u/%u\r\n",
+                (unsigned)feedback_fail_count,
+                (unsigned)ROBOT_VISUAL_SERVO_FEEDBACK_FAIL_LIMIT);
+            if (feedback_fail_count >= ROBOT_VISUAL_SERVO_FEEDBACK_FAIL_LIMIT) {
+                robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+                break;
+            }
+
+            robot_visual_servo_wait_period(&next_tick);
+            continue;
+        }
+
+        feedback_fail_count = 0u;
+        memcpy(T_cmd, candidate_T, sizeof(T_cmd));
+        memcpy(g_robot.T, T_cmd, sizeof(g_robot.T));
+        g_robot.cur_pos.x = T_cmd[0][3] - T_0_6_reset[0][3];
+        g_robot.cur_pos.y = T_cmd[1][3] - T_0_6_reset[1][3];
+        g_robot.cur_pos.z = T_cmd[2][3] - T_0_6_reset[2][3];
+        for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
+            last_target[j] = target_angle[j];
+        }
+        first_update = false;
+        robot_kinematics_joint_angle_update(result);
+
+        robot_visual_servo_wait_period(&next_tick);
     }
 
+finish:
+    robot_joint_velocity_zero_all(ROBOT_ARM_JOINT_NUM);
     robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
     taskENTER_CRITICAL();
     g_visual_servo.vx = 0.0f;
@@ -2158,8 +2492,9 @@ static int robot_visual_servo_run(void)
     ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_VISUAL_SERVO_ACTIVE);
     ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
     taskEXIT_CRITICAL();
-    LOG("robot visual servo stopped\r\n");
-    return 0;
+    robot_visual_servo_fault_t fault = robot_visual_servo_fault_get();
+    LOG("robot visual servo stopped fault=%u\r\n", (unsigned)fault);
+    return (fault == ROBOT_VISUAL_SERVO_FAULT_NONE) ? 0 : -1;
 }
 
 struct position g_pos = {0};	// debug
@@ -2224,7 +2559,7 @@ static int robot_pid_remote(void)
 		first_update = false;
 
 		while(xTaskGetTickCount() < end_time) {
-			robot_pid_one_period(target_angle, feedforward, NULL, 4);
+			(void)robot_pid_one_period(target_angle, feedforward, NULL, 4, false);
 		}
 	}
 

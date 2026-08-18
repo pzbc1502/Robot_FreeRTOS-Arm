@@ -16,6 +16,8 @@ struct robot_kinematics {
     uint32_t result_invalid_mask;                                   /* 解算结果无效掩码 */
 };
 
+int robot_kinematics_forward(const float joint_angle[ROBOT_MAX_JOINT_NUM],
+                             float T_out[4][4]);
 void robot_kinematics_cal_T(const float T_in[4][4], float T_out[4][4], struct position *pos);
 void robot_kinematics_show_result(void);
 void robot_kinematics_show_T(float T[4][4]);
