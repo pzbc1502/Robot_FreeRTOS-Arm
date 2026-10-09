@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "jetson_vision.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +19,15 @@ extern "C" {
 #define ROBOT_WORKFLOW_RETREAT_WAIT_MS        (2000u)
 #define ROBOT_WORKFLOW_MOTION_TIMEOUT_MS      (15000u)
 #define ROBOT_WORKFLOW_RESET_TIMEOUT_MS       (45000u)
+/* Stop confirmation observes feedback stability, not a hardware emergency stop. */
+#define ROBOT_WORKFLOW_STOP_TIMEOUT_MS        (2000u)
+#define ROBOT_WORKFLOW_STOP_SAMPLE_MS         (100u)
+#define ROBOT_WORKFLOW_STOP_STABLE_MS         (200u)
+#define ROBOT_WORKFLOW_STOP_STABLE_COUNT      (3u)
+#define ROBOT_WORKFLOW_STOP_TOL_DEG           (0.10f)
+#define ROBOT_SCAN_PREPARE_TIMEOUT_MS          (60000u)
+#define ROBOT_SCAN_SEGMENT_TIMEOUT_MS          (30000u)
+#define ROBOT_SCAN_PHOTO_TIMEOUT_MS            (15000u)
 
 typedef enum
 {
@@ -35,6 +45,8 @@ typedef enum
     FLOW_RETREAT_WAIT_RESTART,
     FLOW_ABORT_HOLD,
     FLOW_FAULT_HOLD,
+    FLOW_SCAN_ACTIVE,
+    FLOW_SCAN_READY,
 } workflow_state_t;
 
 typedef struct
@@ -48,6 +60,9 @@ typedef struct
     bool has_workflow_control;
     uint8_t workflow_action;
     uint8_t workflow_seq;
+
+    bool has_scan_control;
+    jetson_scan_control_t scan_control;
 
     bool has_capture_control;
     uint8_t capture_action;

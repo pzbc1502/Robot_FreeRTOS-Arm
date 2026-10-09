@@ -18,6 +18,7 @@ void vision_service_thread_entry(void * pvParameters)
         obs.now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
         obs.has_workflow_control = jetson_get_workflow_control(&obs.workflow_action,
                                                                &obs.workflow_seq);
+        obs.has_scan_control = jetson_get_scan_control(&obs.scan_control);
         obs.has_capture_control = jetson_get_capture_control_ex(&obs.capture_action,
                                                                 &obs.capture_point_id,
                                                                 &obs.capture_seq);

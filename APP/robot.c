@@ -92,7 +92,6 @@ const float T_0_6_reset[4][4] = {
 
 
 /* 机械臂运动学仅控制 J1~J5，J6 由夹爪模块独立控制 */
-#define ROBOT_ARM_JOINT_NUM (ROBOT_MAX_JOINT_NUM - 1)
 
 
 /* 各关节权重：用于逆解结果选择时的加权误差计算（J6权重为0，不参与选解） */
@@ -113,6 +112,7 @@ volatile struct robot_remote_control g_remote_control = {0};
 static volatile robot_visual_servo_ctrl_t g_visual_servo = {0};
 static volatile bool g_robot_motion_abort_requested = false;
 static volatile uint32_t g_robot_motion_generation = 1u;
+static volatile bool g_robot_control_event_active = false;
 static volatile robot_auto_result_t g_robot_auto_result = ROBOT_AUTO_RESULT_NONE;
 static volatile robot_joint_result_t g_robot_joint_result = ROBOT_JOINT_RESULT_NONE;
 static volatile robot_reset_result_t g_robot_reset_result = ROBOT_RESET_RESULT_NONE;
@@ -1628,7 +1628,7 @@ static void robot_motion_abort_clear(void)
     taskEXIT_CRITICAL();
 }
 
-void robot_motion_abort(void)
+bool robot_motion_abort(void)
 {
     taskENTER_CRITICAL();
     if (!g_robot_motion_abort_requested) {
@@ -1651,7 +1651,45 @@ void robot_motion_abort(void)
     ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
     taskEXIT_CRITICAL();
 
-    robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+    return robot_joint_stop_all_checked(ROBOT_ARM_JOINT_NUM);
+}
+
+bool robot_motion_stop_feedback(float angles[ROBOT_ARM_JOINT_NUM], uint32_t *sample_ms)
+{
+    if ((angles == NULL) || (sample_ms == NULL) || (g_robot.event_queue == NULL)) {
+        return false;
+    }
+
+    taskENTER_CRITICAL();
+    uint32_t generation = g_robot_motion_generation;
+    bool idle = g_robot_motion_abort_requested && !g_robot_control_event_active &&
+                (uxQueueMessagesWaiting(g_robot.event_queue) == 0u);
+    taskEXIT_CRITICAL();
+    if (!idle) {
+        return false;
+    }
+
+    uint32_t missing_mask = 0u;
+    if ((robot_update_all_angles(ROBOT_ARM_JOINT_NUM, &missing_mask, NULL) != 0) ||
+        (missing_mask != 0u)) {
+        *sample_ms = HAL_GetTick();
+        return false;
+    }
+
+    taskENTER_CRITICAL();
+    idle = g_robot_motion_abort_requested && !g_robot_control_event_active &&
+           (generation == g_robot_motion_generation) &&
+           (uxQueueMessagesWaiting(g_robot.event_queue) == 0u);
+    for (uint8_t i = 0u; idle && (i < ROBOT_ARM_JOINT_NUM); i++) {
+        if (!isfinite(g_robot.joints[i].current_angle)) {
+            idle = false;
+        } else {
+            angles[i] = robot_angle_normalize(g_robot.joints[i].current_angle);
+        }
+    }
+    *sample_ms = HAL_GetTick();
+    taskEXIT_CRITICAL();
+    return idle;
 }
 
 static int robot_pid_run(struct position *path, int path_size, float *result)
@@ -2044,10 +2082,11 @@ static void robot_control_task(void *arg)
 	struct robot_event event = {0};
 	// 无限循环等待事件
     while(xQueueReceive(g_robot.event_queue, &event, portMAX_DELAY) == pdPASS) {
+        g_robot_control_event_active = true;
         if (robot_event_is_stale(&event)) {
             LOG("discard stale robot event type=%u generation=%lu\r\n",
                 (unsigned)event.type, (unsigned long)event.generation);
-            continue;
+            goto event_done;
         }
 
         if (robot_motion_abort_is_requested()) {
@@ -2060,7 +2099,7 @@ static void robot_control_task(void *arg)
             } else if (!safe_observation) {
                 LOG("reject robot event while safety abort latched: type=%u\r\n",
                     (unsigned)event.type);
-                continue;
+                goto event_done;
             }
         }
 
@@ -2166,6 +2205,8 @@ static void robot_control_task(void *arg)
 			default:
 				LOG("robot event type error\n");
         }
+event_done:
+        g_robot_control_event_active = false;
     }
 }
 
@@ -3060,6 +3101,29 @@ robot_scan_result_t robot_scan_result_get(void)
     robot_scan_result_t result = g_robot_scan_result;
     taskEXIT_CRITICAL();
     return result;
+}
+
+bool robot_scan_verify_pose(uint8_t point_id)
+{
+    float expected[ROBOT_MAX_JOINT_NUM] = {0};
+    float actual[ROBOT_MAX_JOINT_NUM] = {0};
+    taskENTER_CRITICAL();
+    bool pending_motion = (g_robot_joint_result == ROBOT_JOINT_RESULT_RUNNING) ||
+        (g_robot_reset_result == ROBOT_RESET_RESULT_RUNNING) ||
+        ((g_robot.event_queue != NULL) && (uxQueueMessagesWaiting(g_robot.event_queue) != 0u));
+    taskEXIT_CRITICAL();
+    if (pending_motion || robot_is_auto_busy() || robot_capture_is_active() ||
+        robot_motion_abort_latched() || robot_is_visual_servo_active()) {
+        return false;
+    }
+    for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
+        expected[j] = (point_id == 0u) ? g_joints_init[j].current_angle
+                                      : g_robot.joints[j].current_angle;
+    }
+    if ((point_id != 0u) && !robot_scan_apply_view(point_id, expected)) {
+        return false;
+    }
+    return robot_scan_feedback_matches(expected, actual);
 }
 
 int robot_send_scan_segment_event(robot_scan_segment_t segment)

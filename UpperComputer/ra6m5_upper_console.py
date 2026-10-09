@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 from collections.abc import Callable, Sequence
 import datetime as dt
 import queue
@@ -8,6 +9,12 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+if __package__:
+    from . import ra6m5_protocol as scan_wire
+    from .scan_client import ScanClient
+else:
+    import ra6m5_protocol as scan_wire
+    from scan_client import ScanClient
 
 import serial
 from serial.tools import list_ports
@@ -33,6 +40,7 @@ from PySide6.QtWidgets import (
 APP_TITLE = "RA6M5 Robot Serial Console"
 DEFAULT_BAUD = 115200
 ARM_HISTORY_LIMIT = 15
+LOG_HISTORY_LIMIT = 10000
 SETTINGS_ORG = "RA6M5Robot"
 SETTINGS_APP = "UpperConsole"
 DEFAULT_DEMO_SEQUENCE = "30,-20:5;15,-10:5;8,-5:5;0,0:0"
@@ -260,6 +268,10 @@ def should_display_arm_line(line: str) -> bool:
     return not any(fragment in line for fragment in noisy_fragments)
 
 
+def is_uart_statistics_log(line: str) -> bool:
+    return "[ARM-RX] [JETSON_UART] rx_bytes=" in line
+
+
 def _status_from_func_value(
     raw: bytes,
     func: int,
@@ -288,6 +300,11 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
     idx = 0
     consumed = 0
     while idx < len(data):
+        if data[idx] == RA6_SOF and idx + 4 > len(data):
+            break
+        if data[idx] == JETSON_UNIFIED_SOF0 and (idx + 1 == len(data) or
+                (data[idx + 1] == JETSON_UNIFIED_SOF1 and idx + 8 > len(data))):
+            break
         if idx + 3 < len(data) and data[idx] == RA6_SOF:
             raw = data[idx:idx + 4]
             if raw[3] == RA6_EOF:
@@ -301,6 +318,10 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
                 consumed = idx
                 continue
             payload_len = data[idx + 5]
+            if payload_len > 32:
+                idx += 1
+                consumed = idx
+                continue
             total_len = 8 + payload_len
             if idx + total_len > len(data):
                 break
@@ -314,7 +335,11 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
             msg_type = raw[3]
             seq = raw[4]
             payload = raw[6:6 + payload_len]
-            if msg_type == JETSON_MSG_STATUS and len(payload) == 3:
+            if msg_type == 0x82:
+                status = scan_wire.decode_scan_status(raw)
+                if status is not None:
+                    frames.append(status)
+            elif msg_type == JETSON_MSG_STATUS and len(payload) == 3:
                 frames.append(
                     _status_from_func_value(
                         raw,
@@ -429,7 +454,7 @@ class FormalStatusMailbox:
             self._pending.clear()
 
     def publish(self, status: Ra6Status) -> None:
-        if not status.is_formal:
+        if not status.is_formal or status.msg_type == 0x82:
             return
         with self._condition:
             self._pending.append(status)
@@ -736,6 +761,7 @@ class QtUpperConsole(QMainWindow):
         self.settings = QSettings(SETTINGS_ORG, SETTINGS_APP)
         self.logger = SessionLogger(log_dir or (Path.cwd() / "logs"))
         self.log_queue: queue.Queue[str] = queue.Queue()
+        self.log_history: deque[str] = deque(maxlen=LOG_HISTORY_LIMIT)
         self.status_update_queue: queue.Queue[tuple[str, str, str | None]] = queue.Queue()
         self._jetson_protocol = JETSON_PROTOCOL_OLD
         self.arm = SerialChannel("ARM", self)
@@ -782,6 +808,16 @@ class QtUpperConsole(QMainWindow):
         self.status_dots: dict[str, QLabel] = {}
         self.unified_seq = int(time.time_ns() % 255) + 1
         self.seq_lock = threading.Lock()
+        self.scan_client = ScanClient()
+        self.scan_status_queue = queue.Queue()
+        self.scan_measure_ready = False
+        self.scan_distance_safe = False
+        self.scan_measure_seq = None
+        self.scan_abort_seq = None
+        self.scan_abort_deadline = None
+        self.scan_stop_failed = False
+        self.scan_finish_seq = None
+        self.scan_finish_deadline = None
         self.jetson_rx_buffer = bytearray()
         self._build_ui()
         self._set_status("PROTO", self.current_protocol_label())
@@ -805,6 +841,7 @@ class QtUpperConsole(QMainWindow):
         self.left_tabs = QTabWidget()
         self.left_tabs.addTab(self._arm_group(), "机械臂控制")
         self.left_tabs.addTab(self._jetson_group(), "Jetson/定靶")
+        self.left_tabs.addTab(self._scan_group(), "扫描调试")
         self.left_tabs.addTab(self._capture_group(), "拍摄点位")
         left.addWidget(self.left_tabs, 1)
         left.addStretch(1)
@@ -812,10 +849,15 @@ class QtUpperConsole(QMainWindow):
         log_bar = QHBoxLayout()
         log_bar.addWidget(QLabel("运行日志"))
         log_bar.addStretch(1)
+        self.show_uart_stats = QCheckBox("显示 UART 统计")
+        self.show_uart_stats.setChecked(self._settings_bool("logs/show_uart_stats", False))
+        self.show_uart_stats.toggled.connect(self.on_uart_stats_toggled)
+        log_bar.addWidget(self.show_uart_stats)
         log_bar.addWidget(self._button("清空日志", self.clear_visible_log))
         right.addLayout(log_bar)
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
+        self.log_text.document().setMaximumBlockCount(LOG_HISTORY_LIMIT)
         right.addWidget(self.log_text, 1)
 
     def _serial_group(self) -> QGroupBox:
@@ -988,6 +1030,146 @@ class QtUpperConsole(QMainWindow):
         layout.addWidget(self._target_demo_group())
         layout.addWidget(self._formal_workflow_group())
         return group
+
+    def _scan_group(self) -> QGroupBox:
+        group = QGroupBox("固定扫描调试（不执行激光）")
+        layout = QVBoxLayout(group)
+        self.scan_stage = QLabel("未运行")
+        self.scan_stage.setWordWrap(True)
+        layout.addWidget(self.scan_stage)
+        row = QHBoxLayout()
+        row.addWidget(self._button("开始测距", self.scan_begin_measure))
+        row.addWidget(self._button("提交3帧实测距离", self.scan_distance_samples))
+        row.addWidget(self._button("启动扫描", self.scan_start))
+        layout.addLayout(row)
+        row = QHBoxLayout()
+        self.scan_photo_ok = self._button("保存成功（模拟）", lambda: self.scan_photo(True))
+        self.scan_photo_fail = self._button("保存失败", lambda: self.scan_photo(False))
+        self.scan_photo_ok.setEnabled(False)
+        self.scan_photo_fail.setEnabled(False)
+        row.addWidget(self.scan_photo_ok)
+        row.addWidget(self.scan_photo_fail)
+        row.addWidget(self._button("查询状态", self.scan_query))
+        row.addWidget(self._button("终止并保持", self.scan_abort))
+        row.addWidget(self._button("结束回HOME", self.scan_finish))
+        layout.addLayout(row)
+        return group
+
+    def _scan_write(self, frame: bytes) -> bool:
+        if self._jetson_protocol != JETSON_PROTOCOL_NEW or not self.jetson.is_open():
+            self.emit_log("SCAN", "ERROR", "请先打开 Jetson 协议口并选择新协议")
+            return False
+        try:
+            self.jetson.write(frame, "SCAN " + bytes_to_hex(frame))
+            return True
+        except Exception as exc:
+            self.emit_log("SCAN", "ERROR", str(exc))
+            return False
+
+    def scan_begin_measure(self) -> None:
+        if self.scan_client.active or not self._acquire_automatic_demo("scan"):
+            return
+        self.scan_measure_ready = self.scan_distance_safe = False
+        self.scan_client = ScanClient()
+        self.stop_safe_distance()
+        self.safe_distance_enable.setChecked(False)
+        self.stop_periodic_vision()
+        self.scan_measure_seq = self._next_unified_seq()
+        self.scan_abort_seq = None
+        self.scan_finish_seq = None
+        self.scan_finish_deadline = None
+        if self._scan_write(build_unified_workflow_control_frame(WORKFLOW_START, self.scan_measure_seq)):
+            self.heartbeat_enable.setChecked(True)
+            self.start_heartbeat()
+            self.scan_stage.setText("开始测距，等待公共测距位")
+        else:
+            self._release_automatic_demo("scan")
+
+    def scan_distance_samples(self) -> None:
+        if self.automatic_demo_owner != "scan" or not self.scan_measure_ready or self.scan_client.active:
+            self.emit_log("SCAN", "WARN", "尚未到公共测距位，或扫描已开始")
+            return
+        try:
+            distance = int(self.safe_distance_mm.text())
+            if distance < 100 or distance > 65535 or not self.safe_distance_valid.isChecked():
+                raise ValueError("需要有效且不少于100 mm的现场实测距离")
+        except ValueError as exc:
+            self.emit_log("SCAN", "ERROR", str(exc))
+            return
+        if QMessageBox.question(self, "确认实测距离", f"当前输入 {distance} mm 是现场实测值吗？\n不是默认值或估计值，且现场人员已准备好急停。") != QMessageBox.Yes:
+            return
+        for i in range(3):
+            QTimer.singleShot(i * 120, lambda d=distance: self._scan_distance_sample(d))
+
+    def _scan_distance_sample(self, distance: int) -> None:
+        if self.automatic_demo_owner == "scan" and self.scan_measure_ready and not self.scan_client.active:
+            self._scan_write(build_unified_safe_distance_frame(distance, True, self._next_unified_seq()))
+
+    def scan_start(self) -> None:
+        if self.automatic_demo_owner != "scan" or not self.scan_distance_safe or self.scan_client.active:
+            self.emit_log("SCAN", "WARN", "需要先完成本次测距许可，且没有正在运行的扫描")
+            return
+        if QMessageBox.question(self, "确认扫描运动", "仅限固定模型台架，激光关闭，运动范围无人，现场急停可用。现在启动扫描？") != QMessageBox.Yes:
+            return
+        last = int(self.settings.value("scan/last_id", 0))
+        scan_id = max(last + 1, int(time.time()))
+        if scan_id > 0xFFFFFFFF:
+            self.emit_log("SCAN", "ERROR", "扫描编号已耗尽")
+            return
+        self.settings.setValue("scan/last_id", scan_id)
+        self.settings.sync()
+        frame = self.scan_client.start(scan_id, self._next_unified_seq(), time.monotonic())
+        self._scan_write(frame)
+        self.scan_stage.setText(f"扫描 {scan_id}：等待接受")
+
+    def scan_photo(self, success: bool) -> None:
+        try:
+            frame = self.scan_client.photo(success, self._next_unified_seq(), time.monotonic())
+            self._scan_write(frame)
+            self.scan_photo_ok.setEnabled(False)
+            self.scan_photo_fail.setEnabled(False)
+        except ValueError as exc:
+            self.emit_log("SCAN", "WARN", str(exc))
+
+    def scan_query(self) -> None:
+        self._scan_write(self.scan_client.query(self._next_unified_seq()))
+
+    def scan_finish(self) -> None:
+        if not self.scan_client.confirmed or self.automatic_demo_owner != "scan":
+            self.emit_log("SCAN", "WARN", "只有最终正视到位后才允许正常结束返回")
+            return
+        self.scan_finish_seq = self._next_unified_seq()
+        self.scan_finish_deadline = time.monotonic() + 47
+        self.scan_client.abort()
+        self._scan_write(build_unified_workflow_control_frame(WORKFLOW_FINISH, self.scan_finish_seq))
+        self.scan_stage.setText("正常结束，等待 HOME 完成；未完成前保持控制锁")
+
+    def scan_abort(self) -> None:
+        if self.scan_abort_deadline is not None:
+            return
+        if self.automatic_demo_owner is None:
+            self._acquire_automatic_demo("scan")
+        self.scan_finish_seq = self.scan_finish_deadline = None
+        self.scan_abort_seq = self._next_unified_seq()
+        self.scan_abort_deadline = time.monotonic() + 3.0
+        self.scan_stop_failed = False
+        self.scan_client.abort()
+        self.scan_measure_ready = self.scan_distance_safe = False
+        self.scan_photo_ok.setEnabled(False)
+        self.scan_photo_fail.setEnabled(False)
+        self.scan_stage.setText("已请求终止，等待确认；未确认前不放行手动运动")
+        if not self._scan_write(build_unified_workflow_control_frame(WORKFLOW_ABORT, self.scan_abort_seq)):
+            self._scan_stop_unconfirmed()
+
+    def _scan_stop_unconfirmed(self) -> None:
+        self.scan_abort_deadline = None
+        self.scan_stop_failed = True
+        self.scan_measure_ready = self.scan_distance_safe = False
+        self.scan_client.abort()
+        self.heartbeat_enable.setChecked(False)
+        self.stop_heartbeat()
+        self.scan_stage.setText("停止未确认；心跳已停止，控制保持锁定，请按现场急停策略处理")
+        self.emit_log("SCAN", "ERROR", "停止未确认，不能宣称机械臂已经停稳；未解除控制锁")
 
     def _target_demo_group(self) -> QGroupBox:
         group = QGroupBox("一键定靶演示")
@@ -1369,13 +1551,21 @@ class QtUpperConsole(QMainWindow):
 
     def _next_unified_seq(self) -> int:
         with self.seq_lock:
-            self.unified_seq = (self.unified_seq + 1) & 0xFF
-            if self.unified_seq == 0:
-                self.unified_seq = 1
+            reserved = {self.scan_client.start_seq, self.scan_client.photo_seq,
+                        self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq} if self.automatic_demo_owner == "scan" else set()
+            while True:
+                self.unified_seq = (self.unified_seq % 255) + 1
+                if self.unified_seq not in reserved:
+                    break
             return self.unified_seq
 
     def on_protocol_changed(self) -> None:
         protocol = str(self.protocol_mode.currentData() or JETSON_PROTOCOL_OLD)
+        if protocol != JETSON_PROTOCOL_NEW and self.automatic_demo_owner == "scan":
+            self.scan_abort()
+            self.scan_client.active = False
+            self.scan_client.confirmed = False
+            self._release_automatic_demo("scan")
         self._jetson_protocol = protocol
         if protocol != JETSON_PROTOCOL_NEW and self.formal_workflow_active:
             self.stop_formal_workflow_demo()
@@ -1404,6 +1594,10 @@ class QtUpperConsole(QMainWindow):
             self.stop_heartbeat()
 
     def on_safe_distance_toggled(self, checked: bool) -> None:
+        if checked and self.automatic_demo_owner == "scan":
+            self.safe_distance_enable.setChecked(False)
+            self.emit_log("SCAN", "WARN", "扫描调试请使用现场实测距离提交，不运行默认距离保持")
+            return
         self.settings.setValue("jetson/safe_distance_enable", checked)
         self.settings.setValue("jetson/safe_distance_mm", self.safe_distance_mm.text())
         self.settings.setValue("jetson/safe_distance_valid", self.safe_distance_valid.isChecked())
@@ -1485,6 +1679,9 @@ class QtUpperConsole(QMainWindow):
             self.emit_log("JETSON", "ERROR", str(exc))
 
     def send_safe_distance_values(self, distance_mm: int, valid: bool) -> bool:
+        if self.automatic_demo_owner == "scan":
+            self.emit_log("SCAN", "WARN", "扫描调试请使用专用实测距离提交按钮")
+            return False
         if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
             self.emit_log("JETSON", "WARN", "OLD protocol does not support safe distance")
             return False
@@ -1640,6 +1837,10 @@ class QtUpperConsole(QMainWindow):
 
     def close_channel(self, channel: SerialChannel) -> None:
         if channel is self.jetson:
+            if self.automatic_demo_owner == "scan":
+                self.scan_abort()
+                self.scan_client.active = False
+                self._release_automatic_demo("scan")
             if self.formal_workflow_active:
                 self.formal_workflow_stop.set()
                 self._stop_formal_vision()
@@ -1666,7 +1867,7 @@ class QtUpperConsole(QMainWindow):
         if not command:
             self.emit_log("ARM", "WARN", "空命令已忽略。")
             return
-        if self.formal_workflow_active and command.lower() != "laser_off":
+        if (self.formal_workflow_active or self.automatic_demo_owner == "scan") and command.lower() not in ("laser_off", "motion_abort"):
             self.emit_log("ARM", "SAFETY", f"比赛全流程运行中，已拒绝手动命令: {command}")
             return
         self._remember_arm_command(command)
@@ -1827,6 +2028,9 @@ class QtUpperConsole(QMainWindow):
         self.arm_history.blockSignals(False)
 
     def send_target_ctrl(self, enable: bool) -> bool:
+        if enable and self.automatic_demo_owner == "scan":
+            self.emit_log("SCAN", "SAFETY", "扫描调试不允许进入旧定靶流程")
+            return False
         if not self.jetson.is_open():
             self.emit_log("JETSON", "ERROR", "Jetson模拟串口未打开，控制帧未发送。")
             return False
@@ -1849,6 +2053,9 @@ class QtUpperConsole(QMainWindow):
         return True
 
     def send_capture_ctrl(self, action: int, point_id: int) -> bool:
+        if self.automatic_demo_owner == "scan":
+            self.emit_log("SCAN", "SAFETY", "扫描期间不混用旧拍摄/选视图命令")
+            return False
         if self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
             self.emit_log("JETSON", "ERROR", "CAPTURE_CTRL requires NEW A5 5A + CRC16 protocol.")
             return False
@@ -1871,6 +2078,9 @@ class QtUpperConsole(QMainWindow):
         return True
 
     def stop_target_ctrl_with_reset(self) -> None:
+        if self.automatic_demo_owner == "scan":
+            self.scan_abort()
+            return
         self.stop_heartbeat()
         self.stop_safe_distance()
         if not self.send_target_ctrl(False):
@@ -2104,6 +2314,11 @@ class QtUpperConsole(QMainWindow):
         self.vision_stop.set()
 
     def safety_stop(self) -> None:
+        if self.automatic_demo_owner == "scan":
+            self.scan_abort()
+            self.send_arm_command("motion_abort")
+            self.send_arm_command("laser_off")
+            return
         if self.formal_workflow_active:
             self.stop_formal_workflow_demo()
             self.send_arm_command("laser_off")
@@ -2136,6 +2351,8 @@ class QtUpperConsole(QMainWindow):
             frames, remaining = parse_ra6_status_stream(bytes(self.jetson_rx_buffer))
             self.jetson_rx_buffer = bytearray(remaining[-64:])
             for status in frames:
+                if status.msg_type == 0x82 or (status.is_formal and status.event == EVENT_WORKFLOW):
+                    self.scan_status_queue.put(status)
                 if status.is_formal:
                     self.formal_status_mailbox.publish(status)
                     self.emit_log(
@@ -2297,7 +2514,16 @@ class QtUpperConsole(QMainWindow):
         return False
 
     def clear_visible_log(self) -> None:
+        self.log_history.clear()
         self.log_text.clear()
+
+    def on_uart_stats_toggled(self, checked: bool) -> None:
+        self.settings.setValue("logs/show_uart_stats", checked)
+        self.settings.sync()
+        lines = (line for line in self.log_history if checked or not is_uart_statistics_log(line))
+        self.log_text.setPlainText("\n".join(lines))
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
 
     def emit_log(self, source: str, kind: str, message: str) -> None:
         line = f"[{dt.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] [{source}-{kind}] {message}"
@@ -2305,6 +2531,67 @@ class QtUpperConsole(QMainWindow):
         self.log_queue.put(line)
 
     def _flush_logs(self) -> None:
+        while True:
+            try:
+                status = self.scan_status_queue.get_nowait()
+            except queue.Empty:
+                break
+            if status.msg_type == 0x82:
+                self.emit_log("SCAN", "STATUS", f"id={status.scan_id} {status.name} state={scan_wire.SCAN_STATES[status.scan_state]} flags=0x{status.scan_flags:02X} error=0x{status.error:02X}")
+                if self.scan_client.receive(status, time.monotonic()):
+                    if not self.scan_client.cancelling:
+                        self.scan_stage.setText(f"扫描 {status.scan_id}：{scan_wire.SCAN_STATES[status.scan_state]}；error=0x{status.error:02X}")
+                    ready = self.scan_client.active and not self.scan_client.cancelling and self.scan_client.state == 3 and not self.scan_client.seen_photo and self.scan_client.pending is None
+                    self.scan_photo_ok.setEnabled(ready)
+                    self.scan_photo_fail.setEnabled(ready)
+                    if status.error or status.scan_state in (8, 9):
+                        if self.automatic_demo_owner == "scan" and not self.scan_client.cancelling:
+                            self.scan_abort()
+                    if self.scan_client.confirmed:
+                        self.scan_stage.setText(f"扫描 {status.scan_id}：最终正视真实到位，激光保持关闭")
+            elif self.automatic_demo_owner == "scan" and status.seq in (0, self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq):
+                if (status.msg_type == 0x81 and status.event == EVENT_WORKFLOW and
+                        self.scan_abort_seq is not None and status.seq == self.scan_abort_seq and
+                        status.value == WORKFLOW_ABORTED_HOLD and status.error == 0):
+                    if not self.scan_stop_failed:
+                        self.scan_abort_deadline = None
+                        self.scan_measure_ready = self.scan_distance_safe = False
+                        self.scan_client.active = self.scan_client.confirmed = False
+                        self._release_automatic_demo("scan")
+                        self.scan_stage.setText("MCU 停止确认通过；旧扫描已作废，需重新测距")
+                elif status.error or (status.event == EVENT_WORKFLOW and status.value == WORKFLOW_FAULT_HOLD):
+                    self.scan_measure_ready = self.scan_distance_safe = False
+                    self.scan_client.active = self.scan_client.confirmed = False
+                    self.scan_client.pending = None
+                    if status.seq == self.scan_abort_seq:
+                        self._scan_stop_unconfirmed()
+                    elif self.scan_abort_deadline is None and not self.scan_stop_failed:
+                        self.scan_abort()
+                elif self.scan_abort_seq is not None:
+                    pass
+                elif status.event == EVENT_WORKFLOW and status.seq == self.scan_finish_seq and status.value == WORKFLOW_RETURN_HOME_DONE:
+                    self.scan_client.active = self.scan_client.confirmed = False
+                    self.scan_finish_seq = None
+                    self.scan_finish_deadline = None
+                    self.scan_distance_safe = False
+                    self._release_automatic_demo("scan")
+                    self.scan_stage.setText("正常结束，HOME 已完成")
+                elif status.event == EVENT_WORKFLOW and status.seq == self.scan_measure_seq and status.value == WORKFLOW_MEASURE_READY and not self.scan_client.cancelling:
+                    self.scan_measure_ready = True
+                    self.scan_stage.setText("公共测距位已到位，请输入现场实测距离")
+                elif status.event == EVENT_WORKFLOW and status.seq == self.scan_measure_seq and status.value == WORKFLOW_SAFE_LATCHED and not self.scan_client.cancelling:
+                    self.scan_distance_safe = True
+                    self.scan_stage.setText("测距许可完成，可以启动固定扫描")
+        if self.scan_abort_deadline is not None and time.monotonic() >= self.scan_abort_deadline:
+            self._scan_stop_unconfirmed()
+        if self.scan_finish_deadline is not None and time.monotonic() >= self.scan_finish_deadline:
+            self.emit_log("SCAN", "ERROR", "正常返回 HOME 等待超时，不能视为完成；已请求中止")
+            self.scan_abort()
+        if self.scan_client.expired(time.monotonic()):
+            self.emit_log("SCAN", "ERROR", "扫描阶段等待超时，请现场确认停止；已请求中止")
+            self.scan_abort()
+        for frame in self.scan_client.poll(time.monotonic(), self._next_unified_seq):
+            self._scan_write(frame)
         while True:
             try:
                 key, value, color = self.status_update_queue.get_nowait()
@@ -2322,9 +2609,13 @@ class QtUpperConsole(QMainWindow):
                 line = self.log_queue.get_nowait()
             except queue.Empty:
                 return
-            self.log_text.append(line)
+            self.log_history.append(line)
+            if self.show_uart_stats.isChecked() or not is_uart_statistics_log(line):
+                self.log_text.append(line)
 
     def closeEvent(self, event) -> None:  # noqa: N802
+        if self.automatic_demo_owner == "scan":
+            self.scan_abort()
         if self.formal_workflow_active:
             self.formal_workflow_stop.set()
             self._stop_formal_vision()

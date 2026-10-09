@@ -91,6 +91,9 @@ static volatile bool s_new_target_control = false;
 static uint8_t s_workflow_action = 0u;
 static uint8_t s_workflow_seq = 0u;
 static volatile bool s_new_workflow_control = false;
+#define JETSON_SCAN_QUEUE_SIZE 8u
+static jetson_scan_control_t s_scan_queue[JETSON_SCAN_QUEUE_SIZE];
+static uint8_t s_scan_read, s_scan_write, s_scan_count;
 static volatile bool s_unified_protocol_active = false;
 static volatile bool s_heartbeat_seen = false;
 static uint32_t s_last_heartbeat_ms = 0u;
@@ -98,7 +101,7 @@ static uint8_t s_last_unified_seq = 0u;
 static uint8_t s_last_unified_type = 0u;
 
 static SemaphoreHandle_t s_tx_sem = NULL;
-static uint8_t s_tx_frame[2u + 4u + 3u + 2u];
+static uint8_t s_tx_frame[8u + JETSON_SCAN_STATUS_LEN];
 
 static uint32_t jetson_now_ms(void)
 {
@@ -387,6 +390,32 @@ static void handle_valid_unified_frame(void)
             }
             break;
 
+        case JETSON_MSG_SCAN_CTRL:
+            if (s_parser.unified_len != JETSON_SCAN_CTRL_LEN)
+            {
+                (void)jetson_send_error(s_parser.unified_seq, JETSON_ERROR_INVALID_PARAM);
+                break;
+            }
+            {
+                const uint8_t *p = s_parser.unified_payload;
+                jetson_scan_control_t control = {
+                    .action = p[0], .value = p[1], .seq = s_parser.unified_seq,
+                    .scan_id = (uint32_t)p[2] | ((uint32_t)p[3] << 8) |
+                               ((uint32_t)p[4] << 16) | ((uint32_t)p[5] << 24)
+                };
+                if (s_scan_count == JETSON_SCAN_QUEUE_SIZE)
+                {
+                    (void)jetson_send_scan_status(control.seq, JETSON_SCAN_ACK,
+                        JETSON_SCAN_NONE, 0u, control.action, 0u,
+                        JETSON_ERROR_BUSY, control.scan_id);
+                    break;
+                }
+                s_scan_queue[s_scan_write] = control;
+                s_scan_write = (uint8_t)((s_scan_write + 1u) % JETSON_SCAN_QUEUE_SIZE);
+                s_scan_count++;
+            }
+            break;
+
         default:
             LOG("[JETSON_RX] unsupported unified type=0x%02X len=%u\r\n",
                 (unsigned)s_parser.unified_type,
@@ -646,6 +675,7 @@ void jetson_vision_init(void)
     s_new_capture_control = false;
     s_new_target_control = false;
     s_new_workflow_control = false;
+    s_scan_read = s_scan_write = s_scan_count = 0u;
     s_vision_seq_seen = false;
     s_distance_seq_seen = false;
     s_unified_protocol_active = false;
@@ -832,6 +862,19 @@ bool jetson_is_unified_protocol_active(void)
     return s_unified_protocol_active;
 }
 
+bool jetson_get_scan_control(jetson_scan_control_t *control)
+{
+    /* Both producer and consumer run in the vision service task. */
+    if ((control == NULL) || (s_scan_count == 0u))
+    {
+        return false;
+    }
+    *control = s_scan_queue[s_scan_read];
+    s_scan_read = (uint8_t)((s_scan_read + 1u) % JETSON_SCAN_QUEUE_SIZE);
+    s_scan_count--;
+    return true;
+}
+
 bool jetson_is_link_alive(uint32_t now_ms)
 {
     if (!s_unified_protocol_active)
@@ -936,6 +979,32 @@ bool jetson_send_error(uint8_t seq, uint8_t error_code)
 {
     uint32_t tx_len = build_unified_error_frame(seq, error_code);
     return jetson_send_tx_frame(tx_len);
+}
+
+bool jetson_send_scan_status(uint8_t seq, uint8_t event, uint8_t state,
+                            uint8_t flags, uint8_t action, uint8_t result,
+                            uint8_t error, uint32_t scan_id)
+{
+    s_tx_frame[0] = JETSON_UNIFIED_SOF0;
+    s_tx_frame[1] = JETSON_UNIFIED_SOF1;
+    s_tx_frame[2] = JETSON_UNIFIED_VERSION;
+    s_tx_frame[3] = JETSON_MSG_SCAN_STATUS;
+    s_tx_frame[4] = seq;
+    s_tx_frame[5] = JETSON_SCAN_STATUS_LEN;
+    s_tx_frame[6] = event;
+    s_tx_frame[7] = state;
+    s_tx_frame[8] = flags;
+    s_tx_frame[9] = action;
+    s_tx_frame[10] = result;
+    s_tx_frame[11] = error;
+    for (uint8_t i = 0u; i < 4u; i++)
+    {
+        s_tx_frame[12u + i] = (uint8_t)(scan_id >> (8u * i));
+    }
+    uint16_t crc = crc_modbus(&s_tx_frame[2], 4u + JETSON_SCAN_STATUS_LEN);
+    s_tx_frame[16] = (uint8_t)crc;
+    s_tx_frame[17] = (uint8_t)(crc >> 8);
+    return jetson_send_tx_frame(18u);
 }
 
 bool jetson_send_status_u8(uint8_t func, uint8_t value)

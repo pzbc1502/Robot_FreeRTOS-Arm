@@ -37,6 +37,7 @@ extern "C" {
 //#endif
 
 #define ROBOT_MAX_JOINT_NUM                 6       /* 机械臂最大关节数 */
+#define ROBOT_ARM_JOINT_NUM                 (ROBOT_MAX_JOINT_NUM - 1)
 #define ROBOT_MAX_EVENT_NUM                 20      /* 消息队列最大事件数 */
 
 #define ROBOT_MQTT_ENABLE                   0U      /* 使能 MQTT 服务开关 */
@@ -338,8 +339,11 @@ void robot_visual_servo_set_velocity(float vx, float vy, float vz);
 bool robot_is_visual_servo_active(void);
 robot_visual_servo_fault_t robot_visual_servo_fault_get(void);
 void robot_visual_servo_fault_clear(void);
-void robot_motion_abort(void);
+/* Return CAN stop acknowledgement only; it is not a stationary-pose proof. */
+bool robot_motion_abort(void);
 bool robot_motion_abort_latched(void);
+/* Fresh J1-J5 feedback, only after the aborted executor and queue are idle. */
+bool robot_motion_stop_feedback(float angles[ROBOT_ARM_JOINT_NUM], uint32_t *sample_ms);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
 int robot_send_view_arc_event(float duration_ms);
 /* Caller prepares the formal LEFT pose, then explicitly requests each segment.
@@ -347,6 +351,8 @@ int robot_send_view_arc_event(float duration_ms);
  * Cancel with robot_motion_abort(); results are persistent, not consumed. */
 int robot_send_scan_segment_event(robot_scan_segment_t segment);
 robot_scan_result_t robot_scan_result_get(void);
+/* Read all five joints and verify the formal view (0 = HOME). No motion. */
+bool robot_scan_verify_pose(uint8_t point_id);
 int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);
 

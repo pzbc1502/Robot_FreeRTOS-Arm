@@ -21,6 +21,8 @@ JETSON_MSG_VISION_ERROR = 0x03
 JETSON_MSG_CAPTURE_CTRL = 0x04
 JETSON_MSG_SAFE_DISTANCE = 0x05
 JETSON_MSG_WORKFLOW_CTRL = 0x06
+JETSON_MSG_SCAN_CTRL = 0x07
+JETSON_MSG_SCAN_STATUS = 0x82
 JETSON_MSG_STATUS = 0x81
 JETSON_MSG_ERROR = 0xFE
 
@@ -104,6 +106,10 @@ class Ra6Status:
     error: int = 0
     msg_type: int | None = None
     is_formal: bool = False
+    scan_id: int | None = None
+    scan_state: int | None = None
+    scan_flags: int = 0
+    request_action: int | None = None
 
 
 def bytes_to_hex(data: bytes) -> str:
@@ -185,6 +191,41 @@ def build_unified_workflow_control_frame(action: int, seq: int) -> bytes:
     return build_unified_frame(JETSON_MSG_WORKFLOW_CTRL, seq, bytes([action]))
 
 
+SCAN_STATES = {
+    0: "NONE", 1: "PREPARING", 2: "LEFT_TO_FRONT", 3: "WAIT_PHOTO",
+    4: "FRONT_TO_RIGHT", 5: "RETURNING_HOME", 8: "ABORTED_HOLD",
+    9: "FAULT_HOLD", 10: "RETURNING_FRONT", 11: "FRONT_OBSERVE_HOLD",
+    12: "SCAN_CHAIN_COMPLETED",
+}
+SCAN_EVENTS = {
+    1: "ACK", 2: "SNAPSHOT", 3: "FRONT_PHOTO_READY", 4: "PHOTO_ACCEPTED",
+    5: "SCAN_DONE", 6: "HOME_READY", 7: "TERMINATED", 8: "FRONT_OBSERVE_READY",
+}
+
+
+def build_scan_control(action: int, value: int, scan_id: int, seq: int) -> bytes:
+    if not 1 <= seq <= 255 or not 0 <= scan_id <= 0xFFFFFFFF:
+        raise ValueError("invalid scan ID or SEQ")
+    if action not in (0, 1, 2) or value not in ((0, 1) if action == 2 else (0,)):
+        raise ValueError("invalid scan action/value")
+    if action != 0 and scan_id == 0:
+        raise ValueError("START/PHOTO_DONE require nonzero scan ID")
+    return build_unified_frame(7, seq, bytes([action, value]) + scan_id.to_bytes(4, "little"))
+
+
+def decode_scan_status(raw: bytes) -> Ra6Status | None:
+    if (len(raw) != 18 or raw[:4] != b"\xA5\x5A\x01\x82" or raw[5] != 10 or
+            crc16_modbus(raw[2:-2]) != int.from_bytes(raw[-2:], "little")):
+        return None
+    event, state, flags, action, result, error = raw[6:12]
+    if (event not in SCAN_EVENTS or state not in SCAN_STATES or flags & ~7 or
+            action not in (0, 1, 2) or result not in (0, 1) or raw[4] == 0):
+        return None
+    return Ra6Status(raw, event, result, "SCAN_" + SCAN_EVENTS[event], raw[4], event,
+                     error, 0x82, True, int.from_bytes(raw[12:16], "little"),
+                     state, flags, action)
+
+
 def _status_from_func_value(
     raw: bytes,
     func: int,
@@ -213,6 +254,11 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
     idx = 0
     consumed = 0
     while idx < len(data):
+        if data[idx] == RA6_SOF and idx + 4 > len(data):
+            break
+        if data[idx] == JETSON_UNIFIED_SOF0 and (idx + 1 == len(data) or
+                (data[idx + 1] == JETSON_UNIFIED_SOF1 and idx + 8 > len(data))):
+            break
         if idx + 3 < len(data) and data[idx] == RA6_SOF:
             raw = data[idx:idx + 4]
             if raw[3] == RA6_EOF:
@@ -226,6 +272,10 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
                 consumed = idx
                 continue
             payload_len = data[idx + 5]
+            if payload_len > 32:
+                idx += 1
+                consumed = idx
+                continue
             total_len = 8 + payload_len
             if idx + total_len > len(data):
                 break
@@ -239,7 +289,11 @@ def parse_ra6_status_stream(data: bytes) -> tuple[list[Ra6Status], bytes]:
             msg_type = raw[3]
             seq = raw[4]
             payload = raw[6:6 + payload_len]
-            if msg_type == JETSON_MSG_STATUS and len(payload) == 3:
+            if msg_type == JETSON_MSG_SCAN_STATUS:
+                scan = decode_scan_status(raw)
+                if scan is not None:
+                    frames.append(scan)
+            elif msg_type == JETSON_MSG_STATUS and len(payload) == 3:
                 frames.append(
                     _status_from_func_value(
                         raw,

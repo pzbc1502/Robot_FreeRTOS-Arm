@@ -65,7 +65,7 @@ def build_source():
         "robot_joint_rotate_to", "robot_view_arc_smoothstep", "robot_auto_final_confirm",
         "robot_pid_one_period_limited", "robot_pid_one_period", "robot_scan_apply_view",
         "robot_scan_feedback_matches", "robot_scan_segment_move", "robot_scan_result_get",
-        "robot_send_scan_segment_event"))
+        "robot_send_scan_segment_event", "robot_scan_verify_pose"))
     capture_functions = function(capture, "capture_steps_for") + function(capture, "robot_capture_view_angles_get")
     checked_stop = function(robot, "robot_joint_stop_all_checked")
     gains = declaration(robot, r"static const float ROBOT_JOINT_KP\[[^;]*;")
@@ -117,8 +117,12 @@ static uint8_t pos_direction;
 static struct robot_event queued_event;
 static bool robot_motion_abort_is_requested(void);
 static void robot_joint_stop_all(uint8_t n) { (void)n; memset(commanded,0,sizeof(commanded)); }
-void robot_motion_abort(void);
+bool robot_motion_abort(void);
+static bool robot_joint_stop_all_checked(uint8_t n);
 static bool robot_capture_is_active(void) { return capture_active; }
+static bool robot_is_auto_busy(void) { return ROBOT_STATUS_IS(g_robot.status,ROBOT_STATUS_AUTO_BUSY); }
+static bool robot_is_visual_servo_active(void) { return ROBOT_STATUS_IS(g_robot.status,ROBOT_STATUS_VISUAL_SERVO_ACTIVE); }
+static bool robot_motion_abort_latched(void) { return g_robot_motion_abort_requested; }
 static int robot_update_all_angles(uint8_t n,uint32_t *missing,uint32_t *elapsed) {
     (void)n; (void)elapsed; now_ms+=read_delay_ms;
     if(feedback_fail_at && now_ms>=feedback_fail_at) missing_feedback=true;
@@ -207,6 +211,10 @@ int main(void) {
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
     execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FRONT_READY && pending==0);
+    assert(robot_scan_verify_pose(2));
+    pending=1;assert(!robot_scan_verify_pose(2));pending=0;
+    g_robot_joint_result=ROBOT_JOINT_RESULT_RUNNING;assert(!robot_scan_verify_pose(2));g_robot_joint_result=0;
+    missing_feedback=true;assert(!robot_scan_verify_pose(2));missing_feedback=false;
     assert(fabsf(g_robot.joints[0].current_angle-90)<3 && fabsf(g_robot.joints[3].current_angle)<3);
     assert(peak_speed<=ROBOT_SCAN_MAX_SPEED_DEG_S && laser_off_calls>=2);
     for(int j=0;j<5;j++) assert(commanded[j]==0);
@@ -255,7 +263,10 @@ int main(void) {
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
     reset_fixture(); pending=1;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
-    puts("scan motion actual-C simulated-plant checks passed (no hardware)");
+    reset_fixture();memcpy(g_robot.joints,g_joints_init,sizeof(g_joints_init));
+    assert(robot_scan_verify_pose(0));
+    g_robot.joints[0].current_angle+=5;assert(!robot_scan_verify_pose(0));
+    puts("scan motion/pose verification actual-C simulated-plant checks passed (no hardware)");
 }
 """
 

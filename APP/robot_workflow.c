@@ -8,6 +8,7 @@
 #include "bsp_uart.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include <math.h>
 #include <string.h>
 
 #define WORKFLOW_COMMAND_CACHE_SIZE   (8u)
@@ -67,11 +68,57 @@ typedef enum
     COMMAND_NEW = 0,
     COMMAND_DUPLICATE,
     COMMAND_CONFLICT,
+    COMMAND_BUSY,
 } command_prepare_result_t;
 
 static robot_workflow_ctx_t s_workflow;
 static command_cache_entry_t s_command_cache[WORKFLOW_COMMAND_CACHE_SIZE];
 static uint32_t s_command_cache_age = 0u;
+static struct
+{
+    bool pending, restart_locked;
+    uint8_t stable_count;
+    uint32_t deadline, next_sample, anchor_ms;
+    float anchor[ROBOT_ARM_JOINT_NUM];
+} s_stop;
+
+/* Round identity survives command-cache expiry. IDs increase within one boot. */
+static struct
+{
+    uint32_t id, high_water, deadline, next_verify;
+    uint8_t state, flags, error, start_seq, photo_seq, photo_value;
+    bool photo_seen;
+} s_scan;
+
+static void scan_report(uint8_t seq, uint8_t event, uint8_t action,
+                        uint8_t result, uint8_t error)
+{
+    (void)jetson_send_scan_status(seq, event, s_scan.state, s_scan.flags,
+                                  action, result, error, s_scan.id);
+}
+
+static void scan_invalidate(uint8_t state, uint8_t error)
+{
+    if ((s_scan.id != 0u) && (s_scan.state != JETSON_SCAN_NONE) &&
+        ((s_scan.state != JETSON_SCAN_ABORTED_HOLD) ||
+         (state == JETSON_SCAN_FAULT_HOLD)) &&
+        (s_scan.state != JETSON_SCAN_FAULT_HOLD) &&
+        (s_scan.state != JETSON_SCAN_CHAIN_COMPLETED))
+    {
+        s_scan.state = state;
+        s_scan.flags = 0u;
+        s_scan.error = error;
+        scan_report(s_scan.start_seq, JETSON_SCAN_TERMINATED,
+                    JETSON_SCAN_START, 0u, error);
+    }
+}
+
+static void scan_snapshot(uint8_t seq, uint8_t action)
+{
+    uint8_t result = ((s_scan.state == JETSON_SCAN_ABORTED_HOLD) ||
+                      (s_scan.state == JETSON_SCAN_FAULT_HOLD)) ? 0u : 1u;
+    scan_report(seq, JETSON_SCAN_SNAPSHOT, action, result, s_scan.error);
+}
 
 static const char *workflow_state_name(workflow_state_t state)
 {
@@ -91,6 +138,8 @@ static const char *workflow_state_name(workflow_state_t state)
         case FLOW_RETREAT_WAIT_RESTART:        return "RETREAT_WAIT_RESTART";
         case FLOW_ABORT_HOLD:                  return "ABORT_HOLD";
         case FLOW_FAULT_HOLD:                  return "FAULT_HOLD";
+        case FLOW_SCAN_ACTIVE:                 return "SCAN_ACTIVE";
+        case FLOW_SCAN_READY:                  return "SCAN_READY";
         default:                               return "UNKNOWN";
     }
 }
@@ -178,6 +227,14 @@ static command_cache_entry_t *command_find(uint8_t type, uint8_t seq)
     return NULL;
 }
 
+static bool command_stop_pending(const command_cache_entry_t *entry)
+{
+    return s_stop.pending && entry->used &&
+           (entry->type == JETSON_MSG_WORKFLOW_CTRL) && (entry->len == 1u) &&
+           (entry->payload[0] == JETSON_WORKFLOW_ACTION_ABORT_HOLD) &&
+           entry->ack_valid && (entry->ack_value == 1u) && !entry->business_valid;
+}
+
 static void command_replay(const command_cache_entry_t *entry)
 {
     if (entry == NULL)
@@ -203,6 +260,7 @@ static command_cache_entry_t *command_prepare(uint8_t type, uint8_t seq,
 {
     command_cache_entry_t *entry = command_find(type, seq);
     if ((entry != NULL) &&
+        !command_stop_pending(entry) &&
         ((uint32_t)(now_ms - entry->received_ms) > WORKFLOW_COMMAND_CACHE_TTL_MS))
     {
         memset(entry, 0, sizeof(*entry));
@@ -224,7 +282,7 @@ static command_cache_entry_t *command_prepare(uint8_t type, uint8_t seq,
         return entry;
     }
 
-    uint8_t slot = 0u;
+    uint8_t slot = WORKFLOW_COMMAND_CACHE_SIZE;
     uint32_t oldest_age = UINT32_MAX;
     for (uint8_t i = 0u; i < WORKFLOW_COMMAND_CACHE_SIZE; i++)
     {
@@ -234,13 +292,20 @@ static command_cache_entry_t *command_prepare(uint8_t type, uint8_t seq,
             oldest_age = 0u;
             break;
         }
-        if (s_command_cache[i].age < oldest_age)
+        if (!command_stop_pending(&s_command_cache[i]) &&
+            (s_command_cache[i].age < oldest_age))
         {
             oldest_age = s_command_cache[i].age;
             slot = i;
         }
     }
 
+    if (slot == WORKFLOW_COMMAND_CACHE_SIZE)
+    {
+        (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+        *result = COMMAND_BUSY;
+        return NULL;
+    }
     entry = &s_command_cache[slot];
     memset(entry, 0, sizeof(*entry));
     entry->used = true;
@@ -326,9 +391,108 @@ static void workflow_clear_round(void)
     workflow_update_target_indicators();
 }
 
+static void workflow_stop_finish(uint8_t error_code, uint32_t now_ms)
+{
+    /* Complete every coalesced ABORT with its own SEQ; never infer success from ACK. */
+    for (uint8_t i = 0u; i < WORKFLOW_COMMAND_CACHE_SIZE; i++)
+    {
+        command_cache_entry_t *entry = &s_command_cache[i];
+        if (command_stop_pending(entry))
+        {
+            command_business(entry->type, entry->seq, RA6_TO_JETSON_WORKFLOW,
+                             (error_code == JETSON_ERROR_NONE) ?
+                             JETSON_WORKFLOW_ABORTED_HOLD : JETSON_WORKFLOW_FAULT_HOLD,
+                             error_code);
+            entry->received_ms = now_ms;
+        }
+    }
+    s_stop.pending = false;
+    s_stop.restart_locked = (error_code != JETSON_ERROR_NONE);
+    s_workflow.fault_latched = s_stop.restart_locked;
+    workflow_force_laser_off(error_code);
+    if (s_stop.restart_locked)
+    {
+        scan_invalidate(JETSON_SCAN_FAULT_HOLD, error_code);
+        workflow_enter(FLOW_FAULT_HOLD, now_ms);
+        (void)jetson_send_error(s_workflow.workflow_seq, error_code);
+        LOG("[WORKFLOW] stop unconfirmed error=0x%02X\r\n", error_code);
+    }
+    else
+    {
+        LOG("[WORKFLOW] stop confirmed by fresh J1-J5 feedback\r\n");
+    }
+}
+
+static void workflow_stop_step(uint32_t now_ms)
+{
+    if (!s_stop.pending)
+    {
+        return;
+    }
+    if (workflow_time_reached(now_ms, s_stop.deadline))
+    {
+        workflow_stop_finish(JETSON_ERROR_MOTION_FAILED, now_ms);
+        return;
+    }
+    if (!workflow_time_reached(now_ms, s_stop.next_sample))
+    {
+        return;
+    }
+
+    float angles[ROBOT_ARM_JOINT_NUM];
+    uint32_t sample_ms = now_ms;
+    bool valid = robot_motion_stop_feedback(angles, &sample_ms);
+    if (workflow_time_reached(sample_ms, s_stop.deadline))
+    {
+        workflow_stop_finish(JETSON_ERROR_MOTION_FAILED, sample_ms);
+        return;
+    }
+    s_stop.next_sample = sample_ms + ROBOT_WORKFLOW_STOP_SAMPLE_MS;
+    bool stable = valid && (s_stop.stable_count != 0u);
+    for (uint8_t i = 0u; valid && (i < ROBOT_ARM_JOINT_NUM); i++)
+    {
+        if (!isfinite(angles[i]))
+        {
+            valid = false;
+            stable = false;
+            break;
+        }
+        float delta = fabsf(angles[i] - s_stop.anchor[i]);
+        if (delta > 180.0f) { delta = 360.0f - delta; }
+        if (delta > ROBOT_WORKFLOW_STOP_TOL_DEG) { stable = false; }
+    }
+    if (!valid)
+    {
+        s_stop.stable_count = 0u;
+        return;
+    }
+    if (!stable)
+    {
+        memcpy(s_stop.anchor, angles, sizeof(angles));
+        s_stop.anchor_ms = sample_ms;
+        s_stop.stable_count = 1u;
+        return;
+    }
+    if (s_stop.stable_count < ROBOT_WORKFLOW_STOP_STABLE_COUNT)
+    {
+        s_stop.stable_count++;
+    }
+    if ((s_stop.stable_count >= ROBOT_WORKFLOW_STOP_STABLE_COUNT) &&
+        ((uint32_t)(sample_ms - s_stop.anchor_ms) >= ROBOT_WORKFLOW_STOP_STABLE_MS))
+    {
+        workflow_stop_finish(JETSON_ERROR_NONE, sample_ms);
+    }
+}
+
 static void workflow_fault(uint8_t error_code, uint32_t now_ms)
 {
-    if (s_workflow.state == FLOW_FAULT_HOLD)
+    bool stop_was_pending = s_stop.pending;
+    if (s_stop.pending)
+    {
+        workflow_stop_finish(error_code, now_ms);
+    }
+    s_stop.restart_locked = true;
+    if ((s_workflow.state == FLOW_FAULT_HOLD) && !stop_was_pending)
     {
         workflow_force_laser_off(error_code);
         return;
@@ -341,6 +505,7 @@ static void workflow_fault(uint8_t error_code, uint32_t now_ms)
         robot_capture_cancel();
     }
     robot_motion_abort();
+    scan_invalidate(JETSON_SCAN_FAULT_HOLD, error_code);
     workflow_clear_round();
     s_workflow.fault_latched = true;
     workflow_enter(FLOW_FAULT_HOLD, now_ms);
@@ -488,6 +653,12 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
     switch (obs->workflow_action)
     {
         case JETSON_WORKFLOW_ACTION_START_MEASURE:
+            if (s_stop.pending || s_stop.restart_locked)
+            {
+                command_ack(entry, false, s_stop.pending ? JETSON_ERROR_BUSY :
+                            JETSON_ERROR_MOTION_FAILED);
+                return;
+            }
             if (!obs->heartbeat_alive)
             {
                 command_ack(entry, false, JETSON_ERROR_HEARTBEAT_TIMEOUT);
@@ -532,7 +703,8 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
         case JETSON_WORKFLOW_ACTION_FINISH_RETURN_HOME:
             if ((s_workflow.state != FLOW_SELECTED_VIEW) &&
                 (s_workflow.state != FLOW_TARGET_ACTIVE) &&
-                (s_workflow.state != FLOW_TARGET_HOLD))
+                (s_workflow.state != FLOW_TARGET_HOLD) &&
+                (s_workflow.state != FLOW_SCAN_READY))
             {
                 command_ack(entry, false, JETSON_ERROR_INVALID_STATE);
                 return;
@@ -544,6 +716,11 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
                 robot_motion_abort();
             }
             workflow_clear_round();
+            if (s_scan.state == JETSON_SCAN_FRONT_OBSERVE_HOLD)
+            {
+                s_scan.state = JETSON_SCAN_CHAIN_COMPLETED;
+                s_scan.flags = 0u;
+            }
             s_workflow.workflow_seq = obs->workflow_seq;
             if (!workflow_begin_home(obs->now_ms, FLOW_RETURN_HOME))
             {
@@ -555,6 +732,11 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
             break;
 
         case JETSON_WORKFLOW_ACTION_ABORT_HOLD:
+            if (s_stop.pending)
+            {
+                command_ack(entry, true, JETSON_ERROR_NONE);
+                break;
+            }
             s_workflow.workflow_seq = obs->workflow_seq;
             workflow_force_laser_off(JETSON_ERROR_NONE);
             robot_target_stop_hold();
@@ -562,12 +744,21 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
             {
                 robot_capture_cancel();
             }
-            robot_motion_abort();
+            s_stop.pending = true;
+            s_stop.restart_locked = true;
+            s_stop.stable_count = 0u;
+            s_stop.deadline = obs->now_ms + ROBOT_WORKFLOW_STOP_TIMEOUT_MS;
+            s_stop.next_sample = obs->now_ms;
+            bool stop_acknowledged = robot_motion_abort();
+            scan_invalidate(JETSON_SCAN_ABORTED_HOLD, JETSON_ERROR_MOTION_ABORTED);
             workflow_clear_round();
             s_workflow.fault_latched = false;
             workflow_enter(FLOW_ABORT_HOLD, obs->now_ms);
             command_ack(entry, true, JETSON_ERROR_NONE);
-            workflow_status(JETSON_WORKFLOW_ABORTED_HOLD, JETSON_ERROR_NONE);
+            if (!stop_acknowledged)
+            {
+                workflow_stop_finish(JETSON_ERROR_MOTION_FAILED, obs->now_ms);
+            }
             break;
 
         default:
@@ -734,6 +925,68 @@ static void workflow_handle_capture_result(uint32_t now_ms)
     if ((result == ROBOT_CAPTURE_RESULT_NONE) ||
         (result == ROBOT_CAPTURE_RESULT_RUNNING))
     {
+        return;
+    }
+    if (s_workflow.state == FLOW_SCAN_ACTIVE)
+    {
+        if (workflow_time_reached(now_ms, s_scan.deadline))
+        {
+            workflow_fault(JETSON_ERROR_SCAN_STAGE_TIMEOUT, now_ms);
+            return;
+        }
+        if (result != ROBOT_CAPTURE_RESULT_OK)
+        {
+            workflow_fault((result == ROBOT_CAPTURE_RESULT_ABORTED) ?
+                JETSON_ERROR_MOTION_ABORTED : JETSON_ERROR_MOTION_FAILED, now_ms);
+            return;
+        }
+        if ((s_scan.state == JETSON_SCAN_PREPARING) &&
+            (action == JETSON_CAPTURE_ACTION_GOTO) && (point_id == 1u))
+        {
+            if (robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT) != pdPASS)
+            {
+                workflow_fault(JETSON_ERROR_MOTION_FAILED, now_ms);
+                return;
+            }
+            s_scan.state = JETSON_SCAN_LEFT_TO_FRONT;
+            s_scan.deadline = now_ms + ROBOT_SCAN_SEGMENT_TIMEOUT_MS;
+        }
+        else if ((s_scan.state == JETSON_SCAN_RETURNING_HOME) &&
+                 (action == JETSON_CAPTURE_ACTION_HOME) && (point_id == 0u))
+        {
+            if (!robot_scan_verify_pose(0u))
+            {
+                workflow_fault(JETSON_ERROR_POSE_INVALID, now_ms);
+                return;
+            }
+            s_scan.flags |= JETSON_SCAN_HOME_VERIFIED;
+            s_scan.state = JETSON_SCAN_RETURNING_FRONT;
+            s_scan.deadline = now_ms + ROBOT_SCAN_PREPARE_TIMEOUT_MS;
+            scan_report(s_scan.start_seq, JETSON_SCAN_HOME_READY,
+                        JETSON_SCAN_START, 1u, JETSON_ERROR_NONE);
+            if (!robot_capture_request(JETSON_CAPTURE_ACTION_GOTO, 2u))
+            {
+                workflow_fault(JETSON_ERROR_MOTION_FAILED, now_ms);
+            }
+        }
+        else if ((s_scan.state == JETSON_SCAN_RETURNING_FRONT) &&
+                 (action == JETSON_CAPTURE_ACTION_GOTO) && (point_id == 2u))
+        {
+            if (!robot_scan_verify_pose(2u))
+            {
+                workflow_fault(JETSON_ERROR_POSE_INVALID, now_ms);
+                return;
+            }
+            s_scan.state = JETSON_SCAN_FRONT_OBSERVE_HOLD;
+            workflow_enter(FLOW_SCAN_READY, now_ms);
+            /* No legacy SELECTED_VIEW: target identity/doctor permit not wired yet. */
+            scan_report(s_scan.start_seq, JETSON_SCAN_FRONT_OBSERVE_READY,
+                        JETSON_SCAN_START, 1u, JETSON_ERROR_NONE);
+        }
+        else
+        {
+            workflow_fault(JETSON_ERROR_INVALID_STATE, now_ms);
+        }
         return;
     }
     if (result != ROBOT_CAPTURE_RESULT_OK)
@@ -1040,11 +1293,231 @@ static void workflow_handle_target_event(uint32_t now_ms)
     }
 }
 
+static void workflow_scan_command(const robot_workflow_obs_t *obs)
+{
+    const jetson_scan_control_t *c = &obs->scan_control;
+    uint8_t error = JETSON_ERROR_NONE;
+    if ((c->seq == 0u) || (c->action > JETSON_SCAN_PHOTO_DONE) ||
+        ((c->action != JETSON_SCAN_PHOTO_DONE) && (c->value != 0u)) ||
+        ((c->action == JETSON_SCAN_PHOTO_DONE) && (c->value > 1u)) ||
+        ((c->action != JETSON_SCAN_QUERY) && (c->scan_id == 0u)))
+    {
+        error = JETSON_ERROR_INVALID_PARAM;
+    }
+    else if (c->action == JETSON_SCAN_QUERY)
+    {
+        if ((c->scan_id != 0u) && (c->scan_id != s_scan.id))
+        {
+            error = JETSON_ERROR_SCAN_ID_MISMATCH;
+        }
+        else
+        {
+            if (((s_workflow.state == FLOW_SCAN_READY) ||
+                 ((s_workflow.state == FLOW_SCAN_ACTIVE) && (s_scan.state == JETSON_SCAN_WAIT_PHOTO))) &&
+                !robot_scan_verify_pose(2u))
+            {
+                workflow_fault(JETSON_ERROR_POSE_INVALID, obs->now_ms);
+            }
+            scan_report(c->seq, JETSON_SCAN_ACK, c->action, 1u, JETSON_ERROR_NONE);
+            scan_snapshot(c->seq, c->action);
+            return;
+        }
+    }
+    else if ((c->scan_id == s_scan.id) &&
+             (((c->seq == s_scan.start_seq) && (c->action != JETSON_SCAN_START)) ||
+              (s_scan.photo_seen && (c->seq == s_scan.photo_seq) &&
+               ((c->action != JETSON_SCAN_PHOTO_DONE) || (c->value != s_scan.photo_value)))))
+    {
+        error = JETSON_ERROR_SEQ_CONFLICT;
+    }
+    else if ((c->action == JETSON_SCAN_START) && (c->scan_id == s_scan.id))
+    {
+        scan_report(c->seq, JETSON_SCAN_ACK, c->action, 1u, JETSON_ERROR_NONE);
+        scan_snapshot(c->seq, c->action);
+        return;
+    }
+    else if (c->action == JETSON_SCAN_START)
+    {
+        if (c->scan_id <= s_scan.high_water)
+        {
+            error = JETSON_ERROR_SCAN_ID_MISMATCH;
+        }
+        else if ((s_workflow.state != FLOW_SAFE_READY) || !s_workflow.distance_safe_latched)
+        {
+            error = JETSON_ERROR_INVALID_STATE;
+        }
+        else if (!obs->heartbeat_alive)
+        {
+            error = JETSON_ERROR_HEARTBEAT_TIMEOUT;
+        }
+        else if (robot_capture_is_active() || robot_is_auto_busy() || robot_motion_abort_latched())
+        {
+            error = JETSON_ERROR_BUSY;
+        }
+        else
+        {
+            workflow_force_laser_off(JETSON_ERROR_NONE);
+            robot_target_stop_hold();
+            /* A previous legacy round may have cached the pre-HOME base pose. */
+            robot_capture_init();
+            if (!robot_capture_request(JETSON_CAPTURE_ACTION_GOTO, 1u))
+            {
+                error = JETSON_ERROR_BUSY;
+            }
+            else
+            {
+                memset(&s_scan, 0, sizeof(s_scan));
+                s_scan.id = s_scan.high_water = c->scan_id;
+                s_scan.start_seq = c->seq;
+                s_scan.state = JETSON_SCAN_PREPARING;
+                s_scan.deadline = obs->now_ms + ROBOT_SCAN_PREPARE_TIMEOUT_MS;
+                s_workflow.selected_view_id = 0u;
+                workflow_enter(FLOW_SCAN_ACTIVE, obs->now_ms);
+                scan_report(c->seq, JETSON_SCAN_ACK, c->action, 1u, JETSON_ERROR_NONE);
+                return;
+            }
+        }
+    }
+    else if (c->scan_id != s_scan.id)
+    {
+        error = JETSON_ERROR_SCAN_ID_MISMATCH;
+    }
+    else if (s_scan.photo_seen)
+    {
+        if (c->value != s_scan.photo_value)
+        {
+            error = JETSON_ERROR_SEQ_CONFLICT;
+        }
+        else
+        {
+            scan_report(c->seq, JETSON_SCAN_ACK, c->action, 1u, JETSON_ERROR_NONE);
+            scan_snapshot(c->seq, c->action);
+            return;
+        }
+    }
+    else if ((s_workflow.state != FLOW_SCAN_ACTIVE) || (s_scan.state != JETSON_SCAN_WAIT_PHOTO))
+    {
+        error = JETSON_ERROR_INVALID_STATE;
+    }
+    else if (workflow_time_reached(obs->now_ms, s_scan.deadline))
+    {
+        error = JETSON_ERROR_PHOTO_CONFIRM_TIMEOUT;
+        workflow_fault(error, obs->now_ms);
+    }
+    else
+    {
+        s_scan.photo_seen = true;
+        s_scan.photo_seq = c->seq;
+        s_scan.photo_value = c->value;
+        scan_report(c->seq, JETSON_SCAN_ACK, c->action, 1u, JETSON_ERROR_NONE);
+        if (c->value == 0u)
+        {
+            workflow_fault(JETSON_ERROR_PHOTO_SAVE_FAILED, obs->now_ms);
+            return;
+        }
+        if (robot_send_scan_segment_event(ROBOT_SCAN_FRONT_TO_RIGHT) != pdPASS)
+        {
+            workflow_fault(JETSON_ERROR_MOTION_FAILED, obs->now_ms);
+            return;
+        }
+        s_scan.flags = JETSON_SCAN_PHOTO_SAVED;
+        s_scan.state = JETSON_SCAN_FRONT_TO_RIGHT;
+        s_scan.deadline = obs->now_ms + ROBOT_SCAN_SEGMENT_TIMEOUT_MS;
+        scan_report(c->seq, JETSON_SCAN_PHOTO_ACCEPTED, c->action, 1u, JETSON_ERROR_NONE);
+        return;
+    }
+    /* Rejected requests echo their own ID, never another round's ready flags. */
+    (void)jetson_send_scan_status(c->seq, JETSON_SCAN_ACK, JETSON_SCAN_NONE,
+        0u, c->action, 0u, error, c->scan_id);
+}
+
+static void workflow_scan_step(uint32_t now_ms)
+{
+    if (s_workflow.state == FLOW_SCAN_READY)
+    {
+        if (robot_is_auto_busy() || !ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID) ||
+            (workflow_time_reached(now_ms, s_scan.next_verify) && !robot_scan_verify_pose(2u)))
+        {
+            workflow_fault(JETSON_ERROR_POSE_INVALID, now_ms);
+        }
+        if (workflow_time_reached(now_ms, s_scan.next_verify))
+        {
+            s_scan.next_verify = now_ms + 300u;
+        }
+        return;
+    }
+    if (s_workflow.state != FLOW_SCAN_ACTIVE)
+    {
+        return;
+    }
+    if (workflow_time_reached(now_ms, s_scan.deadline))
+    {
+        workflow_fault((s_scan.state == JETSON_SCAN_WAIT_PHOTO) ?
+            JETSON_ERROR_PHOTO_CONFIRM_TIMEOUT : JETSON_ERROR_SCAN_STAGE_TIMEOUT, now_ms);
+        return;
+    }
+    if ((s_scan.state == JETSON_SCAN_WAIT_PHOTO) && workflow_time_reached(now_ms, s_scan.next_verify))
+    {
+        s_scan.next_verify = now_ms + 300u;
+        if (!robot_scan_verify_pose(2u))
+        {
+            workflow_fault(JETSON_ERROR_POSE_INVALID, now_ms);
+        }
+        return;
+    }
+    if ((s_scan.state != JETSON_SCAN_LEFT_TO_FRONT) &&
+        (s_scan.state != JETSON_SCAN_FRONT_TO_RIGHT))
+    {
+        return;
+    }
+    robot_scan_result_t result = robot_scan_result_get();
+    if ((result == ROBOT_SCAN_RESULT_FAILED) || (result == ROBOT_SCAN_RESULT_ABORTED))
+    {
+        workflow_fault((result == ROBOT_SCAN_RESULT_ABORTED) ?
+            JETSON_ERROR_MOTION_ABORTED : JETSON_ERROR_MOTION_FAILED, now_ms);
+    }
+    else if ((s_scan.state == JETSON_SCAN_LEFT_TO_FRONT) &&
+             (result == ROBOT_SCAN_RESULT_FRONT_READY))
+    {
+        s_scan.state = JETSON_SCAN_WAIT_PHOTO;
+        s_scan.deadline = now_ms + ROBOT_SCAN_PHOTO_TIMEOUT_MS;
+        s_scan.next_verify = now_ms + 300u;
+        scan_report(s_scan.start_seq, JETSON_SCAN_FRONT_PHOTO_READY,
+                    JETSON_SCAN_START, 1u, JETSON_ERROR_NONE);
+    }
+    else if ((s_scan.state == JETSON_SCAN_FRONT_TO_RIGHT) &&
+             (result == ROBOT_SCAN_RESULT_RIGHT_READY))
+    {
+        s_scan.flags |= JETSON_SCAN_FINISHED;
+        s_scan.state = JETSON_SCAN_RETURNING_HOME;
+        s_scan.deadline = now_ms + ROBOT_WORKFLOW_RESET_TIMEOUT_MS;
+        scan_report(s_scan.start_seq, JETSON_SCAN_DONE, JETSON_SCAN_START, 1u, JETSON_ERROR_NONE);
+        if (!robot_capture_request(JETSON_CAPTURE_ACTION_HOME, 0u))
+        {
+            workflow_fault(JETSON_ERROR_MOTION_FAILED, now_ms);
+        }
+    }
+}
+
 static void workflow_reject_pending_commands(const robot_workflow_obs_t *obs,
                                              uint8_t error_code)
 {
     command_prepare_result_t prepare = COMMAND_NEW;
     command_cache_entry_t *entry = NULL;
+
+    if (obs->has_scan_control)
+    {
+        if (obs->scan_control.action == JETSON_SCAN_QUERY)
+        {
+            workflow_scan_command(obs);
+        }
+        else
+        {
+            (void)jetson_send_scan_status(obs->scan_control.seq, JETSON_SCAN_ACK,
+                JETSON_SCAN_NONE, 0u, obs->scan_control.action, 0u,
+                error_code, obs->scan_control.scan_id);
+        }
+    }
 
     if (obs->has_workflow_control)
     {
@@ -1085,6 +1558,8 @@ void robot_workflow_init(void)
     memset(&s_workflow, 0, sizeof(s_workflow));
     memset(s_command_cache, 0, sizeof(s_command_cache));
     s_command_cache_age = 0u;
+    memset(&s_scan, 0, sizeof(s_scan));
+    memset(&s_stop, 0, sizeof(s_stop));
     s_workflow.state = FLOW_IDLE;
     s_workflow.capture_next_point = 1u;
     robot_capture_init();
@@ -1129,6 +1604,7 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
     {
         workflow_handle_workflow_command(obs);
     }
+    workflow_stop_step(obs->now_ms);
     if ((s_workflow.state == FLOW_ABORT_HOLD) ||
         (s_workflow.state == FLOW_FAULT_HOLD))
     {
@@ -1139,6 +1615,10 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
         if (obs->has_capture_control)
         {
             workflow_handle_capture_command(obs);
+        }
+        if (obs->has_scan_control)
+        {
+            workflow_scan_command(obs);
         }
         workflow_force_laser_off(JETSON_ERROR_NONE);
         return;
@@ -1156,6 +1636,11 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
 
     robot_capture_step(obs->now_ms);
     workflow_handle_capture_result(obs->now_ms);
+    workflow_scan_step(obs->now_ms);
+    if (obs->has_scan_control)
+    {
+        workflow_scan_command(obs);
+    }
     if (obs->has_capture_control &&
         (s_workflow.state != FLOW_FAULT_HOLD))
     {

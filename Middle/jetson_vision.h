@@ -33,7 +33,9 @@ extern "C" {
 #define JETSON_MSG_CAPTURE_CTRL    0x04u
 #define JETSON_MSG_SAFE_DISTANCE   0x05u
 #define JETSON_MSG_WORKFLOW_CTRL   0x06u
+#define JETSON_MSG_SCAN_CTRL       0x07u
 #define JETSON_MSG_STATUS          0x81u
+#define JETSON_MSG_SCAN_STATUS     0x82u
 #define JETSON_MSG_ERROR           0xFEu
 
 #define JETSON_HEARTBEAT_TIMEOUT_MS 600u
@@ -94,6 +96,47 @@ extern "C" {
 #define JETSON_ERROR_SEQ_CONFLICT  0x0Du
 #define JETSON_ERROR_TARGET_GATE_DENIED 0x0Eu
 #define JETSON_ERROR_MOTION_ABORTED 0x0Fu
+#define JETSON_ERROR_SCAN_ID_MISMATCH 0x10u
+#define JETSON_ERROR_PHOTO_SAVE_FAILED 0x11u
+#define JETSON_ERROR_PHOTO_CONFIRM_TIMEOUT 0x12u
+#define JETSON_ERROR_SCAN_STAGE_TIMEOUT 0x13u
+
+#define JETSON_SCAN_CTRL_LEN       6u
+#define JETSON_SCAN_STATUS_LEN     10u
+#define JETSON_SCAN_QUERY          0x00u
+#define JETSON_SCAN_START          0x01u
+#define JETSON_SCAN_PHOTO_DONE     0x02u
+#define JETSON_SCAN_ACK            0x01u
+#define JETSON_SCAN_SNAPSHOT       0x02u
+#define JETSON_SCAN_FRONT_PHOTO_READY 0x03u
+#define JETSON_SCAN_PHOTO_ACCEPTED 0x04u
+#define JETSON_SCAN_DONE           0x05u
+#define JETSON_SCAN_HOME_READY     0x06u
+#define JETSON_SCAN_TERMINATED     0x07u
+#define JETSON_SCAN_FRONT_OBSERVE_READY 0x08u
+#define JETSON_SCAN_NONE           0x00u
+#define JETSON_SCAN_PREPARING      0x01u
+#define JETSON_SCAN_LEFT_TO_FRONT  0x02u
+#define JETSON_SCAN_WAIT_PHOTO     0x03u
+#define JETSON_SCAN_FRONT_TO_RIGHT 0x04u
+#define JETSON_SCAN_RETURNING_HOME 0x05u
+/* State 0x06/0x07 are reserved, not HOME_HOLD or SELECT_CONSUMED. */
+#define JETSON_SCAN_ABORTED_HOLD   0x08u
+#define JETSON_SCAN_FAULT_HOLD     0x09u
+#define JETSON_SCAN_RETURNING_FRONT 0x0Au
+#define JETSON_SCAN_FRONT_OBSERVE_HOLD 0x0Bu
+#define JETSON_SCAN_CHAIN_COMPLETED 0x0Cu
+#define JETSON_SCAN_PHOTO_SAVED    0x01u
+#define JETSON_SCAN_FINISHED       0x02u
+#define JETSON_SCAN_HOME_VERIFIED  0x04u
+
+typedef struct
+{
+    uint8_t action;
+    uint8_t value;
+    uint8_t seq;
+    uint32_t scan_id;
+} jetson_scan_control_t;
 
 void jetson_vision_init(void);
 void jetson_vision_process(void);
@@ -103,6 +146,7 @@ bool jetson_get_target_control_ex(bool *enable, uint8_t *seq);
 bool jetson_get_capture_control_ex(uint8_t *action, uint8_t *point_id, uint8_t *seq);
 bool jetson_get_safe_distance_ex(uint16_t *distance_mm, bool *valid, uint8_t *seq);
 bool jetson_get_workflow_control(uint8_t *action, uint8_t *seq);
+bool jetson_get_scan_control(jetson_scan_control_t *control);
 bool jetson_get_vision_error(int16_t *dcx, int16_t *dcy);
 bool jetson_get_target_control(bool *enable);
 bool jetson_get_capture_control(uint8_t *action, uint8_t *point_id);
@@ -111,6 +155,9 @@ bool jetson_is_unified_protocol_active(void);
 bool jetson_is_link_alive(uint32_t now_ms);
 bool jetson_send_status(uint8_t seq, uint8_t event, uint8_t value, uint8_t error_code);
 bool jetson_send_error(uint8_t seq, uint8_t error_code);
+bool jetson_send_scan_status(uint8_t seq, uint8_t event, uint8_t state,
+                            uint8_t flags, uint8_t action, uint8_t result,
+                            uint8_t error, uint32_t scan_id);
 bool jetson_send_status_u8(uint8_t func, uint8_t value);
 void jetson_notify_rx_char_from_isr(uint8_t byte);
 void jetson_notify_tx_complete_from_isr(void);

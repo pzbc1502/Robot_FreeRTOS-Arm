@@ -292,7 +292,7 @@ def test_robot_visual_servo_api_exists() -> None:
                  "visual servo velocity API")
     require_code(ROBOT_H, "bool robot_is_visual_servo_active(void);",
                  "visual servo active API")
-    require_code(ROBOT_H, "void robot_motion_abort(void);", "motion abort API")
+    require_code(ROBOT_H, "bool robot_motion_abort(void);", "checked motion abort API")
     require_code(ROBOT_H, "robot_auto_result_t", "auto result type")
     require_code(ROBOT_H, "robot_auto_result_t robot_auto_result_consume(void);",
                  "auto result consume API")
