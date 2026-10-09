@@ -18,6 +18,8 @@ typedef enum
 } robot_capture_result_t;
 
 void robot_capture_init(void);
+/* Formal view recipe: angles are J1, J4, J5 in degrees, not a full pose. */
+bool robot_capture_view_angles_get(uint8_t point_id, float angles[3]);
 bool robot_capture_request(uint8_t action, uint8_t point_id);
 void robot_capture_step(uint32_t now_ms);
 void robot_capture_cancel(void);

@@ -209,7 +209,32 @@ enum robot_event_type
     ROBOT_JOINTS_SYNC_EVENT,        /* 关节同步事件：强制同步所有关节状态 */
     ROBOT_READ_ALL_EVENT,           /* 批量读取 J1~J5 当前角度 */
     ROBOT_VIEW_ARC_EVENT,           /* 独立演示：平滑经过左、正、右三视图 */
+    ROBOT_SCAN_SEGMENT_EVENT,       /* Formal scan motion only; no protocol/workflow. */
 };
+
+/* Each segment starts at rest; tune only after fixed-model path validation. */
+#define ROBOT_SCAN_SEGMENT_DURATION_MS      (12000U)
+#define ROBOT_SCAN_MAX_SPEED_DEG_S          (8.0f)
+#define ROBOT_SCAN_MAX_TRACK_ERROR_DEG      (8.0f)
+#define ROBOT_SCAN_POSE_TOL_DEG             (3.0f)
+#define ROBOT_SCAN_SETTLE_TIMEOUT_MS        (2000U)
+#define ROBOT_SCAN_BUDGET_MARGIN_MS         (4000U)
+
+typedef enum
+{
+    ROBOT_SCAN_LEFT_TO_FRONT = 0,
+    ROBOT_SCAN_FRONT_TO_RIGHT,
+} robot_scan_segment_t;
+
+typedef enum
+{
+    ROBOT_SCAN_RESULT_NONE = 0,
+    ROBOT_SCAN_RESULT_RUNNING,
+    ROBOT_SCAN_RESULT_FRONT_READY,
+    ROBOT_SCAN_RESULT_RIGHT_READY,
+    ROBOT_SCAN_RESULT_FAILED,
+    ROBOT_SCAN_RESULT_ABORTED,
+} robot_scan_result_t;
 
 typedef enum
 {
@@ -317,6 +342,11 @@ void robot_motion_abort(void);
 bool robot_motion_abort_latched(void);
 int robot_send_time_func_event(float time_limit_ms, float radius_mm);
 int robot_send_view_arc_event(float duration_ms);
+/* Caller prepares the formal LEFT pose, then explicitly requests each segment.
+ * FRONT_READY is not photo confirmation or HOME/SELECT permission.
+ * Cancel with robot_motion_abort(); results are persistent, not consumed. */
+int robot_send_scan_segment_event(robot_scan_segment_t segment);
+robot_scan_result_t robot_scan_result_get(void);
 int robot_send_read_all_event(void);
 uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acceleration);
 

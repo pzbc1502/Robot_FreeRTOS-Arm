@@ -107,6 +107,20 @@ static const capture_step_t *capture_steps_for(uint8_t action, uint8_t point_id)
     }
 }
 
+bool robot_capture_view_angles_get(uint8_t point_id, float angles[3])
+{
+    const capture_step_t *steps = capture_steps_for(JETSON_CAPTURE_ACTION_GOTO, point_id);
+    if ((angles == NULL) || (steps == NULL))
+    {
+        return false;
+    }
+    for (uint8_t i = 0u; i < 3u; i++)
+    {
+        angles[i] = steps[i + 1u].value;
+    }
+    return true;
+}
+
 static void capture_set_terminal_result(robot_capture_result_t result)
 {
     s_result_action = s_capture.action;

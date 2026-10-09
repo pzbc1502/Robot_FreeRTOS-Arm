@@ -454,6 +454,11 @@ def test_visual_servo_requires_fresh_feedback_for_pid() -> None:
     require_code(ROBOT_C, "static bool robot_pid_one_period(",
                  "boolean PID period result")
     pid_period = function_body(ROBOT_C, "static bool robot_pid_one_period(")
+    require_call(pid_period, "robot_pid_one_period_limited",
+                 ("target_angle", "feedforward", "total_error", "joint_num",
+                  "require_fresh_feedback", "ROBOT_FF_OUTPUT_LIMIT", "0.0f"),
+                 "legacy PID limits preserved")
+    pid_period = function_body(ROBOT_C, "static bool robot_pid_one_period_limited(")
     require_code(pid_period, "bool require_fresh_feedback", "strict feedback parameter")
     require_code(pid_period, "robot_update_all_angles(", "fresh joint feedback read")
     require_code(pid_period, "require_fresh_feedback && !fresh_feedback",
