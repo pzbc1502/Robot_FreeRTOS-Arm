@@ -27,12 +27,16 @@ extern "C" {
 #define TARGET_USE_VISUAL_SERVO      (1)        /* 1=使用视觉伺服闭环，0=不使用视觉伺服闭环 */
 #endif
 
+
+
 //视觉伺服参数
 #define TARGET_VS_KX_MM_S_PER_PX      (0.09f)    /* 200 mm 工作距离：X 轴约 0.5/s 闭环增益 */
 #define TARGET_VS_KZ_MM_S_PER_PX      (-0.09f)   /* 图像向下对应机械臂 -Z，保留已验证方向 */
 #define TARGET_VS_MAX_SPEED_MM_S      (1.0f)     /* 粗调速度上限，避免大误差阶段收敛过慢 */
 #define TARGET_VS_FINE_MAX_SPEED_MM_S (0.5f)     /* 30 px 内精调速度上限，约 1.2 px/200 ms */
 #define TARGET_VS_CMD_TIMEOUT_MS      (300u)     /* 容忍一次 200 ms 视觉帧抖动，仍小于视觉失效时间 */
+
+
 
 //末端auto修正参数
 #define TARGET_KX_MM_PER_PX          (0.38f)    /* 视觉 dcx 到机械臂 X 小步修正的比例，单位 mm/px */

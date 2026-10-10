@@ -1,0 +1,14 @@
+[14:38:43.599] [ARM-TX] read_all
+[14:38:43.665] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0Found handler for 'read_all', executing...
+[14:38:43.665] [ARM-RX] ROBOT_READ_ALL_EVENT
+[14:38:43.665] [ARM-RX] read_all ret=0 elapsed=2 ms missing=0x00
+[14:38:43.665] [ARM-RX] J1 angle=90.00
+[14:38:43.665] [ARM-RX] J2 ang
+[14:38:43.727] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:44.725] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:45.780] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:46.781] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:47.776] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:48.771] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:49.769] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82
+[14:38:50.761] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0 tx_ok=19 tx_start_fail=0 tx_timeout=0 last_type=0x06 last_seq=82

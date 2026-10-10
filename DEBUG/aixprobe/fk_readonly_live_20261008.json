@@ -1,0 +1,265 @@
+{
+  "timestamp_utc": "2026-10-08T04:06:16.364281+00:00",
+  "read_only": true,
+  "halt_reset_motion_flash_write_performed": false,
+  "historical_sign_hypotheses": {
+    "batch": "20261007_221641",
+    "hypotheses_not_validated": true,
+    "not_motor_commands": true,
+    "variants_deg": {
+      "current_fk": {
+        "left_to_front": 19.409856886023007,
+        "front_to_right": 34.32870271666877,
+        "left_to_right": 53.70167041254745
+      },
+      "reflect_j1_about_home": {
+        "left_to_front": 9.583759341780745,
+        "front_to_right": 6.3724830952033695,
+        "left_to_right": 6.3198247588301255
+      },
+      "reflect_j4_about_home": {
+        "left_to_front": 9.583759341780745,
+        "front_to_right": 6.3724830952033695,
+        "left_to_right": 6.3198247588301255
+      }
+    }
+  },
+  "elf": {
+    "path": "E:\\Renesas\\RA6M5-Robot\\Robot_FreeRTOS - Arm\\Objects\\Robot_FreeRTOS.axf",
+    "sha256": "e9fa6e2f07a5f1123b8bfdf51296a8500d7e61ed846d4bcfb3e22cce9c4185f5",
+    "robot_layout": {
+      "size": 356,
+      "members": {
+        "control_handle": 0,
+        "cmd_service_handle": 4,
+        "mqtt_sync_task_handle": 8,
+        "remote_service_handle": 12,
+        "T": 16,
+        "joints": 80,
+        "status": 320,
+        "event_queue": 324,
+        "cmd_queue": 328,
+        "cur_pos": 332,
+        "cur_rot": 344
+      }
+    },
+    "joint_layout": {
+      "size": 40,
+      "members": {
+        "current_angle": 0,
+        "postive_direction": 4,
+        "reduction_ratio": 8,
+        "p_limit_irq": 12,
+        "min_angle": 16,
+        "max_angle": 20,
+        "reset_dir": 24,
+        "status": 28,
+        "velocity": 32,
+        "acceleration": 36
+      }
+    },
+    "symbols": {
+      "g_robot": {
+        "address": 536874208,
+        "size": 356
+      },
+      "D_H": {
+        "address": 85716,
+        "size": 96
+      },
+      "g_joints_init": {
+        "address": 86976,
+        "size": 240
+      },
+      "g_can_context": {
+        "address": 536873612,
+        "size": 148
+      },
+      "robot_kinematics_forward": {
+        "address": 43105,
+        "size": 548
+      },
+      "g_visual_servo": {
+        "address": 536877444,
+        "size": 24
+      },
+      "s_target": {
+        "address": 536908428,
+        "size": 48
+      },
+      "s_workflow": {
+        "address": 536908972,
+        "size": 36
+      }
+    },
+    "flash_segments": [
+      {
+        "address": 0,
+        "size": 960
+      },
+      {
+        "address": 960,
+        "size": 95452
+      }
+    ]
+  },
+  "mcp_status": {
+    "version": "0.1.0",
+    "openocd_cmd_file": "/etc/ailink/openocd_cmd",
+    "uptime": 1123,
+    "memory_total_kb": 109828,
+    "memory_free_kb": 67132,
+    "session_active": true,
+    "session_id": "sess_1791431587",
+    "openocd_cmd": "openocd -f interface/cmsis-dap.cfg -c \"cmsis-dap vid_pid 0x1a86 0x8011\" -c \"transport select swd\" -f /etc/ailink/target/renesas_ra6m5.cfg -c \"bindto 0.0.0.0\" -c \"gdb port 3333\"",
+    "openocd_running": true
+  },
+  "poll": {
+    "response": "background polling: on\nTAP: ra6m5.cpu (enabled)"
+  },
+  "targets": {
+    "response": "    TargetName         Type       Endian TapName            State       \n--  ------------------ ---------- ------ ------------------ ------------\n 0* ra6m5.cpu          cortex_m   little ra6m5.cpu          running"
+  },
+  "cpuid": "0x410fd214",
+  "dhcsr": {
+    "hex": "0x1140001",
+    "halted": false,
+    "sleeping": true
+  },
+  "flash_match": {
+    "complete": true,
+    "matched_bytes": 96412
+  },
+  "live_D_H": [
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.5707963705062866
+    ],
+    [
+      0.0,
+      1.5707963705062866,
+      0.0,
+      1.5707963705062866
+    ],
+    [
+      200.0,
+      3.1415927410125732,
+      0.0,
+      -1.5707963705062866
+    ],
+    [
+      47.630001068115234,
+      -1.5707963705062866,
+      -184.5,
+      0.0
+    ],
+    [
+      0.0,
+      1.5707963705062866,
+      0.0,
+      1.5707963705062866
+    ],
+    [
+      0.0,
+      1.5707963705062866,
+      75.0,
+      0.0
+    ]
+  ],
+  "before_serial": {
+    "timestamp_utc": "2026-10-08T04:06:47.028483+00:00",
+    "coherent_halted_snapshot": false,
+    "status": 64,
+    "joints": [
+      {
+        "current_angle": 90.0,
+        "postive_direction": 1,
+        "reduction_ratio": 50.0,
+        "min_angle": 0.0,
+        "max_angle": 360.0,
+        "status": 0,
+        "velocity": 0.0,
+        "acceleration": 0.0
+      },
+      {
+        "current_angle": 90.0,
+        "postive_direction": 0,
+        "reduction_ratio": 99.98999786376953,
+        "min_angle": 88.0,
+        "max_angle": 180.0,
+        "status": 0,
+        "velocity": 0.0,
+        "acceleration": 0.0
+      },
+      {
+        "current_angle": -90.0,
+        "postive_direction": 0,
+        "reduction_ratio": 50.88999938964844,
+        "min_angle": -92.0,
+        "max_angle": 90.0,
+        "status": 0,
+        "velocity": 0.0,
+        "acceleration": 0.0
+      },
+      {
+        "current_angle": 0.0,
+        "postive_direction": 0,
+        "reduction_ratio": 51.0,
+        "min_angle": -90.0,
+        "max_angle": 90.0,
+        "status": 0,
+        "velocity": 0.0,
+        "acceleration": 0.0
+      },
+      {
+        "current_angle": 90.0,
+        "postive_direction": 1,
+        "reduction_ratio": 26.850000381469727,
+        "min_angle": 0.0,
+        "max_angle": 92.0,
+        "status": 0,
+        "velocity": 0.0,
+        "acceleration": 0.0
+      },
+      {
+        "current_angle": 0.0,
+        "postive_direction": 0,
+        "reduction_ratio": 51.0,
+        "min_angle": 0.0,
+        "max_angle": 360.0,
+        "status": 0,
+        "velocity": 0.0,
+        "acceleration": 0.0
+      }
+    ],
+    "T_stored_not_necessarily_measured": [
+      [
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -1.0,
+        -47.630001068115234
+      ],
+      [
+        1.0,
+        0.0,
+        0.0,
+        15.5
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "error": "could not open port 'COM3': FileNotFoundError(2, '系统找不到指定的文件。', None, 2)"
+}

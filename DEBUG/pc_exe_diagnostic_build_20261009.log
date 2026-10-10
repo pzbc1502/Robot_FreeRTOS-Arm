@@ -1,0 +1,33 @@
+118 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+118 INFO: Python: 3.11.4
+133 INFO: Platform: Windows-10-10.0.26200-SP0
+133 INFO: Python environment: C:\Users\Administrator\AppData\Local\Programs\Python\Python311
+141 INFO: Module search paths (PYTHONPATH):
+['',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\python311.zip',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\DLLs',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311',
+ 'C:\\Users\\Administrator\\AppData\\Roaming\\Python\\Python311\\site-packages',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\Pythonwin',
+ 'E:\\Renesas\\RA6M5-Robot\\Robot_FreeRTOS - Arm']
+pygame 2.6.1 (SDL 2.28.4, Python 3.11.4)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+619 INFO: checking Analysis
+655 INFO: checking PYZ
+666 INFO: checking PKG
+680 INFO: Bootloader C:\Users\Administrator\AppData\Local\Programs\Python\Python311\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+680 INFO: checking EXE
+681 INFO: Rebuilding EXE-00.toc because RA6M5_Robot_Console.exe missing
+681 INFO: Building EXE from EXE-00.toc
+681 INFO: Copying bootloader EXE to E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\diagnostic\RA6M5_Robot_Console.exe
+686 INFO: Copying icon to EXE
+690 INFO: Copying 0 resources to EXE
+690 INFO: Embedding manifest in EXE
+693 INFO: Appending PKG archive to EXE
+727 INFO: Fixing EXE headers
+938 INFO: Building EXE from EXE-00.toc completed successfully.
+942 INFO: Build complete! The results are available in: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\diagnostic

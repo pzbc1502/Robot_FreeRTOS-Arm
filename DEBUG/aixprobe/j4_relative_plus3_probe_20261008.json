@@ -1,0 +1,26 @@
+{
+  "timestamp_utc": "2026-10-08T04:36:49.966627+00:00",
+  "operator_authorized": "J4 relative +3 degrees, hold five seconds, relative -3 return; no other joints",
+  "sent_motion_commands": [],
+  "samples": {
+    "before": {
+      "port": "COM3",
+      "baud": 115200,
+      "sent_commands": [
+        "read_all"
+      ],
+      "lines": [
+        "[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0"
+      ],
+      "samples": [
+        {
+          "valid": false,
+          "joint_deg": {}
+        }
+      ]
+    }
+  },
+  "completed": false,
+  "physical_direction_not_observed_by_software": true,
+  "error": "RuntimeError('Firmware error: [JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0')"
+}

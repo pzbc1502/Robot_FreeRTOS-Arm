@@ -1,0 +1,13 @@
+[14:39:32.814] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0[JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0st_seq=82
+[14:39:32.916] [ARM-TX] read_all
+[14:39:32.940] [ARM-RX] Found handler for 'read_all', executing...
+[14:39:32.940] [ARM-RX] ROBOT_READ_ALL_EVENT
+[14:39:32.940] [ARM-RX] read_all ret=0 elapsed=2 ms missing=0x00
+[14:39:32.941] [ARM-RX] J1 angle=90.00
+[14:39:32.941] [ARM-RX] J2 angle=90.00
+[14:39:32.941] [ARM-RX] J3 angle=270.00
+[14:39:32.941] [ARM-RX] J4 angle=0.00
+[14:39:32.941] [ARM-RX] J5 angle=90.00
+HOME_READBACK joint_deg=[90.0, 90.0, 270.0, 0.0, 90.0] error_deg=[0.0, 0.0, 0.0, 0.0, 0.0]
+Encoder feedback only; power-cycle zero reference is not independently verified.
+No reset, motion, or binary workflow command was sent.

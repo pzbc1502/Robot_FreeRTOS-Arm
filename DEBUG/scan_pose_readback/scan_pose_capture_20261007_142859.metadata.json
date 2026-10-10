@@ -1,0 +1,36 @@
+{
+  "distance_source": "operator_actual_measurement",
+  "samples": {
+    "left": {
+      "capture_seq": 1,
+      "first_joint_deg": [
+        70.0,
+        119.34,
+        309.03,
+        329.99,
+        86.06
+      ],
+      "second_joint_deg": [
+        70.0,
+        119.34,
+        309.03,
+        330.0,
+        86.05
+      ],
+      "recorded_at": "2026-10-07T14:32:04.332"
+    }
+  },
+  "complete": false,
+  "public_pose_joint_deg": [
+    90.0,
+    119.35,
+    309.04,
+    360.0,
+    80.37
+  ],
+  "distance_samples_mm": [
+    403,
+    410,
+    406
+  ]
+}

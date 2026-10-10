@@ -38,6 +38,7 @@ extern "C" {
 
 #define ROBOT_MAX_JOINT_NUM                 6       /* 机械臂最大关节数 */
 #define ROBOT_ARM_JOINT_NUM                 (ROBOT_MAX_JOINT_NUM - 1)
+#define ROBOT_JOINT_LIMIT_SWITCHES_ENABLED   (0U)     /* Current rig has no physical joint limit switches. */
 #define ROBOT_MAX_EVENT_NUM                 20      /* 消息队列最大事件数 */
 
 #define ROBOT_MQTT_ENABLE                   0U      /* 使能 MQTT 服务开关 */
@@ -104,6 +105,8 @@ extern "C" {
 #define ROBOT_FF_OUTPUT_LIMIT               (200.0f)/* 前馈+P 输出限幅，单位 °/s */
 
 #define ROBOT_CAN_TIMEOUT                   (15)    /* CAN 通信超时时间，单位 ms */
+#define ROBOT_CAN_BATCH_FEEDBACK_WAIT_MS     (6U)
+#define ROBOT_CAN_BATCH_FEEDBACK_GRACE_MS    (4U)    /* One bounded grace wait for a partially received batch. */
 
 #define ROBOT_ERROR_RANGE                   (1e-4f) /* 浮点数计算误差允许范围 */
 #define ROBOT_JOINT_ANGLE_ERROR_RANGE       (1e-1f) /* 关节角度控制误差允许范围 */

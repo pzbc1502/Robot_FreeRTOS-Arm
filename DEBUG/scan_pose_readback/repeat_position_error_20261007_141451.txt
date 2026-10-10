@@ -1,0 +1,12 @@
+[INFO] READ_ONLY_BASELINE COM3 @ 115200; only read_all, no motion commands
+[14:14:51.775] [ARM-RX] [JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok0
+[14:14:51.958] [ARM-TX] read_all
+[14:14:52.026] [ARM-RX] Found handler for 'read_all', executing...
+[14:14:52.026] [ARM-RX] ROBOT_READ_ALL_EVENT
+[14:14:52.026] [ARM-RX] read_all ret=0 elapsed=2 ms missing=0x00
+[14:14:52.026] [ARM-RX] J1 angle=90.00
+[14:14:52.026] [ARM-RX] J2 angle=90.00
+[14:14:52.026] [ARM-RX] J3 angle=270.00
+[14:14:52.026] [ARM-RX] J4 angle=360.00
+[14:14:52.027] [ARM-RX] J5 angle=90.00
+[BASELINE_ONLY] current joint_deg=[90.0, 90.0, 270.0, 360.0, 90.0]; pose not labelled left/front/right

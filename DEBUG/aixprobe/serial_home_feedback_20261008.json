@@ -1,0 +1,78 @@
+{
+  "port": "COM3",
+  "baud": 115200,
+  "sent_commands": [
+    "read_all",
+    "read_all",
+    "read_all"
+  ],
+  "lines": [
+    "[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok0",
+    "Found handler for 'read_all', executing...",
+    "ROBOT_READ_ALL_EVENT",
+    "read_all ret=0 elapsed=2 ms missing=0x00",
+    "J1 angle=90.00",
+    "J2 angle=90.00",
+    "J3 angle=270.00",
+    "J4 angle=360.00",
+    "J5 angle=90.00",
+    "Found handler for 'read_all', executing...",
+    "ROBOT_READ_ALL_EVENT",
+    "read_all ret=0 elapsed=2 ms missing=0x00",
+    "J1 angle=90.00",
+    "J2 angle=90.00",
+    "J3 angle=270.00",
+    "J4 angle=360.00",
+    "J5 angle=90.00",
+    "[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0",
+    "Found handler for 'read_all', executing...",
+    "ROBOT_READ_ALL_EVENT",
+    "read_all ret=0 elapsed=2 ms missing=0x00",
+    "J1 angle=90.00",
+    "J2 angle=90.00",
+    "J3 angle=270.00",
+    "J4 angle=360.00",
+    "J5 angle=90.00"
+  ],
+  "samples": [
+    {
+      "valid": true,
+      "joint_deg": {
+        "1": 90.0,
+        "2": 90.0,
+        "3": 270.0,
+        "4": 360.0,
+        "5": 90.0
+      },
+      "ret": 0,
+      "elapsed_ms": 2,
+      "missing_mask": 0
+    },
+    {
+      "valid": true,
+      "joint_deg": {
+        "1": 90.0,
+        "2": 90.0,
+        "3": 270.0,
+        "4": 360.0,
+        "5": 90.0
+      },
+      "ret": 0,
+      "elapsed_ms": 2,
+      "missing_mask": 0
+    },
+    {
+      "valid": true,
+      "joint_deg": {
+        "1": 90.0,
+        "2": 90.0,
+        "3": 270.0,
+        "4": 360.0,
+        "5": 90.0
+      },
+      "ret": 0,
+      "elapsed_ms": 2,
+      "missing_mask": 0
+    }
+  ]
+}

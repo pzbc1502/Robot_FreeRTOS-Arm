@@ -1,0 +1,5 @@
+[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok0
+[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0
+[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0
+[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0
+[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0

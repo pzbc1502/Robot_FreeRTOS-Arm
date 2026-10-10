@@ -1,0 +1,33 @@
+{
+  "execution": "PC emulation only; CAN backend intercepted before execution",
+  "real_hardware_operated": false,
+  "cases": [
+    {
+      "j4_current_angle": 0.0,
+      "requested_angle": 3.0,
+      "absolute": true,
+      "motor_addr": 4,
+      "direction": 0,
+      "steps": 1360,
+      "commanded_joint_travel_deg": 3.0
+    },
+    {
+      "j4_current_angle": 360.0,
+      "requested_angle": 3.0,
+      "absolute": true,
+      "motor_addr": 4,
+      "direction": 1,
+      "steps": 161840,
+      "commanded_joint_travel_deg": 357.0
+    },
+    {
+      "j4_current_angle": 360.0,
+      "requested_angle": 3.0,
+      "absolute": false,
+      "motor_addr": 4,
+      "direction": 0,
+      "steps": 1360,
+      "commanded_joint_travel_deg": 3.0
+    }
+  ]
+}

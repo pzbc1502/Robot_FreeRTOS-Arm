@@ -1,0 +1,76 @@
+111 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+111 INFO: Python: 3.11.4
+133 INFO: Platform: Windows-10-10.0.26200-SP0
+133 INFO: Python environment: C:\Users\Administrator\AppData\Local\Programs\Python\Python311
+139 INFO: Module search paths (PYTHONPATH):
+['E:\\Renesas\\RA6M5-Robot\\Robot_FreeRTOS - Arm\\UpperComputer',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\python311.zip',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\DLLs',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311',
+ 'C:\\Users\\Administrator\\AppData\\Roaming\\Python\\Python311\\site-packages',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\win32\\lib',
+ 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\Pythonwin',
+ 'E:\\Renesas\\RA6M5-Robot\\Robot_FreeRTOS - Arm']
+pygame 2.6.1 (SDL 2.28.4, Python 3.11.4)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+617 INFO: checking Analysis
+618 INFO: Building Analysis because Analysis-00.toc is non existent
+618 INFO: Looking for Python shared library...
+618 INFO: Using Python shared library: C:\Users\Administrator\AppData\Local\Programs\Python\Python311\python311.dll
+618 INFO: Running Analysis Analysis-00.toc
+618 INFO: Target bytecode optimization level: 0
+618 INFO: Initializing module dependency graph...
+619 INFO: Initializing module graph hook caches...
+633 INFO: Analyzing modules for base_library.zip ...
+1431 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+1483 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+2433 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+2496 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+4571 INFO: Caching module dependency graph...
+4663 INFO: Analyzing E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\ra6m5_upper_console.py
+5006 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+5177 INFO: Processing standard module hook 'hook-PySide6.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+5399 INFO: Processing standard module hook 'hook-shiboken6.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+5671 INFO: Processing standard module hook 'hook-PySide6.QtNetwork.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+9315 INFO: Processing standard module hook 'hook-PySide6.QtCore.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+14276 INFO: Processing standard module hook 'hook-PySide6.QtWidgets.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+19478 INFO: Processing standard module hook 'hook-PySide6.QtGui.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+54854 INFO: Processing module hooks (post-graph stage)...
+54876 INFO: Performing binary vs. data reclassification (120 entries)
+54986 INFO: Looking for ctypes DLLs
+55029 WARNING: Ignoring /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation imported from C:\Users\Administrator\AppData\Local\Programs\Python\Python311\Lib\site-packages\serial\tools\list_ports_osx.py - only basenames are supported with ctypes imports!
+55029 WARNING: Ignoring /System/Library/Frameworks/IOKit.framework/IOKit imported from C:\Users\Administrator\AppData\Local\Programs\Python\Python311\Lib\site-packages\serial\tools\list_ports_osx.py - only basenames are supported with ctypes imports!
+55045 INFO: Analyzing run-time hooks ...
+55046 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+55058 INFO: Including run-time hook 'pyi_rth_pyside6.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+55071 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+55075 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PyInstaller\\hooks'
+55090 INFO: Creating base_library.zip...
+55125 INFO: Looking for dynamic libraries
+55316 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\shiboken6']
+55316 INFO: Extra DLL search directories (PATH): ['C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\Lib\\site-packages\\PySide6']
+60923 INFO: Warnings written to E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\clean_work\RA6M5_Robot_Console\warn-RA6M5_Robot_Console.txt
+60962 INFO: Graph cross-reference written to E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\clean_work\RA6M5_Robot_Console\xref-RA6M5_Robot_Console.html
+61006 INFO: checking PYZ
+61006 INFO: Building PYZ because PYZ-00.toc is non existent
+61006 INFO: Building PYZ (ZlibArchive) E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\clean_work\RA6M5_Robot_Console\PYZ-00.pyz
+61293 INFO: Building PYZ (ZlibArchive) E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\clean_work\RA6M5_Robot_Console\PYZ-00.pyz completed successfully.
+61310 INFO: checking PKG
+61310 INFO: Building PKG because PKG-00.toc is non existent
+61310 INFO: Building PKG (CArchive) RA6M5_Robot_Console.pkg
+88280 INFO: Building PKG (CArchive) RA6M5_Robot_Console.pkg completed successfully.
+88291 INFO: Bootloader C:\Users\Administrator\AppData\Local\Programs\Python\Python311\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+88291 INFO: checking EXE
+88291 INFO: Building EXE because EXE-00.toc is non existent
+88292 INFO: Building EXE from EXE-00.toc
+88293 INFO: Copying bootloader EXE to E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\clean_dist\RA6M5_Robot_Console.exe
+88304 INFO: Copying icon to EXE
+88314 INFO: Copying 0 resources to EXE
+88315 INFO: Embedding manifest in EXE
+88325 INFO: Appending PKG archive to EXE
+88402 INFO: Fixing EXE headers
+88883 INFO: Building EXE from EXE-00.toc completed successfully.
+88897 INFO: Build complete! The results are available in: E:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\UpperComputer\build\scan_release_20261009\clean_dist

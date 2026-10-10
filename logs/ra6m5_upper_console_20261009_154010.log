@@ -1,0 +1,6 @@
+[15:40:10.231] [APP-INFO] 已刷新串口: COM16, COM3, COM38, COM22, COM21, COM39
+[15:40:10.232] [APP-INFO] log file: logs\ra6m5_upper_console_20261009_154010.log
+[15:40:10.238] [ARM-ERROR] ARM串口未打开，命令未发送: soft_reset
+[15:40:10.239] [JETSON-INFO] 已停止周期视觉发送
+[15:40:10.240] [JETSON-INFO] heartbeat stopped
+[15:40:10.240] [JETSON-INFO] safe distance stopped

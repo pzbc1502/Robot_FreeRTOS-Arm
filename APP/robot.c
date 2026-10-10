@@ -439,7 +439,7 @@ static uint32_t robot_joint_rotate_to(uint32_t joint_id, enum dir dir, float ang
 
 static void robot_joint_limit_happend(uint8_t joint_id)
 {
-	if (g_robot.event_queue == NULL) {
+	if (!ROBOT_JOINT_LIMIT_SWITCHES_ENABLED || (g_robot.event_queue == NULL)) {
         return;
     }
 
@@ -570,6 +570,13 @@ static bool robot_joint_reset(uint8_t joint_id)
 /* 执行硬回零：依次将各关节转动直到触发限位开关，然后将角度设置为初始值 */
 static bool robot_joint_hard_reset(void)
 {
+    if (!ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
+        LOG("[RESET] hard reset rejected: no joint limit switches configured\r\n");
+        ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
+        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
+        g_hard_reset_done = true;
+        return false;
+    }
 	LOG("robot_joint_hard_reset start now\r\n ");
     bool reset_ok = true;
     // 按指定顺序回零：5->4->2->3->1（关节下标从0开始）
@@ -739,7 +746,22 @@ static int robot_update_all_angles(uint8_t joint_num, uint32_t *missing_mask_out
         Emm_V5_Read_Sys_Params((uint8_t)(i + 1u), S_CPOS);
     }
 
-    bool all_ok = BSP_CAN_WaitAllMotors(joint_num, 6u);
+    bool all_ok = BSP_CAN_WaitAllMotors(joint_num, ROBOT_CAN_BATCH_FEEDBACK_WAIT_MS);
+    if (!all_ok) {
+        uint32_t pending_mask = 0u;
+        __disable_irq();
+        for (uint8_t i = 0; i < joint_num; i++) {
+            if (g_can_context.motor_rx_flag[i] == 0u) {
+                pending_mask |= (1u << i);
+            }
+        }
+        __enable_irq();
+
+        /* Keep the same locked request batch; never retry with cached angles. */
+        if (pending_mask != ((1u << joint_num) - 1u)) {
+            all_ok = BSP_CAN_WaitAllMotors(joint_num, ROBOT_CAN_BATCH_FEEDBACK_GRACE_MS);
+        }
+    }
 
     for (uint8_t i = 0; i < joint_num; i++) {
         uint8_t rx[8] = {0};
@@ -1088,7 +1110,11 @@ static bool robot_joint_soft_reset(void)
         uint8_t i = reset_order[idx];
         LOG("Soft resetting joint %d...\r\n", i);
 
-		ROBOT_STATUS_SET(g_robot.joints[i].status, ROBOT_STATUS_LIMIT_ENABLE);
+        if (ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
+            ROBOT_STATUS_SET(g_robot.joints[i].status, ROBOT_STATUS_LIMIT_ENABLE);
+        } else {
+            ROBOT_STATUS_CLEAR(g_robot.joints[i].status, ROBOT_STATUS_LIMIT_ENABLE);
+        }
 		int dir = DIR_POSITIVE;
 
 		ret = robot_update_current_angle_retry((uint8_t)i, 2);
@@ -1868,8 +1894,9 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
         }
     }
 
-    LOG("[SCAN_MOTION] segment=%u begin duration=%lu ms\r\n",
-        (unsigned)segment, (unsigned long)duration_ms);
+    LOG("[SCAN_MOTION] segment=%u begin duration=%lu ms hardware_limits=%u\r\n",
+        (unsigned)segment, (unsigned long)duration_ms,
+        (unsigned)ROBOT_JOINT_LIMIT_SWITCHES_ENABLED);
     /* ponytail: stream fixed joint interpolation; no Cartesian arc/FK promise. */
     for (uint32_t elapsed = 0u; elapsed <= duration_ms; elapsed += period_ms) {
         if (robot_motion_abort_is_requested() || ROBOT_TARGET_ENABLED ||
@@ -1918,6 +1945,7 @@ finish:
     bool aborted = robot_motion_abort_is_requested();
     if (!ok) {
         robot_motion_abort();
+        BSP_CAN_PrintInfo("scan_stop");
     }
     taskENTER_CRITICAL();
     g_robot_scan_result = (ok && !g_robot_motion_abort_requested)
@@ -2243,6 +2271,9 @@ static bool robot_pid_one_period_limited(float *target_angle, float *feedforward
     if ((joint_num <= 0) || (joint_num > ROBOT_ARM_JOINT_NUM) ||
         (target_angle == NULL) || (feedforward == NULL) ||
         robot_motion_abort_is_requested()) {
+        if (track_limit > 0.0f) {
+            LOG("[SCAN_GUARD] rejected control input or abort latch\r\n");
+        }
         return false;
     }
 
@@ -2252,6 +2283,10 @@ static bool robot_pid_one_period_limited(float *target_angle, float *feedforward
     bool fresh_feedback = (feedback_result == 0) && (missing_mask == 0u);
 
     if (require_fresh_feedback && !fresh_feedback) {
+        if (track_limit > 0.0f) {
+            LOG("[SCAN_GUARD] fresh feedback failed ret=%d missing=0x%02lX\r\n",
+                feedback_result, (unsigned long)missing_mask);
+        }
         if (!robot_joint_velocity_zero_all((uint8_t)joint_num)) {
             LOG("visual servo zero velocity CAN lock failed\r\n");
             robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
@@ -2265,14 +2300,21 @@ static bool robot_pid_one_period_limited(float *target_angle, float *feedforward
 
     for (int j = 0; j < joint_num; j++) {
         if (robot_motion_abort_is_requested()) {
+            if (track_limit > 0.0f) {
+                LOG("[SCAN_GUARD] abort latch during control\r\n");
+            }
             period_ok = false;
             break;
         }
 
-        if (track_limit > 0.0f) {
+        if ((track_limit > 0.0f) && ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
             bsp_io_level_t limit_level = BSP_IO_LEVEL_LOW;
-            if ((R_IOPORT_PinRead(&g_ioport_ctrl, g_joint_limit_pins[j], &limit_level) != FSP_SUCCESS) ||
-                (limit_level == BSP_IO_LEVEL_HIGH)) {
+            fsp_err_t pin_result = R_IOPORT_PinRead(&g_ioport_ctrl,
+                                                   g_joint_limit_pins[j], &limit_level);
+            if ((pin_result != FSP_SUCCESS) || (limit_level == BSP_IO_LEVEL_HIGH)) {
+                LOG("[SCAN_GUARD] J%u hardware limit pin=0x%04X level=%u ret=%d\r\n",
+                    (unsigned)(j + 1), (unsigned)g_joint_limit_pins[j],
+                    (unsigned)limit_level, (int)pin_result);
                 period_ok = false;
                 break;
             }
@@ -2284,6 +2326,9 @@ static bool robot_pid_one_period_limited(float *target_angle, float *feedforward
             (!isfinite(error) || (fabsf(error) > track_limit) ||
              (robot_joint_compare_angle((uint8_t)j, g_robot.joints[j].current_angle,
                                         &g_robot.joints[j].current_angle) != 0))) {
+            LOG("[SCAN_GUARD] J%u angle/tracking rejected current=%.2f target=%.2f error=%.2f limit=%.2f\r\n",
+                (unsigned)(j + 1), g_robot.joints[j].current_angle,
+                target_angle[j], error, track_limit);
             period_ok = false;
             break;
         }
@@ -2831,6 +2876,7 @@ static int robot_pid_remote(void)
  */
 void robot_init(void)
 {
+#if ROBOT_JOINT_LIMIT_SWITCHES_ENABLED
     /* 打开外部中断(限位开关) */
     if (JOINT_LIMIT_1.p_api->open(JOINT_LIMIT_1.p_ctrl, JOINT_LIMIT_1.p_cfg) != FSP_SUCCESS) {
         LOG("JOINT_LIMIT_1 open failed\r\n");
@@ -2850,6 +2896,9 @@ void robot_init(void)
     if (JOINT_LIMIT_6.p_api->open(JOINT_LIMIT_6.p_ctrl, JOINT_LIMIT_6.p_cfg) != FSP_SUCCESS) {
         LOG("JOINT_LIMIT_6 open failed\r\n");
     }
+#else
+    LOG("[ROBOT_CONFIG] joint limit switches absent; software angle limits remain active\r\n");
+#endif
 
     /* 初始化关节参数 */
     memcpy(g_robot.joints, g_joints_init, sizeof(g_joints_init));

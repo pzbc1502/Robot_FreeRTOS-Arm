@@ -1,0 +1,26 @@
+[14:37:10.652] [ARM-RX] [JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0[JETSON_UART] rx_bytes=11379 frames_ok=950 crc_fail=0 overflow=0st_seq=82
+[14:37:10.838] [ARM-TX] read_all
+[14:37:10.947] [ARM-RX] Found handler for 'read_all', executing...
+[14:37:10.947] [ARM-RX] ROBOT_READ_ALL_EVENT
+[14:37:10.947] [ARM-RX] [CAN][TX] timeout id=0x00000100 dlc=2
+[14:37:10.947] [ARM-RX] [CAN][timeout] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[14:37:10.947] [ARM-RX] CAN Send chunk for Motor ID 1 failed with err: 20
+[14:37:10.947] [ARM-RX] [CAN][TX] write failed id=0x00000200 dlc=2 err=60003
+[14:37:10.947] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[14:37:10.949] [ARM-RX] CAN Send chunk for Motor ID 2 failed with err: 60003
+[14:37:10.949] [ARM-RX] [CAN][TX] write failed id=0x00000300 dlc=2 err=60003
+[14:37:11.002] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[14:37:11.002] [ARM-RX] CAN Send chunk for Motor ID 3 failed with err: 60003
+[14:37:11.002] [ARM-RX] [CAN][TX] write failed id=0x00000400 dlc=2 err=60003
+[14:37:11.002] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[14:37:11.002] [ARM-RX] CAN Send chunk for Motor ID 4 failed with err: 60003
+[14:37:11.002] [ARM-RX] [CAN][TX] write failed id=0x00000500 dlc=2 err=60003
+[14:37:11.002] [ARM-RX] [CAN][write_fail] status=0x000000A8 tx_err=128 rx_err=0 err_code=0x00000401
+[14:37:11.002] [ARM-RX] CAN Send chunk for Motor ID 5 failed with err: 60003
+[14:37:11.056] [ARM-RX] batch angle read timeout/missing mask=0x1F elapsed=145 ms
+[14:37:11.056] [ARM-RX] read_all ret=1 elapsed=145 ms missing=0x1F
+[14:37:11.056] [ARM-RX] J1 angle=88.13
+[14:37:11.056] [ARM-RX] J2 angle=119.34
+[14:37:11.056] [ARM-RX] J3 angle=309.03
+[14:37:11.056] [ARM-RX] J4 angle=145.40
+[14:37:11.056] [ARM-RX] J5 angle=86.05

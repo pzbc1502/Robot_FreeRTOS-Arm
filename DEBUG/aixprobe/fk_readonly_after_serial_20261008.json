@@ -1,0 +1,172 @@
+{
+  "timestamp_utc": "2026-10-08T04:22:28.382923+00:00",
+  "read_only": true,
+  "motion_commands_sent": [],
+  "prior_flash_verification": "fk_readonly_final_20261008.json",
+  "elf_sha256": "e9fa6e2f07a5f1123b8bfdf51296a8500d7e61ed846d4bcfb3e22cce9c4185f5",
+  "mcp_status": {
+    "version": "0.1.0",
+    "openocd_cmd_file": "/etc/ailink/openocd_cmd",
+    "uptime": 2095,
+    "memory_total_kb": 109828,
+    "memory_free_kb": 66968,
+    "session_active": true,
+    "session_id": "sess_1791431587",
+    "openocd_cmd": "openocd -f interface/cmsis-dap.cfg -c \"cmsis-dap vid_pid 0x1a86 0x8011\" -c \"transport select swd\" -f /etc/ailink/target/renesas_ra6m5.cfg -c \"bindto 0.0.0.0\" -c \"gdb port 3333\"",
+    "openocd_running": true
+  },
+  "joint_deg_in_live_ram": [
+    90.00032806396484,
+    90.00060272216797,
+    269.99969482421875,
+    359.9996643066406,
+    89.99979400634766
+  ],
+  "robot_status": 64,
+  "can_dlc": [
+    7,
+    7,
+    7,
+    7,
+    7,
+    0
+  ],
+  "can_flags": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    0
+  ],
+  "current_T_not_guaranteed_measured": [
+    [
+      0.0,
+      -1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      -1.0,
+      -47.630001068115234
+    ],
+    [
+      1.0,
+      0.0,
+      0.0,
+      15.5
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "offline_fk_from_fresh_feedback": [
+    [
+      9.025107222636371e-11,
+      -0.9999999999999911,
+      -1.331580558946885e-07,
+      0.00027271498664330825
+    ],
+    [
+      -1.944107595578216e-05,
+      1.3315805411494729e-07,
+      -0.9999999998110135,
+      -47.62918033883518
+    ],
+    [
+      0.9999999998110224,
+      9.28398080880804e-11,
+      -1.9441075955769973e-05,
+      15.499245276238934
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "serial_feedback": {
+    "port": "COM3",
+    "baud": 115200,
+    "sent_commands": [
+      "read_all",
+      "read_all",
+      "read_all"
+    ],
+    "lines": [
+      "[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok0",
+      "Found handler for 'read_all', executing...",
+      "ROBOT_READ_ALL_EVENT",
+      "read_all ret=0 elapsed=2 ms missing=0x00",
+      "J1 angle=90.00",
+      "J2 angle=90.00",
+      "J3 angle=270.00",
+      "J4 angle=360.00",
+      "J5 angle=90.00",
+      "Found handler for 'read_all', executing...",
+      "ROBOT_READ_ALL_EVENT",
+      "read_all ret=0 elapsed=2 ms missing=0x00",
+      "J1 angle=90.00",
+      "J2 angle=90.00",
+      "J3 angle=270.00",
+      "J4 angle=360.00",
+      "J5 angle=90.00",
+      "[JETSON_UART] rx_bytes=0 frames_ok=0 crc_fail=0 overflow=0 tx_ok=0 tx_start_fail=0 tx_timeout=0 last_type=0x00 last_seq=0",
+      "Found handler for 'read_all', executing...",
+      "ROBOT_READ_ALL_EVENT",
+      "read_all ret=0 elapsed=2 ms missing=0x00",
+      "J1 angle=90.00",
+      "J2 angle=90.00",
+      "J3 angle=270.00",
+      "J4 angle=360.00",
+      "J5 angle=90.00"
+    ],
+    "samples": [
+      {
+        "valid": true,
+        "joint_deg": {
+          "1": 90.0,
+          "2": 90.0,
+          "3": 270.0,
+          "4": 360.0,
+          "5": 90.0
+        },
+        "ret": 0,
+        "elapsed_ms": 2,
+        "missing_mask": 0
+      },
+      {
+        "valid": true,
+        "joint_deg": {
+          "1": 90.0,
+          "2": 90.0,
+          "3": 270.0,
+          "4": 360.0,
+          "5": 90.0
+        },
+        "ret": 0,
+        "elapsed_ms": 2,
+        "missing_mask": 0
+      },
+      {
+        "valid": true,
+        "joint_deg": {
+          "1": 90.0,
+          "2": 90.0,
+          "3": 270.0,
+          "4": 360.0,
+          "5": 90.0
+        },
+        "ret": 0,
+        "elapsed_ms": 2,
+        "missing_mask": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "camera": {
+    "mount": "after_j5",
+    "optical_frame": "rgb",
+    "calibration_id": "",
+    "calibrated": false,
+    "T_tool_camera": null,
+    "intrinsics": {
+      "width": 848,
+      "height": 530,
+      "fx": 409.721191,
+      "fy": 409.621887,
+      "cx": 420.925079,
+      "cy": 265.676117
+    }
+  },
+  "poses": {
+    "left": {
+      "joint_deg": [84.99, 120.17, 310.88, 345.54, 79.75],
+      "feedback_valid": true
+    },
+    "front": {
+      "joint_deg": [90.00, 119.34, 309.02, 0.00, 80.43],
+      "feedback_valid": true
+    },
+    "right": {
+      "joint_deg": [105.01, 120.17, 310.88, 14.46, 79.75],
+      "feedback_valid": true
+    }
+  }
+}

@@ -1,0 +1,5 @@
+[14:21:04.096] [INFO] COM16 protocol-only check: HEARTBEAT and TARGET_CTRL=0, no START/GOTO/HOME/vision/output
+[14:21:04.698] [JETSON-TX] TARGET DISABLE seq=17: A5 5A 01 02 17 01 00 A9 EC
+[14:21:04.772] [STATUS] seq=17 COMMAND_ACK value=01 error=00
+[14:21:04.772] [STATUS] seq=17 TARGET_CTRL value=00 error=00
+[14:21:04.772] [PASS] TARGET_DISABLE ACK and status received; no motion commands sent

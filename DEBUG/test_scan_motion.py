@@ -39,13 +39,16 @@ def declaration(source, pattern):
     return match.group(0)
 
 
-def build_source():
+def build_source(hardware_limits_enabled=None):
     robot = (ROOT / "APP/robot.c").read_text(encoding="utf-8")
     header = (ROOT / "APP/robot.h").read_text(encoding="utf-8")
     capture = (ROOT / "APP/robot_capture.c").read_text(encoding="utf-8")
     jetson = (ROOT / "Middle/jetson_vision.h").read_text(encoding="utf-8")
     macros = "\n".join(re.findall(r"(?m)^#define (?:ROBOT_|JETSON_CAPTURE_ACTION_)\w+[^\n]*",
                                  header + robot + jetson))
+    if hardware_limits_enabled is not None:
+        macros = re.sub(r"(?m)^#define ROBOT_JOINT_LIMIT_SWITCHES_ENABLED[^\n]*",
+                        f"#define ROBOT_JOINT_LIMIT_SWITCHES_ENABLED ({int(hardware_limits_enabled)}U)", macros)
     enums = "\n".join(declaration(header, r"typedef enum\s*\{[^}]*\}\s*" + name + r";")
                       for name in ("robot_scan_segment_t", "robot_scan_result_t"))
     structs = declaration(header, r"enum motor_dir\s*\{[^}]*\};")
@@ -62,7 +65,7 @@ def build_source():
         "robot_motion_abort_is_requested", "robot_motion_abort",
         "robot_angle_normalize", "robot_angle_diff", "robot_angle_map",
         "robot_joint_is_full_turn", "robot_joint_compare_angle", "robot_joint_compare_error",
-        "robot_joint_rotate_to", "robot_view_arc_smoothstep", "robot_auto_final_confirm",
+        "robot_joint_rotate_to", "robot_joint_hard_reset", "robot_view_arc_smoothstep", "robot_auto_final_confirm",
         "robot_pid_one_period_limited", "robot_pid_one_period", "robot_scan_apply_view",
         "robot_scan_feedback_matches", "robot_scan_segment_move", "robot_scan_result_get",
         "robot_send_scan_segment_event", "robot_scan_verify_pose"))
@@ -80,11 +83,19 @@ PREAMBLE = r"""
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 typedef int external_irq_instance_t;
+typedef int fsp_err_t;
 static const int JOINT_LIMIT_1, JOINT_LIMIT_2, JOINT_LIMIT_3,
                  JOINT_LIMIT_4, JOINT_LIMIT_5, JOINT_LIMIT_6;
-static void mock_log(const char *format, ...) { (void)format; }
+static char last_scan_guard[256];
+static void mock_log(const char *format, ...) {
+    if (strstr(format,"[SCAN_GUARD]")) {
+        va_list args; va_start(args,format);
+        vsnprintf(last_scan_guard,sizeof(last_scan_guard),format,args); va_end(args);
+    }
+}
 #define LOG(...) mock_log(__VA_ARGS__)
 #define taskENTER_CRITICAL() ((void)0)
 #define taskEXIT_CRITICAL() ((void)0)
@@ -111,8 +122,10 @@ static int g_robot_auto_result, g_robot_joint_result, g_robot_reset_result;
 static struct { bool stop_requested; } g_visual_servo;
 static uint32_t g_robot_motion_generation = 1, now_ms, abort_at, feedback_fail_at, read_delay_ms;
 static robot_scan_result_t g_robot_scan_result;
+static bool g_hard_reset_done;
 static float s_scan_front_target[6], commanded[5], peak_speed;
 static unsigned pending, motion_batches, laser_off_calls, pos_calls, pos_steps;
+static unsigned pin_read_calls, motor_enable_calls, hard_reset_calls, home_write_calls;
 static uint8_t pos_direction;
 static struct robot_event queued_event;
 static bool robot_motion_abort_is_requested(void);
@@ -143,6 +156,16 @@ static bool robot_joint_velocity_zero_all(uint8_t n) { (void)n; robot_joint_stop
 static void robot_joint_velocity_nowait(uint32_t j,float v,uint8_t a) { (void)a; commanded[j]=v; }
 static void robot_visual_servo_fault_set(int f) { (void)f; }
 static void BSP_Laser_Off(void) { laser_off_calls++; }
+static void BSP_CAN_PrintInfo(const char *tag) {
+    assert(strcmp(tag,"scan_stop")==0 && g_robot_motion_abort_requested);
+    for(unsigned j=0;j<5;j++) assert(commanded[j]==0);
+}
+static void Emm_V5_En_Control(uint8_t addr,bool enable,bool sync) {
+    (void)addr;(void)enable;(void)sync;motor_enable_calls++;
+}
+static bool robot_joint_reset(uint8_t joint) { (void)joint;hard_reset_calls++;return false; }
+static void robot_set_home_pose_valid(void) { home_write_calls++; }
+static int robot_mqtt_joints_sync(void) { return 0; }
 typedef int bsp_io_level_t;
 #define BSP_IO_LEVEL_LOW 0
 #define BSP_IO_LEVEL_HIGH 1
@@ -150,7 +173,7 @@ typedef int bsp_io_level_t;
 static int g_ioport_ctrl;
 static const int g_joint_limit_pins[6]={0,1,2,3,4,5};
 static int R_IOPORT_PinRead(void *ctrl,int pin,int *level) {
-    (void)ctrl;(void)pin;*level=limit_triggered?1:0;return pin_fail?1:0;
+    (void)ctrl;(void)pin;pin_read_calls++;*level=limit_triggered?1:0;return pin_fail?1:0;
 }
 static bool BSP_CAN_Lock(unsigned ms) { (void)ms;return true; }
 static void BSP_CAN_Unlock(void) {}
@@ -183,6 +206,8 @@ static void reset_fixture(void) {
     limit_triggered=pin_fail=stop_fail=false;
     pending=now_ms=abort_at=feedback_fail_at=read_delay_ms=motion_batches=laser_off_calls=pos_calls=0; peak_speed=0;
     memset(commanded,0,sizeof(commanded));
+    pin_read_calls=motor_enable_calls=hard_reset_calls=home_write_calls=0;
+    g_hard_reset_done=false;last_scan_guard[0]='\0';
 }
 static void execute_queued(void) {
     assert(pending==1); pending=0; robot_scan_segment_move((robot_scan_segment_t)queued_event.joint_id);
@@ -241,9 +266,21 @@ int main(void) {
     for(int j=0;j<5;j++) assert(commanded[j]==0);
     reset_fixture(); limit_triggered=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
-    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
+    if(ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
+        assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0 && pin_read_calls>0);
+        assert(strstr(last_scan_guard,"hardware limit"));
+    } else {
+        assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FRONT_READY && pin_read_calls==0);
+    }
     reset_fixture(); pin_fail=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
+    if(ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
+        assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0 && pin_read_calls>0);
+    } else {
+        assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FRONT_READY && pin_read_calls==0);
+    }
+    reset_fixture();g_robot.joints[4].current_angle=100;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS);execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
     reset_fixture(); stop_fail=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
@@ -254,6 +291,7 @@ int main(void) {
     reset_fixture(); frozen_plant=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && g_robot_motion_abort_requested);
+    assert(strstr(last_scan_guard,"angle/tracking"));
     reset_fixture(); abort_at=100;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_ABORTED && now_ms<200);
@@ -266,7 +304,12 @@ int main(void) {
     reset_fixture();memcpy(g_robot.joints,g_joints_init,sizeof(g_joints_init));
     assert(robot_scan_verify_pose(0));
     g_robot.joints[0].current_angle+=5;assert(!robot_scan_verify_pose(0));
-    puts("scan motion/pose verification actual-C simulated-plant checks passed (no hardware)");
+    if(!ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
+        reset_fixture();assert(!robot_joint_hard_reset());
+        assert(g_hard_reset_done && motor_enable_calls==0 && hard_reset_calls==0 && home_write_calls==0);
+    }
+    printf("scan motion/pose verification actual-C checks passed: hardware_limits=%u (no hardware)\n",
+           (unsigned)ROBOT_JOINT_LIMIT_SWITCHES_ENABLED);
 }
 """
 
@@ -278,12 +321,20 @@ def main():
     args = parser.parse_args()
     env = os.environ.copy()
     env["PATH"] = str(Path(args.gcc).parent) + os.pathsep + env.get("PATH", "")
+    robot = (ROOT / "APP/robot.c").read_text(encoding="utf-8")
+    soft_reset = function(robot, "robot_joint_soft_reset")
+    assert "if (ROBOT_JOINT_LIMIT_SWITCHES_ENABLED)" in soft_reset
+    limit_isr = function(robot, "robot_joint_limit_happend")
+    assert "!ROBOT_JOINT_LIMIT_SWITCHES_ENABLED" in limit_isr
+    init = function(robot, "robot_init")
+    assert init.index("#if ROBOT_JOINT_LIMIT_SWITCHES_ENABLED") < init.index("JOINT_LIMIT_1.p_api->open")
     with tempfile.TemporaryDirectory(prefix="scan_motion_") as directory:
-        exe = Path(directory) / "check.exe"
-        subprocess.run([args.gcc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
-                        "-x", "c", "-", "-o", str(exe), "-lm"],
-                       input=build_source(), text=True, encoding="utf-8", check=True, env=env)
-        subprocess.run([str(exe)], check=True, env=env)
+        for mode in (None, True):
+            exe = Path(directory) / f"check_{mode}.exe"
+            subprocess.run([args.gcc, "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
+                            "-x", "c", "-", "-o", str(exe), "-lm"],
+                           input=build_source(mode), text=True, encoding="utf-8", check=True, env=env)
+            subprocess.run([str(exe)], check=True, env=env)
 
 
 if __name__ == "__main__":

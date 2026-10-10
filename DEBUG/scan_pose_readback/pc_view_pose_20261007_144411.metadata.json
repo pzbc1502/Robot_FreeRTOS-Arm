@@ -1,0 +1,46 @@
+{
+  "source": "user_provided_pc_upper_console_log_excerpts",
+  "capture_method": "pc_editable_text_recipes",
+  "formal_capture_ctrl_equivalent": false,
+  "full_command_sequence_verified": false,
+  "complete_three_readbacks": true,
+  "static_stability_verified": false,
+  "scan_reference_selection": "pending_user_confirmation",
+  "power_cycle_zero_reference_independently_verified": false,
+  "camera_extrinsic_calibrated": false,
+  "samples": {
+    "left": {
+      "recorded_at": "2026-10-07T14:42:57.651+08:00",
+      "read_all_ret": 0,
+      "missing_mask": "0x00",
+      "elapsed_ms": 2,
+      "snapshot_count": 1,
+      "joint_deg": [84.99, 120.17, 310.88, 345.54, 79.75]
+    },
+    "front": {
+      "recorded_at": "2026-10-07T14:43:46.654+08:00",
+      "read_all_ret": 0,
+      "missing_mask": "0x00",
+      "elapsed_ms": 2,
+      "snapshot_count": 1,
+      "joint_deg": [90.00, 119.34, 309.02, 0.00, 80.43]
+    },
+    "right": {
+      "recorded_at": "2026-10-07T14:44:11.062+08:00",
+      "read_all_ret": 0,
+      "missing_mask": "0x00",
+      "elapsed_ms": 3,
+      "snapshot_count": 1,
+      "joint_deg": [105.01, 120.17, 310.88, 14.46, 79.75]
+    }
+  },
+  "tool_fk_only": {
+    "source": "scan_geometry_preflight.firmware_fk with current DH convention",
+    "frame": "absolute_base",
+    "units": "mm",
+    "left_xyz_mm": [-15.859136, -180.907092, 0.473003],
+    "front_xyz_mm": [0.000000, -175.972892, 0.481112],
+    "right_xyz_mm": [47.032387, -175.404797, 0.473003],
+    "scope": "Theoretical tool origin only, not measured camera centers or safety clearance. Rounded joint feedback and the DH model have unverified physical uncertainty."
+  }
+}
