@@ -408,6 +408,7 @@ static void workflow_stop_finish(uint8_t error_code, uint32_t now_ms)
     }
     s_stop.pending = false;
     s_stop.restart_locked = (error_code != JETSON_ERROR_NONE);
+    jetson_set_workflow_stop_hold(s_stop.restart_locked);
     s_workflow.fault_latched = s_stop.restart_locked;
     workflow_force_laser_off(error_code);
     if (s_stop.restart_locked)
@@ -492,6 +493,7 @@ static void workflow_fault(uint8_t error_code, uint32_t now_ms)
         workflow_stop_finish(error_code, now_ms);
     }
     s_stop.restart_locked = true;
+    jetson_set_workflow_stop_hold(true);
     if ((s_workflow.state == FLOW_FAULT_HOLD) && !stop_was_pending)
     {
         workflow_force_laser_off(error_code);
@@ -746,6 +748,7 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
             }
             s_stop.pending = true;
             s_stop.restart_locked = true;
+            jetson_set_workflow_stop_hold(true);
             s_stop.stable_count = 0u;
             s_stop.deadline = obs->now_ms + ROBOT_WORKFLOW_STOP_TIMEOUT_MS;
             s_stop.next_sample = obs->now_ms;
@@ -1585,6 +1588,13 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
         workflow_reject_pending_commands(obs, JETSON_ERROR_SAFETY);
         return;
     }
+    bool priority_abort = obs->has_workflow_control &&
+                          (obs->workflow_action == JETSON_WORKFLOW_ACTION_ABORT_HOLD);
+    if (priority_abort)
+    {
+        /* An explicit stop does not require a live heartbeat or a motion permit. */
+        workflow_handle_workflow_command(obs);
+    }
     if (workflow_is_active() && !obs->heartbeat_alive)
     {
         workflow_fault(JETSON_ERROR_HEARTBEAT_TIMEOUT, obs->now_ms);
@@ -1600,7 +1610,7 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
         return;
     }
 
-    if (obs->has_workflow_control)
+    if (obs->has_workflow_control && !priority_abort)
     {
         workflow_handle_workflow_command(obs);
     }

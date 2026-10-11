@@ -1,0 +1,125 @@
+{
+  "timestamp": "2026-10-10T19:17:26.679257+08:00",
+  "url": "http://192.168.1.102:8080/mcp",
+  "flash_match": true,
+  "matched_bytes": 102076,
+  "workflow_layout": {
+    "size": 36,
+    "members": {
+      "state": 0,
+      "selected_view_id": 4,
+      "capture_next_point": 5,
+      "capture_done_mask": 6,
+      "safe_sample_count": 7,
+      "safe_sample_seqs": 8,
+      "retreat_steps": 11,
+      "workflow_seq": 12,
+      "target_seq": 13,
+      "capture_seq": 14,
+      "capture_action": 15,
+      "capture_point_id": 16,
+      "state_deadline_ms": 20,
+      "distance_safe_latched": 24,
+      "target_enabled": 25,
+      "target_aligned": 26,
+      "fault_latched": 27,
+      "laser_active": 28,
+      "retreat_phase": 32
+    }
+  },
+  "symbols": {
+    "s_rx_write_index": {
+      "address": 536908432,
+      "size": 4
+    },
+    "s_rx_read_index": {
+      "address": 536907404,
+      "size": 4
+    },
+    "s_rx_byte_count": {
+      "address": 536907388,
+      "size": 4
+    },
+    "s_rx_overflow_count": {
+      "address": 536907400,
+      "size": 4
+    },
+    "s_rx_frames_ok": {
+      "address": 536907396,
+      "size": 4
+    },
+    "s_rx_crc_fail": {
+      "address": 536907392,
+      "size": 4
+    },
+    "s_tx_ok_count": {
+      "address": 536908660,
+      "size": 4
+    },
+    "s_tx_start_fail_count": {
+      "address": 536908668,
+      "size": 4
+    },
+    "s_tx_timeout_count": {
+      "address": 536908672,
+      "size": 4
+    },
+    "s_last_unified_seq": {
+      "address": 536878468,
+      "size": 1
+    },
+    "s_last_unified_type": {
+      "address": 536878469,
+      "size": 1
+    },
+    "s_last_heartbeat_ms": {
+      "address": 536878460,
+      "size": 4
+    },
+    "s_latest_distance_mm": {
+      "address": 536878474,
+      "size": 2
+    },
+    "s_latest_distance_valid": {
+      "address": 536878477,
+      "size": 1
+    },
+    "s_latest_distance_seq": {
+      "address": 536878476,
+      "size": 1
+    },
+    "s_workflow_action": {
+      "address": 536909176,
+      "size": 1
+    },
+    "s_workflow_seq": {
+      "address": 536909177,
+      "size": 1
+    },
+    "s_scan_count": {
+      "address": 536908460,
+      "size": 1
+    },
+    "s_scan_queue": {
+      "address": 536908488,
+      "size": 64
+    },
+    "s_scan": {
+      "address": 536908436,
+      "size": 24
+    },
+    "s_workflow": {
+      "address": 536909140,
+      "size": 36
+    },
+    "s_tx_frame": {
+      "address": 536908642,
+      "size": 18
+    },
+    "s_rx_ring": {
+      "address": 536907408,
+      "size": 1024
+    }
+  },
+  "no_halt_reset_write_or_serial_tx": true
+}

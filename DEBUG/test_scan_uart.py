@@ -32,6 +32,8 @@ static unsigned tx_len, tx_count;
 #define __enable_irq() ((void)0)
 #define __DMB() ((void)0)
 #define __BKPT(x) assert(0)
+#define taskENTER_CRITICAL() ((void)0)
+#define taskEXIT_CRITICAL() ((void)0)
 #define FSP_SUCCESS 0
 #define pdTRUE 1
 #define pdFALSE 0

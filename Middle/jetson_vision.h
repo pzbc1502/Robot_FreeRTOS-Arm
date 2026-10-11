@@ -146,6 +146,8 @@ bool jetson_get_target_control_ex(bool *enable, uint8_t *seq);
 bool jetson_get_capture_control_ex(uint8_t *action, uint8_t *point_id, uint8_t *seq);
 bool jetson_get_safe_distance_ex(uint16_t *distance_mm, bool *valid, uint8_t *seq);
 bool jetson_get_workflow_control(uint8_t *action, uint8_t *seq);
+/* Internal receive gate, owned by the vision service task; not a wire command. */
+void jetson_set_workflow_stop_hold(bool hold);
 bool jetson_get_scan_control(jetson_scan_control_t *control);
 bool jetson_get_vision_error(int16_t *dcx, int16_t *dcy);
 bool jetson_get_target_control(bool *enable);

@@ -696,7 +696,7 @@ static int robot_update_current_angle_from_data(uint8_t joint_id, uint8_t addr, 
 
     if (rx[1] == 0x01u)
     {
-        angle = -angle;
+        angle = -angle; 
     }
 
     if (joint->postive_direction == MOTOR_DIR_CCW)
@@ -1265,7 +1265,6 @@ static bool robot_joint_soft_reset(void)
 
 
 static struct position *robot_time_func_path_interpolation(uint32_t time_limit_ms, int *size)
-
 {
     int path_size = 0;
 	struct position pos = {0};

@@ -42,15 +42,18 @@ int main(void) {
     fixture();front();abort_command(60);
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,1,0) && !successes(60));
     assert(s_stop.pending && aborted && s_scan.state==8 && s_scan.flags==0);
+    assert(receive_stop_hold);
     int homes=reset_count, segments=segment_count, captures=capture_count;
     sample();assert(!successes(60));sample();assert(successes(60)==1);
     assert(!s_stop.pending && !s_stop.restart_locked);
+    assert(!receive_stop_hold);
     assert(reset_count==homes && segment_count==segments && capture_count==captures);cases++;
 
     fixture();stop_ack_ok=false;abort_command(60);
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,1,0));
     assert(reported(60,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,6));
     assert(!successes(60) && s_stop.restart_locked && aborted && !feedback_calls);
+    assert(receive_stop_hold);
     deny_start(61,6);cases++;
 
     fixture();stop_feedback_ok=false;abort_command(60);
@@ -138,6 +141,38 @@ int main(void) {
     obs.workflow_action=1;obs.workflow_seq=60;step();obs.has_workflow_control=false;
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,0,JETSON_ERROR_SEQ_CONFLICT));
     sample();sample();assert(successes(60)==1);cases++;
+    fixture();front();obs.heartbeat_alive=false;abort_command(60);
+    assert(s_workflow.state==FLOW_ABORT_HOLD && s_stop.pending && receive_stop_hold);
+    assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,1,0) && abort_calls==1);
+    sample();sample();assert(successes(60)==1 && !receive_stop_hold);
+    deny_start(61,JETSON_ERROR_HEARTBEAT_TIMEOUT);cases++;
+
+    for(unsigned stage=0;stage<8;stage++) {
+        fixture();
+        switch(stage) {
+            case 0: s_workflow.state=FLOW_HOMING; break;
+            case 1: s_workflow.state=FLOW_MEASURE_POSITION; break;
+            case 2: start();break;
+            case 3: start();complete_capture();break;
+            case 4: front();break;
+            case 5: front();control(2,1,100,21);break;
+            case 6: right();break;
+            case 7: right();complete_capture();break;
+        }
+        obs.heartbeat_alive=false;abort_command(60);
+        assert(s_stop.pending && receive_stop_hold && !successes(60));
+        int old_captures=capture_count,old_segments=segment_count,old_resets=reset_count;
+        scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;
+        reset_result=ROBOT_RESET_RESULT_OK;auto_result=ROBOT_AUTO_RESULT_OK;
+        sample();sample();
+        assert(successes(60)==1 && !receive_stop_hold && s_workflow.state==FLOW_ABORT_HOLD);
+        assert(capture_count==old_captures && segment_count==old_segments && reset_count==old_resets);
+        cases++;
+    }
+
+    fixture();front();obs.limit_triggered=true;abort_command(60);
+    assert(!successes(60) && receive_stop_hold);
+    assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,0,JETSON_ERROR_SAFETY));cases++;
     printf("actual-C stop workflow: %u offline scenarios passed (no hardware)\n",cases);
 }
 '''

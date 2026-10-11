@@ -1,0 +1,39 @@
+{
+  "s_rx_byte_count": 47,
+  "s_rx_frames_ok": 4,
+  "s_rx_crc_fail": 0,
+  "s_tx_ok_count": 4,
+  "s_last_unified_seq": 237,
+  "s_last_unified_type": 1,
+  "s_last_heartbeat_ms": 1190036,
+  "s_latest_distance_mm": 0,
+  "s_latest_distance_valid": 0,
+  "s_workflow_action": 3,
+  "s_workflow_seq": 235,
+  "s_scan_count": 0,
+  "workflow": {
+    "state": 12,
+    "selected_view_id": 0,
+    "capture_next_point": 1,
+    "capture_done_mask": 0,
+    "safe_sample_count": 0,
+    "retreat_steps": 0,
+    "workflow_seq": 235,
+    "target_seq": 0,
+    "capture_seq": 0,
+    "capture_action": 0,
+    "capture_point_id": 0,
+    "state_deadline_ms": 1189883,
+    "distance_safe_latched": 0,
+    "target_enabled": 0,
+    "target_aligned": 0,
+    "fault_latched": 0,
+    "laser_active": 0,
+    "retreat_phase": 0
+  },
+  "scan_raw": "000000000000000000000000000000000000000000000000",
+  "last_tx_frame_sample_not_full_TX_capture": "a5 5a 01 81 eb 03 20 06 00 33 e8 00 00 00 00 00 48 66",
+  "target": {
+    "response": "    TargetName         Type       Endian TapName            State       \n--  ------------------ ---------- ------ ------------------ ------------\n 0* ra6m5.cpu          cortex_m   little ra6m5.cpu          running"
+  }
+}

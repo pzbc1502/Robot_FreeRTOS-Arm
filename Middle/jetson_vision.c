@@ -13,6 +13,7 @@ extern const uart_cfg_t robot_jeston_cfg;
 #define JETSON_RX_RING_SIZE             (1024u)
 #define JETSON_RX_RING_MASK             (JETSON_RX_RING_SIZE - 1u)
 #define JETSON_UART_REPORT_PERIOD_MS    (1000u)
+#define JETSON_RX_PROCESS_BUDGET        (256u)
 
 #if ((JETSON_RX_RING_SIZE & JETSON_RX_RING_MASK) != 0u)
 #error "JETSON_RX_RING_SIZE must be a power of two"
@@ -88,11 +89,24 @@ static volatile bool s_new_capture_control = false;
 static uint8_t s_target_control_value = 0u;
 static uint8_t s_target_control_seq = 0u;
 static volatile bool s_new_target_control = false;
-static uint8_t s_workflow_action = 0u;
-static uint8_t s_workflow_seq = 0u;
-static volatile bool s_new_workflow_control = false;
+#define JETSON_WORKFLOW_QUEUE_SIZE 8u
+typedef struct
+{
+    uint8_t action;
+    uint8_t seq;
+    bool cancelled;
+} jetson_workflow_control_t;
+static jetson_workflow_control_t s_workflow_queue[JETSON_WORKFLOW_QUEUE_SIZE];
+static uint8_t s_workflow_read, s_workflow_write, s_workflow_count;
+static uint8_t s_abort_queue[JETSON_WORKFLOW_QUEUE_SIZE];
+static uint8_t s_abort_read, s_abort_write, s_abort_count;
+static bool s_workflow_stop_hold;
+static bool s_release_drain_active;
+static uint32_t s_release_drain_bytes;
+static bool s_capture_cancelled, s_target_cancelled;
 #define JETSON_SCAN_QUEUE_SIZE 8u
 static jetson_scan_control_t s_scan_queue[JETSON_SCAN_QUEUE_SIZE];
+static bool s_scan_cancelled[JETSON_SCAN_QUEUE_SIZE];
 static uint8_t s_scan_read, s_scan_write, s_scan_count;
 static volatile bool s_unified_protocol_active = false;
 static volatile bool s_heartbeat_seen = false;
@@ -165,6 +179,55 @@ static bool jetson_rx_ring_pop(uint8_t *byte)
     return true;
 }
 
+static bool workflow_motion_blocked(void)
+{
+    return s_workflow_stop_hold || (s_abort_count != 0u) || s_release_drain_active;
+}
+
+static void workflow_cancel_pending(void)
+{
+    for (uint8_t i = 0u; i < s_workflow_count; i++)
+    {
+        uint8_t index = (uint8_t)((s_workflow_read + i) % JETSON_WORKFLOW_QUEUE_SIZE);
+        s_workflow_queue[index].cancelled = true;
+    }
+    for (uint8_t i = 0u; i < s_scan_count; i++)
+    {
+        uint8_t index = (uint8_t)((s_scan_read + i) % JETSON_SCAN_QUEUE_SIZE);
+        s_scan_cancelled[index] = (s_scan_queue[index].action != JETSON_SCAN_QUERY);
+    }
+    s_capture_cancelled = s_new_capture_control;
+    s_target_cancelled = s_new_target_control && (s_target_control_value != 0u);
+    s_new_error = false;
+    s_new_safe_distance = false;
+}
+
+static void workflow_begin_release_drain(void)
+{
+    /* Bytes already received must not become a fresh START after stop completion. */
+    s_release_drain_bytes = (s_rx_write_index - s_rx_read_index) & JETSON_RX_RING_MASK;
+    s_release_drain_active = (s_release_drain_bytes != 0u) ||
+                             (s_parser.state != JETSON_PARSER_WAIT_SOF);
+}
+
+void jetson_set_workflow_stop_hold(bool hold)
+{
+    /* Called only by the vision service task, like the command queues. */
+    if (hold)
+    {
+        workflow_cancel_pending();
+    }
+    else if (s_workflow_stop_hold)
+    {
+        taskENTER_CRITICAL();
+        workflow_begin_release_drain();
+        s_workflow_stop_hold = false;
+        taskEXIT_CRITICAL();
+        return;
+    }
+    s_workflow_stop_hold = hold;
+}
+
 static void handle_vision_error(int16_t dcx, int16_t dcy, bool valid, uint8_t seq)
 {
     if (s_unified_protocol_active && s_vision_seq_seen &&
@@ -197,10 +260,16 @@ static void handle_valid_error_frame(void)
 
 static void handle_target_control(uint8_t value, uint8_t seq)
 {
+    if ((value != 0u) && workflow_motion_blocked())
+    {
+        (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+        return;
+    }
     __disable_irq();
     s_target_control_value = value;
     s_target_control_seq = seq;
     s_new_target_control = true;
+    s_target_cancelled = false;
     __enable_irq();
 
     LOG("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)value);
@@ -231,11 +300,17 @@ static void handle_safe_distance(uint16_t distance_mm, bool valid, uint8_t seq)
 
 static void handle_capture_control(uint8_t action, uint8_t point_id, uint8_t seq)
 {
+    if (workflow_motion_blocked())
+    {
+        (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+        return;
+    }
     __disable_irq();
     s_capture_action = action;
     s_capture_point_id = point_id;
     s_capture_seq = seq;
     s_new_capture_control = true;
+    s_capture_cancelled = false;
     __enable_irq();
 
     LOG("[JETSON_RX] capture_ctrl action=%u point=%u\r\n",
@@ -245,11 +320,47 @@ static void handle_capture_control(uint8_t action, uint8_t point_id, uint8_t seq
 
 static void handle_workflow_control(uint8_t action, uint8_t seq)
 {
-    __disable_irq();
-    s_workflow_action = action;
-    s_workflow_seq = seq;
-    s_new_workflow_control = true;
-    __enable_irq();
+    if ((action != JETSON_WORKFLOW_ACTION_START_MEASURE) &&
+        (action != JETSON_WORKFLOW_ACTION_FINISH_RETURN_HOME) &&
+        (action != JETSON_WORKFLOW_ACTION_ABORT_HOLD))
+    {
+        (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u,
+                                JETSON_ERROR_INVALID_PARAM);
+        return;
+    }
+
+    if (action == JETSON_WORKFLOW_ACTION_ABORT_HOLD)
+    {
+        workflow_cancel_pending();
+        workflow_begin_release_drain();
+        for (uint8_t i = 0u; i < s_abort_count; i++)
+        {
+            uint8_t index = (uint8_t)((s_abort_read + i) % JETSON_WORKFLOW_QUEUE_SIZE);
+            if (s_abort_queue[index] == seq)
+            {
+                return;
+            }
+        }
+        if (s_abort_count == JETSON_WORKFLOW_QUEUE_SIZE)
+        {
+            (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+            return;
+        }
+        s_abort_queue[s_abort_write] = seq;
+        s_abort_write = (uint8_t)((s_abort_write + 1u) % JETSON_WORKFLOW_QUEUE_SIZE);
+        s_abort_count++;
+    }
+    else
+    {
+        if (workflow_motion_blocked() || (s_workflow_count == JETSON_WORKFLOW_QUEUE_SIZE))
+        {
+            (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+            return;
+        }
+        s_workflow_queue[s_workflow_write] = (jetson_workflow_control_t){action, seq, false};
+        s_workflow_write = (uint8_t)((s_workflow_write + 1u) % JETSON_WORKFLOW_QUEUE_SIZE);
+        s_workflow_count++;
+    }
 
     LOG("[JETSON_RX] workflow_ctrl seq=%u action=%u\r\n",
         (unsigned)seq, (unsigned)action);
@@ -403,7 +514,8 @@ static void handle_valid_unified_frame(void)
                     .scan_id = (uint32_t)p[2] | ((uint32_t)p[3] << 8) |
                                ((uint32_t)p[4] << 16) | ((uint32_t)p[5] << 24)
                 };
-                if (s_scan_count == JETSON_SCAN_QUEUE_SIZE)
+                if (((control.action != JETSON_SCAN_QUERY) && workflow_motion_blocked()) ||
+                    (s_scan_count == JETSON_SCAN_QUEUE_SIZE))
                 {
                     (void)jetson_send_scan_status(control.seq, JETSON_SCAN_ACK,
                         JETSON_SCAN_NONE, 0u, control.action, 0u,
@@ -411,6 +523,7 @@ static void handle_valid_unified_frame(void)
                     break;
                 }
                 s_scan_queue[s_scan_write] = control;
+                s_scan_cancelled[s_scan_write] = false;
                 s_scan_write = (uint8_t)((s_scan_write + 1u) % JETSON_SCAN_QUEUE_SIZE);
                 s_scan_count++;
             }
@@ -674,7 +787,11 @@ void jetson_vision_init(void)
     s_new_safe_distance = false;
     s_new_capture_control = false;
     s_new_target_control = false;
-    s_new_workflow_control = false;
+    s_workflow_read = s_workflow_write = s_workflow_count = 0u;
+    s_abort_read = s_abort_write = s_abort_count = 0u;
+    s_workflow_stop_hold = s_release_drain_active = false;
+    s_release_drain_bytes = 0u;
+    s_capture_cancelled = s_target_cancelled = false;
     s_scan_read = s_scan_write = s_scan_count = 0u;
     s_vision_seq_seen = false;
     s_distance_seq_seen = false;
@@ -695,9 +812,18 @@ void jetson_vision_init(void)
 void jetson_vision_process(void)
 {
     uint8_t byte = 0u;
-    while (jetson_rx_ring_pop(&byte))
+    for (uint32_t i = 0u; (i < JETSON_RX_PROCESS_BUDGET) && (s_abort_count == 0u) &&
+                         jetson_rx_ring_pop(&byte); i++)
     {
+        if (s_release_drain_bytes != 0u)
+        {
+            s_release_drain_bytes--;
+        }
         process_byte(byte);
+        if ((s_release_drain_bytes == 0u) && (s_parser.state == JETSON_PARSER_WAIT_SOF))
+        {
+            s_release_drain_active = false;
+        }
     }
 
     uint32_t now_ms = jetson_now_ms();
@@ -762,6 +888,13 @@ bool jetson_get_target_control_value(uint8_t *value, uint8_t *seq)
     {
         return false;
     }
+    if (s_target_cancelled)
+    {
+        s_new_target_control = false;
+        (void)jetson_send_status(s_target_control_seq, RA6_TO_JETSON_COMMAND_ACK,
+                                0u, JETSON_ERROR_BUSY);
+        return false;
+    }
 
     __disable_irq();
     *value = s_target_control_value;
@@ -797,6 +930,13 @@ bool jetson_get_capture_control_ex(uint8_t *action, uint8_t *point_id, uint8_t *
 
     if (!s_new_capture_control)
     {
+        return false;
+    }
+    if (s_capture_cancelled)
+    {
+        s_new_capture_control = false;
+        (void)jetson_send_status(s_capture_seq, RA6_TO_JETSON_COMMAND_ACK,
+                                0u, JETSON_ERROR_BUSY);
         return false;
     }
 
@@ -844,17 +984,35 @@ bool jetson_get_safe_distance(uint16_t *distance_mm, bool *valid)
 
 bool jetson_get_workflow_control(uint8_t *action, uint8_t *seq)
 {
-    if ((action == NULL) || (seq == NULL) || !s_new_workflow_control)
+    if ((action == NULL) || (seq == NULL))
     {
         return false;
     }
 
-    __disable_irq();
-    *action = s_workflow_action;
-    *seq = s_workflow_seq;
-    s_new_workflow_control = false;
-    __enable_irq();
-    return true;
+    if (s_abort_count != 0u)
+    {
+        *action = JETSON_WORKFLOW_ACTION_ABORT_HOLD;
+        *seq = s_abort_queue[s_abort_read];
+        s_abort_read = (uint8_t)((s_abort_read + 1u) % JETSON_WORKFLOW_QUEUE_SIZE);
+        s_abort_count--;
+        return true;
+    }
+    while (s_workflow_count != 0u)
+    {
+        jetson_workflow_control_t control = s_workflow_queue[s_workflow_read];
+        s_workflow_read = (uint8_t)((s_workflow_read + 1u) % JETSON_WORKFLOW_QUEUE_SIZE);
+        s_workflow_count--;
+        if (control.cancelled || workflow_motion_blocked())
+        {
+            (void)jetson_send_status(control.seq, RA6_TO_JETSON_COMMAND_ACK,
+                                    0u, JETSON_ERROR_BUSY);
+            continue;
+        }
+        *action = control.action;
+        *seq = control.seq;
+        return true;
+    }
+    return false;
 }
 
 bool jetson_is_unified_protocol_active(void)
@@ -865,14 +1023,25 @@ bool jetson_is_unified_protocol_active(void)
 bool jetson_get_scan_control(jetson_scan_control_t *control)
 {
     /* Both producer and consumer run in the vision service task. */
-    if ((control == NULL) || (s_scan_count == 0u))
+    if (control == NULL)
     {
         return false;
     }
-    *control = s_scan_queue[s_scan_read];
-    s_scan_read = (uint8_t)((s_scan_read + 1u) % JETSON_SCAN_QUEUE_SIZE);
-    s_scan_count--;
-    return true;
+    while (s_scan_count != 0u)
+    {
+        bool cancelled = s_scan_cancelled[s_scan_read];
+        *control = s_scan_queue[s_scan_read];
+        s_scan_read = (uint8_t)((s_scan_read + 1u) % JETSON_SCAN_QUEUE_SIZE);
+        s_scan_count--;
+        if (cancelled || ((control->action != JETSON_SCAN_QUERY) && workflow_motion_blocked()))
+        {
+            (void)jetson_send_scan_status(control->seq, JETSON_SCAN_ACK,
+                JETSON_SCAN_NONE, 0u, control->action, 0u, JETSON_ERROR_BUSY, control->scan_id);
+            continue;
+        }
+        return true;
+    }
+    return false;
 }
 
 bool jetson_is_link_alive(uint32_t now_ms)

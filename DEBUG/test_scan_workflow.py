@@ -45,6 +45,7 @@ struct { unsigned status; struct {unsigned status;} joints[6]; struct position c
 static bool aborted, busy, capture_active, verify_ok, queue_ok, laser;
 static int segment_count, capture_count, target_starts, laser_on_count, reset_count;
 static bool stop_ack_ok=true, stop_feedback_ok=true;
+static bool receive_stop_hold;
 static unsigned abort_calls, feedback_calls;
 static uint32_t mock_now, feedback_delay;
 static float stop_angles[5];
@@ -65,6 +66,7 @@ static void BSP_TargetOutputLed_Set(bool v) { (void)v; }
 '''
 
 MOCKS = r'''
+void jetson_set_workflow_stop_hold(bool hold) { receive_stop_hold=hold; }
 static robot_scan_result_t scan_result;
 static robot_capture_result_t capture_result;
 static robot_reset_result_t reset_result;
@@ -126,6 +128,7 @@ static void step(void) { mock_now=obs.now_ms; robot_workflow_step(&obs); assert(
 static void fixture(void) {
     aborted=busy=capture_active=laser=false; verify_ok=queue_ok=true;
     stop_ack_ok=stop_feedback_ok=true; abort_calls=feedback_calls=status_count=0;
+    receive_stop_hold=false;
     feedback_delay=0; memset(stop_angles,0,sizeof(stop_angles));
     segment_count=capture_count=target_starts=laser_on_count=reset_count=report_count=0;
     scan_result=ROBOT_SCAN_RESULT_NONE; reset_result=ROBOT_RESET_RESULT_NONE;
