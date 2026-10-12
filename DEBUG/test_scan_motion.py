@@ -67,7 +67,7 @@ def build_source(hardware_limits_enabled=None):
         "robot_joint_is_full_turn", "robot_joint_compare_angle", "robot_joint_compare_error",
         "robot_joint_rotate_to", "robot_joint_hard_reset", "robot_view_arc_smoothstep", "robot_auto_final_confirm",
         "robot_pid_one_period_limited", "robot_pid_one_period", "robot_scan_apply_view",
-        "robot_scan_feedback_matches", "robot_scan_segment_move", "robot_scan_result_get",
+        "robot_scan_feedback_matches", "robot_scan_measure_pose_valid", "robot_scan_segment_move", "robot_scan_result_get",
         "robot_send_scan_segment_event", "robot_scan_verify_pose"))
     capture_functions = function(capture, "capture_steps_for") + function(capture, "robot_capture_view_angles_get")
     checked_stop = function(robot, "robot_joint_stop_all_checked")
@@ -116,6 +116,8 @@ GLOBALS = r"""
 struct robot_event { int type; uint8_t joint_id; uint32_t generation; float param[6]; };
 static struct { struct joint joints[6]; uint32_t status; void *event_queue;
                 struct position cur_pos; } g_robot;
+static bool velocity_transaction_fail;
+static unsigned velocity_fault_count;
 static bool ROBOT_TARGET_ENABLED, g_robot_motion_abort_requested, missing_feedback,
             frozen_plant, queue_fail, capture_active, limit_triggered, pin_fail, stop_fail;
 static int g_robot_auto_result, g_robot_joint_result, g_robot_reset_result;
@@ -123,7 +125,8 @@ static struct { bool stop_requested; } g_visual_servo;
 static uint32_t g_robot_motion_generation = 1, now_ms, abort_at, feedback_fail_at, read_delay_ms;
 static robot_scan_result_t g_robot_scan_result;
 static bool g_hard_reset_done;
-static float s_scan_front_target[6], commanded[5], peak_speed;
+static float s_scan_left_target[6], s_scan_front_target[6], commanded[5], peak_speed;
+static bool check_prepare_progress, saw_prepare_pair;
 static unsigned pending, motion_batches, laser_off_calls, pos_calls, pos_steps;
 static unsigned pin_read_calls, motor_enable_calls, hard_reset_calls, home_write_calls;
 static uint8_t pos_direction;
@@ -145,18 +148,29 @@ static uint32_t HAL_GetTick(void) { return now_ms; }
 static uint32_t xTaskGetTickCount(void) { return now_ms; }
 static void vTaskDelay(uint32_t ms) {
     for(int j=0;j<5;j++) if(!frozen_plant) g_robot.joints[j].current_angle+=commanded[j]*ms/1000.0f;
+    if(check_prepare_progress) {
+        float p1=(90.0f-g_robot.joints[0].current_angle)/20.0f;
+        float p4=-g_robot.joints[3].current_angle/30.0f;
+        assert(fabsf(p1-p4)<0.05f);
+        assert(fabsf(commanded[1])<0.00001f && fabsf(commanded[2])<0.00001f);
+    }
     now_ms+=ms; if(abort_at && now_ms>=abort_at) robot_motion_abort();
 }
-static bool robot_joint_velocity_batch_nowait(const float *v,uint8_t n,uint8_t acc) {
+static bool robot_joint_velocity_batch_checked(const float *v,uint8_t n,uint8_t acc) {
+    if(velocity_transaction_fail) return false;
     (void)acc; motion_batches++;
+    if(check_prepare_progress && !saw_prepare_pair && fabsf(v[0])>0.0001f) {
+        assert(v[0]<0 && v[3]<0); saw_prepare_pair=true;
+    }
     for(int j=0;j<n;j++) { commanded[j]=v[j]; peak_speed=fmaxf(peak_speed,fabsf(v[j])); }
     return true;
 }
 static bool robot_joint_velocity_zero_all(uint8_t n) { (void)n; robot_joint_stop_all(5); return true; }
 static void robot_joint_velocity_nowait(uint32_t j,float v,uint8_t a) { (void)a; commanded[j]=v; }
-static void robot_visual_servo_fault_set(int f) { (void)f; }
+static void robot_visual_servo_fault_set(int f) { (void)f;velocity_fault_count++; }
 static void BSP_Laser_Off(void) { laser_off_calls++; }
 static void BSP_CAN_PrintInfo(const char *tag) {
+    if(strcmp(tag,"scan_begin")==0) { assert(!g_robot_motion_abort_requested);return; }
     assert(strcmp(tag,"scan_stop")==0 && g_robot_motion_abort_requested);
     for(unsigned j=0;j<5;j++) assert(commanded[j]==0);
 }
@@ -196,9 +210,9 @@ static bool robot_pid_one_period_limited(float *,float *,float *,int,bool,float,
 CHECKS = r"""
 static void reset_fixture(void) {
     memset(&g_robot,0,sizeof(g_robot)); memcpy(g_robot.joints,g_joints_init,sizeof(g_joints_init));
-    g_robot.joints[0].current_angle=70; g_robot.joints[1].current_angle=120;
-    g_robot.joints[2].current_angle=310; g_robot.joints[3].current_angle=330;
-    g_robot.joints[4].current_angle=86; g_robot.event_queue=&queued_event;
+    g_robot.joints[0].current_angle=90; g_robot.joints[1].current_angle=120;
+    g_robot.joints[2].current_angle=310; g_robot.joints[3].current_angle=0;
+    g_robot.joints[4].current_angle=80; g_robot.event_queue=&queued_event;
     g_robot.cur_pos=(struct position){0,-130,-15};
     ROBOT_STATUS_SET(g_robot.status,ROBOT_STATUS_POSE_VALID);
     ROBOT_TARGET_ENABLED=g_robot_motion_abort_requested=missing_feedback=frozen_plant=queue_fail=capture_active=false;
@@ -208,9 +222,17 @@ static void reset_fixture(void) {
     memset(commanded,0,sizeof(commanded));
     pin_read_calls=motor_enable_calls=hard_reset_calls=home_write_calls=0;
     g_hard_reset_done=false;last_scan_guard[0]='\0';
+    velocity_transaction_fail=false;velocity_fault_count=0;
+    check_prepare_progress=saw_prepare_pair=false;
 }
 static void execute_queued(void) {
     assert(pending==1); pending=0; robot_scan_segment_move((robot_scan_segment_t)queued_event.joint_id);
+}
+static void prepared_left_fixture(void) {
+    reset_fixture();
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);
+    execute_queued();assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_LEFT_READY);
+    now_ms=motion_batches=laser_off_calls=0;peak_speed=0;
 }
 int main(void) {
     reset_fixture();
@@ -231,6 +253,50 @@ int main(void) {
     for(int i=0;i<=1200;i++) { float s=robot_view_arc_smoothstep(i/1200.0f); assert(s>=previous-1e-6f && s<=1.000001f); previous=s; }
 
     reset_fixture();
+    assert(ROBOT_SCAN_LEFT_TO_FRONT==0 && ROBOT_SCAN_FRONT_TO_RIGHT==1);
+    assert(ROBOT_SCAN_RESULT_FRONT_READY==2 && ROBOT_SCAN_RESULT_ABORTED==5);
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
+    check_prepare_progress=true;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)!=pdPASS);
+    execute_queued();check_prepare_progress=false;
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_LEFT_READY && saw_prepare_pair);
+    assert(fabsf(g_robot.joints[0].current_angle-70)<0.2f);
+    assert(fabsf(g_robot.joints[3].current_angle+30)<0.2f);
+    assert(fabsf(g_robot.joints[4].current_angle-86)<ROBOT_SCAN_POSE_TOL_DEG);
+    assert(fabsf(g_robot.joints[1].current_angle-120)<0.001f);
+    assert(fabsf(robot_angle_diff(g_robot.joints[2].current_angle,310))<0.001f);
+    assert(peak_speed<=ROBOT_SCAN_MAX_SPEED_DEG_S && robot_scan_verify_pose(1));
+    assert(!ROBOT_STATUS_IS(g_robot.status,ROBOT_STATUS_POSE_VALID));
+    for(int j=0;j<5;j++) assert(commanded[j]==0);
+    reset_fixture();g_robot.cur_pos.y+=5;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)!=pdPASS && motion_batches==0);
+    reset_fixture();g_robot.cur_pos.x=NAN;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)!=pdPASS);
+    reset_fixture();ROBOT_STATUS_CLEAR(g_robot.status,ROBOT_STATUS_POSE_VALID);
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)!=pdPASS);
+    reset_fixture();assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);
+    g_robot.cur_pos.z+=5;execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
+    reset_fixture();missing_feedback=true;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
+    reset_fixture();feedback_fail_at=100;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && now_ms<=110);
+    reset_fixture();abort_at=100;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_ABORTED && now_ms<200);
+    reset_fixture();stop_fail=true;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT)==pdPASS);execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED);
+    prepared_left_fixture();g_robot.joints[1].current_angle+=10;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS);execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
+    prepared_left_fixture();robot_motion_abort();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_ABORTED);
+
+    prepared_left_fixture();
     assert(robot_send_scan_segment_event(ROBOT_SCAN_FRONT_TO_RIGHT)!=pdPASS);
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS);
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
@@ -252,19 +318,24 @@ int main(void) {
     assert(robot_send_scan_segment_event(ROBOT_SCAN_FRONT_TO_RIGHT)!=pdPASS);
     assert(!ROBOT_STATUS_IS(g_robot.status,ROBOT_STATUS_POSE_VALID));
 
-    reset_fixture(); assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS);
+    prepared_left_fixture(); assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS);
     execute_queued(); g_robot.joints[1].current_angle+=10;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_FRONT_TO_RIGHT)==pdPASS); unsigned before=motion_batches;
     execute_queued(); assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==before);
 
-    reset_fixture(); missing_feedback=true;
+    prepared_left_fixture(); missing_feedback=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
-    reset_fixture(); feedback_fail_at=100;
+    prepared_left_fixture(); feedback_fail_at=100;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && now_ms<=110);
     for(int j=0;j<5;j++) assert(commanded[j]==0);
-    reset_fixture(); limit_triggered=true;
+    prepared_left_fixture(); velocity_transaction_fail=true;
+    assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
+    assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && g_robot_motion_abort_requested);
+    assert(velocity_fault_count==1 && motion_batches==0);
+    for(int j=0;j<5;j++) assert(commanded[j]==0);
+    prepared_left_fixture(); limit_triggered=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     if(ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
         assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0 && pin_read_calls>0);
@@ -272,34 +343,34 @@ int main(void) {
     } else {
         assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FRONT_READY && pin_read_calls==0);
     }
-    reset_fixture(); pin_fail=true;
+    prepared_left_fixture(); pin_fail=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     if(ROBOT_JOINT_LIMIT_SWITCHES_ENABLED) {
         assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0 && pin_read_calls>0);
     } else {
         assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FRONT_READY && pin_read_calls==0);
     }
-    reset_fixture();g_robot.joints[4].current_angle=100;
+    prepared_left_fixture();g_robot.joints[4].current_angle=100;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS);execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && motion_batches==0);
-    reset_fixture(); stop_fail=true;
+    prepared_left_fixture(); stop_fail=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && g_robot_motion_abort_requested);
-    reset_fixture(); read_delay_ms=30;
+    prepared_left_fixture(); read_delay_ms=30;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && now_ms<17000);
-    reset_fixture(); frozen_plant=true;
+    prepared_left_fixture(); frozen_plant=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_FAILED && g_robot_motion_abort_requested);
     assert(strstr(last_scan_guard,"angle/tracking"));
-    reset_fixture(); abort_at=100;
+    prepared_left_fixture(); abort_at=100;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)==pdPASS); execute_queued();
     assert(robot_scan_result_get()==ROBOT_SCAN_RESULT_ABORTED && now_ms<200);
-    reset_fixture(); ROBOT_TARGET_ENABLED=true;
+    prepared_left_fixture(); ROBOT_TARGET_ENABLED=true;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
-    reset_fixture(); g_robot_joint_result=ROBOT_JOINT_RESULT_RUNNING;
+    prepared_left_fixture(); g_robot_joint_result=ROBOT_JOINT_RESULT_RUNNING;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
-    reset_fixture(); pending=1;
+    prepared_left_fixture(); pending=1;
     assert(robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT)!=pdPASS);
     reset_fixture();memcpy(g_robot.joints,g_joints_init,sizeof(g_joints_init));
     assert(robot_scan_verify_pose(0));

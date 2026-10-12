@@ -117,6 +117,7 @@ static volatile robot_auto_result_t g_robot_auto_result = ROBOT_AUTO_RESULT_NONE
 static volatile robot_joint_result_t g_robot_joint_result = ROBOT_JOINT_RESULT_NONE;
 static volatile robot_reset_result_t g_robot_reset_result = ROBOT_RESET_RESULT_NONE;
 static volatile robot_scan_result_t g_robot_scan_result = ROBOT_SCAN_RESULT_NONE;
+static float s_scan_left_target[ROBOT_MAX_JOINT_NUM];
 static float s_scan_front_target[ROBOT_MAX_JOINT_NUM];
 static volatile bool g_soft_reset_done = false;
 static volatile bool g_hard_reset_done = false;
@@ -166,9 +167,9 @@ static bool robot_motion_abort_is_requested(void);
 static void robot_motion_abort_clear(void);
 static void robot_event_stamp(struct robot_event *event);
 static bool robot_event_is_stale(const struct robot_event *event);
-static void robot_joint_velocity_send_locked(uint32_t joint_id, float velocity, uint8_t acceleration);
+static bool robot_joint_velocity_send_locked(uint32_t joint_id, float velocity, uint8_t acceleration);
 static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration);
-static bool robot_joint_velocity_batch_nowait(const float *velocity, uint8_t joint_num, uint8_t acceleration);
+static bool robot_joint_velocity_batch_checked(const float *velocity, uint8_t joint_num, uint8_t acceleration);
 static bool robot_joint_velocity_zero_all(uint8_t joint_num);
 static void robot_auto_busy_set(void);
 static void robot_auto_busy_clear(void);
@@ -286,13 +287,12 @@ uint32_t robot_joint_veloccity_to(uint32_t joint_id, float velocity, uint8_t acc
 	return 0;
 }
 
-/* PID 控制循环专用：发送速度命令但不等待回包（fire-and-forget）。
- * 参考 MechanicalArm Motor_VelControl，仅发送，靠下一周期读角度闭环校正。 */
-static void robot_joint_velocity_send_locked(uint32_t joint_id, float velocity,
+/* Caller owns the bus lock and decides whether to wait for F6 acknowledgement. */
+static bool robot_joint_velocity_send_locked(uint32_t joint_id, float velocity,
                                               uint8_t acceleration)
 {
-    if (joint_id >= ROBOT_MAX_JOINT_NUM) {
-        return;
+    if ((joint_id >= ROBOT_MAX_JOINT_NUM) || !isfinite(velocity)) {
+        return false;
     }
 
     struct joint *joint = &g_robot.joints[joint_id];
@@ -304,7 +304,7 @@ static void robot_joint_velocity_send_locked(uint32_t joint_id, float velocity,
 
     ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_LIMIT_ENABLE);
     joint->velocity = velocity;
-    Emm_V5_Vel_Control(addr, dir, rpm, acceleration, false);
+    return Emm_V5_Vel_Control(addr, dir, rpm, acceleration, false);
 }
 
 static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8_t acceleration)
@@ -329,7 +329,7 @@ static void robot_joint_velocity_nowait(uint32_t joint_id, float velocity, uint8
     BSP_CAN_Unlock();
 }
 
-static bool robot_joint_velocity_batch_nowait(const float *velocity,
+static bool robot_joint_velocity_batch_checked(const float *velocity,
                                                uint8_t joint_num,
                                                uint8_t acceleration)
 {
@@ -346,19 +346,56 @@ static bool robot_joint_velocity_batch_nowait(const float *velocity,
         return false;
     }
 
+    bool ok = true;
+    uint32_t missing = 0u;
+    uint32_t rejected = 0u;
+    TickType_t tx_started = xTaskGetTickCount();
+    BSP_CAN_ClearVelocityFlags();
     for (uint8_t joint_id = 0u; joint_id < arm_joint_num; joint_id++) {
-        robot_joint_velocity_send_locked(joint_id, velocity[joint_id], acceleration);
+        if (robot_motion_abort_is_requested() ||
+            !BSP_CAN_ExpectVelocityReply((uint8_t)(joint_id + 1u)) ||
+            !robot_joint_velocity_send_locked(joint_id, velocity[joint_id], acceleration)) {
+            LOG("[CAN][VEL_TX] J%u send failed or aborted\r\n", (unsigned)(joint_id + 1u));
+            ok = false;
+            break;
+        }
     }
+    if (ok) {
+        TickType_t wait_started = xTaskGetTickCount();
+        ok = BSP_CAN_WaitVelocityAll(arm_joint_num, ROBOT_CAN_VELOCITY_ACK_WAIT_MS,
+                                     &missing, &rejected);
+        if (!ok) {
+            LOG("[CAN][VEL_ACK] missing=0x%02lX rejected=0x%02lX tx_ms=%lu wait_ms=%lu\r\n",
+                (unsigned long)missing, (unsigned long)rejected,
+                (unsigned long)((TickType_t)(wait_started - tx_started) * portTICK_PERIOD_MS),
+                (unsigned long)((TickType_t)(xTaskGetTickCount() - wait_started) * portTICK_PERIOD_MS));
+            for (uint8_t j = 0u; j < arm_joint_num; j++) {
+                if ((rejected & (1u << j)) != 0u) {
+                    LOG("[CAN][VEL_ACK] J%u status=0x%02X\r\n", (unsigned)(j + 1u),
+                        (unsigned)g_can_context.motor_velocity_status[j]);
+                }
+            }
+        }
+    }
+    BSP_CAN_ClearVelocityFlags();
     BSP_CAN_Unlock();
-    return true;
+    return ok && !robot_motion_abort_is_requested();
 }
 
 static bool robot_joint_velocity_zero_all(uint8_t joint_num)
 {
-    const float zero_velocity[ROBOT_ARM_JOINT_NUM] = {0};
-
-    return robot_joint_velocity_batch_nowait(zero_velocity, joint_num,
-                                             ROBOT_JOINT_DEFAULT_ACCELERATION);
+    if (joint_num > ROBOT_ARM_JOINT_NUM) joint_num = ROBOT_ARM_JOINT_NUM;
+    if (joint_num == 0u) return true;
+    if (!BSP_CAN_Lock(20u)) return false;
+    bool ok = true;
+    BSP_CAN_ClearVelocityFlags();
+    /* Safety zero must reach every axis without waiting for ordinary F6 ACKs. */
+    for (uint8_t joint_id = 0u; joint_id < joint_num; joint_id++) {
+        if (!robot_joint_velocity_send_locked(joint_id, 0.0f,
+                                               ROBOT_JOINT_DEFAULT_ACCELERATION)) ok = false;
+    }
+    BSP_CAN_Unlock();
+    return ok;
 }
 
 /* 控制单关节旋转（支持相对与绝对两种模式） */
@@ -742,12 +779,17 @@ static int robot_update_all_angles(uint8_t joint_num, uint32_t *missing_mask_out
     }
 
     BSP_CAN_ClearMotorFlags();
+    bool tx_ok = true;
     for (uint8_t i = 0; i < joint_num; i++) {
-        Emm_V5_Read_Sys_Params((uint8_t)(i + 1u), S_CPOS);
+        if (!Emm_V5_Read_Sys_Params((uint8_t)(i + 1u), S_CPOS)) {
+            LOG("[CAN][ANGLE_TX] J%u send failed\r\n", (unsigned)(i + 1u));
+            tx_ok = false;
+            break;
+        }
     }
 
-    bool all_ok = BSP_CAN_WaitAllMotors(joint_num, ROBOT_CAN_BATCH_FEEDBACK_WAIT_MS);
-    if (!all_ok) {
+    bool all_ok = tx_ok && BSP_CAN_WaitAllMotors(joint_num, ROBOT_CAN_BATCH_FEEDBACK_WAIT_MS);
+    if (tx_ok && !all_ok) {
         uint32_t pending_mask = 0u;
         __disable_irq();
         for (uint8_t i = 0; i < joint_num; i++) {
@@ -1668,6 +1710,7 @@ bool robot_motion_abort(void)
     g_robot_joint_result = ROBOT_JOINT_RESULT_ABORTED;
     g_robot_reset_result = ROBOT_RESET_RESULT_ABORTED;
     if ((g_robot_scan_result == ROBOT_SCAN_RESULT_RUNNING) ||
+        (g_robot_scan_result == ROBOT_SCAN_RESULT_LEFT_READY) ||
         (g_robot_scan_result == ROBOT_SCAN_RESULT_FRONT_READY)) {
         g_robot_scan_result = ROBOT_SCAN_RESULT_ABORTED;
     }
@@ -1833,6 +1876,15 @@ static bool robot_scan_feedback_matches(const float *expected, float *actual)
     return !robot_motion_abort_is_requested();
 }
 
+static bool robot_scan_measure_pose_valid(void)
+{
+    return ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID) &&
+        isfinite(g_robot.cur_pos.x) && isfinite(g_robot.cur_pos.y) && isfinite(g_robot.cur_pos.z) &&
+        (fabsf(g_robot.cur_pos.x - ROBOT_VIEW_ARC_BASE_X_MM) <= ROBOT_VIEW_ARC_BASE_TOL_MM) &&
+        (fabsf(g_robot.cur_pos.y - ROBOT_VIEW_ARC_BASE_Y_MM) <= ROBOT_VIEW_ARC_BASE_TOL_MM) &&
+        (fabsf(g_robot.cur_pos.z - ROBOT_VIEW_ARC_BASE_Z_MM) <= ROBOT_VIEW_ARC_BASE_TOL_MM);
+}
+
 static void robot_scan_segment_move(robot_scan_segment_t segment)
 {
     float start[ROBOT_MAX_JOINT_NUM] = {0};
@@ -1842,6 +1894,7 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
     uint32_t missing = 0u;
     uint32_t begin_ms = HAL_GetTick();
     bool ok = false;
+    bool measure_ready = robot_scan_measure_pose_valid();
     const uint32_t period_ms = (uint32_t)ROBOT_INTERPOLATION_TIME_RESOLUTION;
     const uint32_t duration_ms = ROBOT_SCAN_SEGMENT_DURATION_MS;
 
@@ -1854,11 +1907,12 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
         !isfinite(ROBOT_SCAN_MAX_TRACK_ERROR_DEG) || (ROBOT_SCAN_MAX_TRACK_ERROR_DEG <= 0.0f) ||
         !isfinite(ROBOT_SCAN_POSE_TOL_DEG) || (ROBOT_SCAN_POSE_TOL_DEG <= 0.0f) ||
         (ROBOT_SCAN_POSE_TOL_DEG > ROBOT_SCAN_MAX_TRACK_ERROR_DEG) ||
-        ROBOT_TARGET_ENABLED || robot_motion_abort_is_requested()) {
+        ROBOT_TARGET_ENABLED || robot_motion_abort_is_requested() ||
+        ((segment == ROBOT_SCAN_MEASURE_TO_LEFT) && !measure_ready)) {
         goto finish;
     }
 
-    if (segment == ROBOT_SCAN_LEFT_TO_FRONT) {
+    if (segment == ROBOT_SCAN_MEASURE_TO_LEFT) {
         if ((robot_update_all_angles(ROBOT_ARM_JOINT_NUM, &missing, NULL) != 0) ||
             (missing != 0u)) {
             goto finish;
@@ -1868,12 +1922,12 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
                 goto finish;
             }
         }
-        memcpy(target, start, sizeof(start));
-        if (!robot_scan_apply_view(1u, target) ||
-            !robot_scan_feedback_matches(target, start)) {
+        memcpy(finish, start, sizeof(start));
+    } else if (segment == ROBOT_SCAN_LEFT_TO_FRONT) {
+        if (!robot_scan_feedback_matches(s_scan_left_target, start)) {
             goto finish;
         }
-        memcpy(finish, start, sizeof(start));
+        memcpy(finish, s_scan_left_target, sizeof(finish));
     } else if (segment == ROBOT_SCAN_FRONT_TO_RIGHT) {
         if (!robot_scan_feedback_matches(s_scan_front_target, start)) {
             goto finish;
@@ -1882,7 +1936,9 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
     } else {
         goto finish;
     }
-    if (!robot_scan_apply_view((segment == ROBOT_SCAN_LEFT_TO_FRONT) ? 2u : 3u, finish)) {
+    uint8_t point_id = (segment == ROBOT_SCAN_MEASURE_TO_LEFT) ? 1u :
+                      ((segment == ROBOT_SCAN_LEFT_TO_FRONT) ? 2u : 3u);
+    if (!robot_scan_apply_view(point_id, finish)) {
         goto finish;
     }
     for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
@@ -1896,6 +1952,7 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
     LOG("[SCAN_MOTION] segment=%u begin duration=%lu ms hardware_limits=%u\r\n",
         (unsigned)segment, (unsigned long)duration_ms,
         (unsigned)ROBOT_JOINT_LIMIT_SWITCHES_ENABLED);
+    BSP_CAN_PrintInfo("scan_begin");
     /* ponytail: stream fixed joint interpolation; no Cartesian arc/FK promise. */
     for (uint32_t elapsed = 0u; elapsed <= duration_ms; elapsed += period_ms) {
         if (robot_motion_abort_is_requested() || ROBOT_TARGET_ENABLED ||
@@ -1935,7 +1992,9 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
     ok = robot_auto_final_confirm(finish, 1, ROBOT_SCAN_POSE_TOL_DEG) &&
          !ROBOT_TARGET_ENABLED &&
          ((HAL_GetTick() - begin_ms) <= (duration_ms + ROBOT_SCAN_BUDGET_MARGIN_MS));
-    if (ok && (segment == ROBOT_SCAN_LEFT_TO_FRONT)) {
+    if (ok && (segment == ROBOT_SCAN_MEASURE_TO_LEFT)) {
+        memcpy(s_scan_left_target, finish, sizeof(finish));
+    } else if (ok && (segment == ROBOT_SCAN_LEFT_TO_FRONT)) {
         memcpy(s_scan_front_target, finish, sizeof(finish));
     }
 
@@ -1948,8 +2007,9 @@ finish:
     }
     taskENTER_CRITICAL();
     g_robot_scan_result = (ok && !g_robot_motion_abort_requested)
-        ? ((segment == ROBOT_SCAN_LEFT_TO_FRONT) ? ROBOT_SCAN_RESULT_FRONT_READY
-                                                : ROBOT_SCAN_RESULT_RIGHT_READY)
+        ? ((segment == ROBOT_SCAN_MEASURE_TO_LEFT) ? ROBOT_SCAN_RESULT_LEFT_READY :
+           ((segment == ROBOT_SCAN_LEFT_TO_FRONT) ? ROBOT_SCAN_RESULT_FRONT_READY
+                                                : ROBOT_SCAN_RESULT_RIGHT_READY))
         : (aborted ? ROBOT_SCAN_RESULT_ABORTED : ROBOT_SCAN_RESULT_FAILED);
     ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
     taskEXIT_CRITICAL();
@@ -2134,7 +2194,8 @@ static void robot_control_task(void *arg)
             (event.type != ROBOT_READ_ALL_EVENT) &&
             (event.type != ROBOT_LIMIT_SWITCH_EVENT)) {
             taskENTER_CRITICAL();
-            if ((g_robot_scan_result == ROBOT_SCAN_RESULT_FRONT_READY) ||
+            if ((g_robot_scan_result == ROBOT_SCAN_RESULT_LEFT_READY) ||
+                (g_robot_scan_result == ROBOT_SCAN_RESULT_FRONT_READY) ||
                 (g_robot_scan_result == ROBOT_SCAN_RESULT_RIGHT_READY)) {
                 g_robot_scan_result = ROBOT_SCAN_RESULT_NONE;
             }
@@ -2353,10 +2414,11 @@ static bool robot_pid_one_period_limited(float *target_angle, float *feedforward
 
     if (require_fresh_feedback) {
         if (period_ok &&
-            !robot_joint_velocity_batch_nowait(command_velocity,
+            !robot_joint_velocity_batch_checked(command_velocity,
                                                 (uint8_t)joint_num,
                                                 ROBOT_JOINT_DEFAULT_ACCELERATION)) {
-            LOG("visual servo velocity batch CAN lock failed\r\n");
+            LOG("visual servo velocity batch CAN transaction failed\r\n");
+            robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
             period_ok = false;
         }
         if (!period_ok &&
@@ -3177,16 +3239,12 @@ bool robot_scan_verify_pose(uint8_t point_id)
 int robot_send_scan_segment_event(robot_scan_segment_t segment)
 {
     if ((g_robot.event_queue == NULL) ||
-        ((segment != ROBOT_SCAN_LEFT_TO_FRONT) && (segment != ROBOT_SCAN_FRONT_TO_RIGHT)) ||
+        ((segment != ROBOT_SCAN_MEASURE_TO_LEFT) &&
+         (segment != ROBOT_SCAN_LEFT_TO_FRONT) && (segment != ROBOT_SCAN_FRONT_TO_RIGHT)) ||
         robot_capture_is_active() || ROBOT_TARGET_ENABLED) {
         return -1;
     }
-    if ((segment == ROBOT_SCAN_LEFT_TO_FRONT) &&
-        (!ROBOT_STATUS_IS(g_robot.status, ROBOT_STATUS_POSE_VALID) ||
-         !isfinite(g_robot.cur_pos.x) || !isfinite(g_robot.cur_pos.y) || !isfinite(g_robot.cur_pos.z) ||
-         (fabsf(g_robot.cur_pos.x - ROBOT_VIEW_ARC_BASE_X_MM) > ROBOT_VIEW_ARC_BASE_TOL_MM) ||
-         (fabsf(g_robot.cur_pos.y - ROBOT_VIEW_ARC_BASE_Y_MM) > ROBOT_VIEW_ARC_BASE_TOL_MM) ||
-         (fabsf(g_robot.cur_pos.z - ROBOT_VIEW_ARC_BASE_Z_MM) > ROBOT_VIEW_ARC_BASE_TOL_MM))) {
+    if ((segment == ROBOT_SCAN_MEASURE_TO_LEFT) && !robot_scan_measure_pose_valid()) {
         return -1;
     }
 
@@ -3202,6 +3260,8 @@ int robot_send_scan_segment_event(robot_scan_segment_t segment)
         (g_robot_reset_result == ROBOT_RESET_RESULT_RUNNING) ||
         (uxQueueMessagesWaiting(g_robot.event_queue) != 0u) ||
         (g_robot_scan_result == ROBOT_SCAN_RESULT_RUNNING) ||
+        ((segment == ROBOT_SCAN_LEFT_TO_FRONT) &&
+         (g_robot_scan_result != ROBOT_SCAN_RESULT_LEFT_READY)) ||
         ((segment == ROBOT_SCAN_FRONT_TO_RIGHT) &&
          (g_robot_scan_result != ROBOT_SCAN_RESULT_FRONT_READY));
     BaseType_t queued = pdFAIL;

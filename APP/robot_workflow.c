@@ -943,18 +943,7 @@ static void workflow_handle_capture_result(uint32_t now_ms)
                 JETSON_ERROR_MOTION_ABORTED : JETSON_ERROR_MOTION_FAILED, now_ms);
             return;
         }
-        if ((s_scan.state == JETSON_SCAN_PREPARING) &&
-            (action == JETSON_CAPTURE_ACTION_GOTO) && (point_id == 1u))
-        {
-            if (robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT) != pdPASS)
-            {
-                workflow_fault(JETSON_ERROR_MOTION_FAILED, now_ms);
-                return;
-            }
-            s_scan.state = JETSON_SCAN_LEFT_TO_FRONT;
-            s_scan.deadline = now_ms + ROBOT_SCAN_SEGMENT_TIMEOUT_MS;
-        }
-        else if ((s_scan.state == JETSON_SCAN_RETURNING_HOME) &&
+        if ((s_scan.state == JETSON_SCAN_RETURNING_HOME) &&
                  (action == JETSON_CAPTURE_ACTION_HOME) && (point_id == 0u))
         {
             if (!robot_scan_verify_pose(0u))
@@ -1363,7 +1352,8 @@ static void workflow_scan_command(const robot_workflow_obs_t *obs)
             robot_target_stop_hold();
             /* A previous legacy round may have cached the pre-HOME base pose. */
             robot_capture_init();
-            if (!robot_capture_request(JETSON_CAPTURE_ACTION_GOTO, 1u))
+            /* ponytail: reuse joint interpolation instead of serial AUTO/J1/J4/J5. */
+            if (robot_send_scan_segment_event(ROBOT_SCAN_MEASURE_TO_LEFT) != pdPASS)
             {
                 error = JETSON_ERROR_BUSY;
             }
@@ -1468,7 +1458,8 @@ static void workflow_scan_step(uint32_t now_ms)
         }
         return;
     }
-    if ((s_scan.state != JETSON_SCAN_LEFT_TO_FRONT) &&
+    if ((s_scan.state != JETSON_SCAN_PREPARING) &&
+        (s_scan.state != JETSON_SCAN_LEFT_TO_FRONT) &&
         (s_scan.state != JETSON_SCAN_FRONT_TO_RIGHT))
     {
         return;
@@ -1478,6 +1469,17 @@ static void workflow_scan_step(uint32_t now_ms)
     {
         workflow_fault((result == ROBOT_SCAN_RESULT_ABORTED) ?
             JETSON_ERROR_MOTION_ABORTED : JETSON_ERROR_MOTION_FAILED, now_ms);
+    }
+    else if ((s_scan.state == JETSON_SCAN_PREPARING) &&
+             (result == ROBOT_SCAN_RESULT_LEFT_READY))
+    {
+        if (robot_send_scan_segment_event(ROBOT_SCAN_LEFT_TO_FRONT) != pdPASS)
+        {
+            workflow_fault(JETSON_ERROR_MOTION_FAILED, now_ms);
+            return;
+        }
+        s_scan.state = JETSON_SCAN_LEFT_TO_FRONT;
+        s_scan.deadline = now_ms + ROBOT_SCAN_SEGMENT_TIMEOUT_MS;
     }
     else if ((s_scan.state == JETSON_SCAN_LEFT_TO_FRONT) &&
              (result == ROBOT_SCAN_RESULT_FRONT_READY))

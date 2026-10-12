@@ -107,6 +107,7 @@ extern "C" {
 #define ROBOT_CAN_TIMEOUT                   (15)    /* CAN 通信超时时间，单位 ms */
 #define ROBOT_CAN_BATCH_FEEDBACK_WAIT_MS     (6U)
 #define ROBOT_CAN_BATCH_FEEDBACK_GRACE_MS    (4U)    /* One bounded grace wait for a partially received batch. */
+#define ROBOT_CAN_VELOCITY_ACK_WAIT_MS       (4U)    /* Shared F6 acknowledgement budget for all arm joints. */
 
 #define ROBOT_ERROR_RANGE                   (1e-4f) /* 浮点数计算误差允许范围 */
 #define ROBOT_JOINT_ANGLE_ERROR_RANGE       (1e-1f) /* 关节角度控制误差允许范围 */
@@ -228,6 +229,7 @@ typedef enum
 {
     ROBOT_SCAN_LEFT_TO_FRONT = 0,
     ROBOT_SCAN_FRONT_TO_RIGHT,
+    ROBOT_SCAN_MEASURE_TO_LEFT,     /* Internal preparation; no new wire action. */
 } robot_scan_segment_t;
 
 typedef enum
@@ -238,6 +240,7 @@ typedef enum
     ROBOT_SCAN_RESULT_RIGHT_READY,
     ROBOT_SCAN_RESULT_FAILED,
     ROBOT_SCAN_RESULT_ABORTED,
+    ROBOT_SCAN_RESULT_LEFT_READY,
 } robot_scan_result_t;
 
 typedef enum

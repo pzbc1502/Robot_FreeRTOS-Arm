@@ -51,9 +51,9 @@ void Emm_V5_Reset_Clog_Pro(uint8_t addr)
   * @brief    读取系统参数
   * @param    addr  ：电机地址
   * @param    s     ：系统参数类型
-  * @retval   地址 + 功能码 + 命令状态 + 校验字节
+  * @retval   true if the request was transmitted; false on invalid input/TX failure.
   */
-void Emm_V5_Read_Sys_Params(uint8_t addr, SysParams_t s)
+bool Emm_V5_Read_Sys_Params(uint8_t addr, SysParams_t s)
 {
   uint8_t i = 0;
   uint8_t cmd[16] = {0};
@@ -77,13 +77,13 @@ void Emm_V5_Read_Sys_Params(uint8_t addr, SysParams_t s)
     case S_ORG  : cmd[i] = 0x3B; ++i; break;
     case S_Conf : cmd[i] = 0x42; ++i; cmd[i] = 0x6C; ++i; break;
     case S_State: cmd[i] = 0x43; ++i; cmd[i] = 0x7A; ++i; break;
-    default: break;
+    default: return false;
   }
 
   cmd[i] = 0x6B; ++i;                   // 校验字节
   
   // 发送命令
-  can_SendCmd(cmd, i);
+  return can_SendCmd(cmd, i);
 }
 
 /**
@@ -139,9 +139,9 @@ void Emm_V5_En_Control(uint8_t addr, bool state, bool snF)
   * @param    vel ：速度       ，范围0 - 5000RPM
   * @param    acc ：加速度     ，范围0 - 255，注意：0是直接启动
   * @param    snF ：多机同步标志，false为不启用，true为启用
-  * @retval   地址 + 功能码 + 命令状态 + 校验字节
+  * @retval   CAN transmit result only; F6 acknowledgement must be checked separately.
   */
-void Emm_V5_Vel_Control(uint8_t addr, uint8_t dir, uint16_t vel, uint8_t acc, bool snF)
+bool Emm_V5_Vel_Control(uint8_t addr, uint8_t dir, uint16_t vel, uint8_t acc, bool snF)
 {
   uint8_t cmd[16] = {0};
 
@@ -156,7 +156,7 @@ void Emm_V5_Vel_Control(uint8_t addr, uint8_t dir, uint16_t vel, uint8_t acc, bo
   cmd[7] =  0x6B;                       // 校验字节
   
   // 发送命令
-  can_SendCmd(cmd, 8);
+  return can_SendCmd(cmd, 8);
 }
 
 /**

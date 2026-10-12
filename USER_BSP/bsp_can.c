@@ -8,12 +8,87 @@
 #include "task.h"
 #include "semphr.h"
 
+extern canfd_extended_cfg_t g_canfd0_extended_cfg;
+
 /* CAN 总线互斥锁（串行化请求-应答） */
 static SemaphoreHandle_t s_can_bus_mutex = NULL;
 
 /* 全局 CAN 上下文结构体，用于保存接收/发送缓冲区和状态 */
 CAN_Context_t g_can_context = {0};
 volatile bool g_can_tx_complete = false; // CAN 发送完成标志
+
+typedef struct {
+    uint32_t total_count;
+    uint32_t pending_count;
+    uint32_t events;
+    uint32_t error_code;
+    uint32_t first_ms;
+    uint32_t last_ms;
+    uint32_t channel;
+    uint32_t buffer;
+    uint32_t recent_tx_id;
+    uint8_t recent_tx_func;
+    bool info_valid;
+    can_info_t info;
+} BSP_CAN_ErrorRecord_t;
+
+/* Coalesce error bursts; logging must not block the CAN ISR. */
+static volatile BSP_CAN_ErrorRecord_t s_can_errors = {0};
+static volatile uint32_t s_can_recent_tx_id;
+static volatile uint8_t s_can_recent_tx_func;
+
+static void BSP_CAN_RecordError(const can_callback_args_t *args)
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    uint32_t now_ms = (uint32_t)(xTaskGetTickCountFromISR() * portTICK_PERIOD_MS);
+    if (s_can_errors.pending_count == 0u) {
+        s_can_errors.first_ms = now_ms;
+    }
+    s_can_errors.total_count++;
+    s_can_errors.pending_count++;
+    s_can_errors.events |= (uint32_t) args->event;
+    /* FSP has already cleared ERFL; preserve the callback's error bits. */
+    s_can_errors.error_code |= args->error;
+    s_can_errors.last_ms = now_ms;
+    s_can_errors.channel = args->channel;
+    s_can_errors.buffer = args->buffer;
+    s_can_errors.recent_tx_id = s_can_recent_tx_id;
+    s_can_errors.recent_tx_func = s_can_recent_tx_func;
+    can_info_t info = {0};
+    s_can_errors.info_valid = (R_CANFD_InfoGet(&g_canfd0_ctrl, &info) == FSP_SUCCESS);
+    s_can_errors.info = info;
+    __set_PRIMASK(primask);
+}
+
+void BSP_CAN_ProcessErrors(void)
+{
+    if ((__get_IPSR() != 0u) || (__get_PRIMASK() != 0u)) {
+        return;
+    }
+
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    BSP_CAN_ErrorRecord_t record = s_can_errors;
+    s_can_errors.pending_count = 0u;
+    s_can_errors.events = 0u;
+    s_can_errors.error_code = 0u;
+    __set_PRIMASK(primask);
+    if (record.pending_count == 0u) {
+        return;
+    }
+
+    /* recent_tx is context, not proof that this frame caused the error. */
+    LOG("[CAN][ERROR] count=%lu total=%lu events=0x%08lX error=0x%08lX first_ms=%lu last_ms=%lu channel=%lu buffer=%lu recent_tx=0x%08lX func=0x%02X info_valid=%u status=0x%08lX tx_err=%u rx_err=%u\r\n",
+        (unsigned long) record.pending_count, (unsigned long) record.total_count,
+        (unsigned long) record.events, (unsigned long) record.error_code,
+        (unsigned long) record.first_ms, (unsigned long) record.last_ms,
+        (unsigned long) record.channel, (unsigned long) record.buffer,
+        (unsigned long) record.recent_tx_id, (unsigned int) record.recent_tx_func,
+        (unsigned int) record.info_valid, (unsigned long) record.info.status,
+        (unsigned int) record.info.error_count_transmit,
+        (unsigned int) record.info.error_count_receive);
+}
 
 /* ============================================================ */
 /*                1. 接收规则配置 (使用宏定义)                  */
@@ -52,6 +127,8 @@ void BSP_CAN_Init(void)
 {
     fsp_err_t err;
 
+    /* Capture ordinary bus errors before the warning/passive thresholds. */
+    g_canfd0_extended_cfg.error_interrupts |= R_CANFD_CFDC_CTR_BEIE_Msk;
     /* 打开并初始化 CAN 模块 */
     err = g_canfd0.p_api->open(g_canfd0.p_ctrl, g_canfd0.p_cfg);
 
@@ -124,6 +201,11 @@ fsp_err_t BSP_CAN_Send(uint32_t id, can_id_mode_t id_mode, uint8_t *p_data, uint
     tx_frame.options           = 0; // 标准CAN 2.0帧，不使用BRS或FDF
     memcpy(tx_frame.data, p_data, len);
 
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    s_can_recent_tx_id = id;
+    s_can_recent_tx_func = (len > 0u) ? p_data[0] : 0u;
+    __set_PRIMASK(primask);
     g_can_tx_complete = false; // 发送前清除标志
     err = R_CANFD_Write(&g_canfd0_ctrl, 0, &tx_frame);
     if (err != FSP_SUCCESS) {
@@ -152,9 +234,9 @@ fsp_err_t BSP_CAN_Send(uint32_t id, can_id_mode_t id_mode, uint8_t *p_data, uint
 /* ============================================================ */
 /*                  上层应用接口 (最终版-支持分包)              */
 /* ============================================================ */
-void can_SendCmd(uint8_t *cmd, uint8_t len)
+bool can_SendCmd(uint8_t *cmd, uint8_t len)
 {
-    if (len < 2) return; // 命令至少需要地址+功能码
+    if ((cmd == NULL) || (len < 2u)) return false;
 
     uint32_t motor_id = cmd[0];
     uint8_t func = cmd[1];
@@ -180,12 +262,13 @@ void can_SendCmd(uint8_t *cmd, uint8_t len)
         if (err != FSP_SUCCESS)
         {
             LOG("CAN Send chunk for Motor ID %u failed with err: %d\r\n", (unsigned int) motor_id, err);
-            return;
+            return false;
         }
 
         offset = (uint8_t)(offset + (dlc - 1));
         packNum++;
     } while (offset < data_len);
+    return true;
 }
 
 /* ============================================================ */
@@ -230,6 +313,66 @@ static void BSP_CAN_DrainRxSem(void)
 void BSP_CAN_DrainRx(void)
 {
     BSP_CAN_DrainRxSem();
+}
+
+void BSP_CAN_ClearVelocityFlags(void)
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    g_can_context.velocity_reply_pending = 0u;
+    for (uint8_t i = 0u; i < 6u; i++) {
+        g_can_context.motor_velocity_flag[i] = 0u;
+        g_can_context.motor_velocity_status[i] = 0u;
+    }
+    __set_PRIMASK(primask);
+}
+
+bool BSP_CAN_ExpectVelocityReply(uint8_t addr)
+{
+    if ((addr == 0u) || (addr > 6u)) return false;
+    uint8_t index = (uint8_t)(addr - 1u);
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    g_can_context.motor_velocity_flag[index] = 0u;
+    g_can_context.motor_velocity_status[index] = 0u;
+    g_can_context.velocity_reply_pending |= (1u << index);
+    __set_PRIMASK(primask);
+    return true;
+}
+
+bool BSP_CAN_WaitVelocityAll(uint8_t joint_num, uint32_t timeout_ms,
+                             uint32_t *missing_mask, uint32_t *rejected_mask)
+{
+    uint32_t missing = 0u;
+    uint32_t rejected = 0u;
+    if (joint_num > 6u) joint_num = 6u;
+    TickType_t start = xTaskGetTickCount();
+    TickType_t timeout_ticks = pdMS_TO_TICKS(timeout_ms);
+    if ((timeout_ms > 0u) && (timeout_ticks == 0u)) timeout_ticks = 1u;
+
+    /* One deadline for the whole batch, not a timeout per motor. */
+    while (1) {
+        missing = rejected = 0u;
+        uint32_t primask = __get_PRIMASK();
+        __disable_irq();
+        for (uint8_t i = 0u; i < joint_num; i++) {
+            if (g_can_context.motor_velocity_flag[i] == 0u) {
+                missing |= (1u << i);
+            } else if (g_can_context.motor_velocity_status[i] != 0x02u) {
+                rejected |= (1u << i);
+            }
+        }
+        __set_PRIMASK(primask);
+        if ((missing == 0u) || (rejected != 0u) ||
+            ((TickType_t)(xTaskGetTickCount() - start) >= timeout_ticks)) {
+            break;
+        }
+        if (xTaskGetSchedulerState() == taskSCHEDULER_NOT_STARTED) __NOP();
+        else taskYIELD();
+    }
+    if (missing_mask != NULL) *missing_mask = missing;
+    if (rejected_mask != NULL) *rejected_mask = rejected;
+    return (missing == 0u) && (rejected == 0u);
 }
 
 void BSP_CAN_ClearMotorFlags(void)
@@ -435,6 +578,24 @@ void canfd0_callback(can_callback_args_t *p_args)
             memcpy(g_can_context.rxData, p_args->frame.data, copy_len);
 
             uint8_t motor_addr = (uint8_t)(g_can_context.CAN_RxMsg.ExtId >> 8);
+            if ((motor_addr >= 1u) && (motor_addr <= 6u) &&
+                (p_args->frame.id == ((uint32_t)motor_addr << 8)) &&
+                (p_args->frame.id_mode == CAN_ID_MODE_EXTENDED) &&
+                (p_args->frame.type == CAN_FRAME_TYPE_DATA) &&
+                (g_can_context.CAN_RxMsg.DLC == 3u) &&
+                (g_can_context.rxData[2] == 0x6Bu) &&
+                ((g_can_context.rxData[0] == 0xF6u) ||
+                 ((g_can_context.rxData[0] == 0x00u) &&
+                  (g_can_context.rxData[1] == 0xEEu))) &&
+                ((g_can_context.velocity_reply_pending & (1u << (motor_addr - 1u))) != 0u)) {
+                uint8_t index = (uint8_t)(motor_addr - 1u);
+                /* Preserve a rejection even if a duplicate success arrives. */
+                if ((g_can_context.motor_velocity_flag[index] == 0u) ||
+                    (g_can_context.rxData[1] != 0x02u)) {
+                    g_can_context.motor_velocity_status[index] = g_can_context.rxData[1];
+                    g_can_context.motor_velocity_flag[index] = 1u;
+                }
+            }
             if ((motor_addr >= 1u) &&
                 (motor_addr <= 6u) &&
                 (copy_len >= 7u) &&
@@ -497,14 +658,17 @@ void canfd0_callback(can_callback_args_t *p_args)
             break;
         }
 
+        case CAN_EVENT_ERR_CHANNEL:
+        case CAN_EVENT_ERR_GLOBAL:
+        case CAN_EVENT_FIFO_MESSAGE_LOST:
+        case CAN_EVENT_MAILBOX_MESSAGE_LOST:
         case CAN_EVENT_ERR_BUS_OFF:
         case CAN_EVENT_ERR_PASSIVE:
         case CAN_EVENT_ERR_WARNING:
         case CAN_EVENT_BUS_RECOVERY:
         case CAN_EVENT_ERR_BUS_LOCK:
         {
-            LOG("[CAN][ISR] event=%d id=0x%08lX dlc=%u\r\n", p_args->event, (unsigned long)p_args->frame.id, (unsigned int)p_args->frame.data_length_code);
-            BSP_CAN_PrintInfo("err_isr");
+            BSP_CAN_RecordError(p_args);
             break;
         }
         

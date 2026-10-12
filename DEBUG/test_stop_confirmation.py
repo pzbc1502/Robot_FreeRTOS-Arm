@@ -153,7 +153,7 @@ int main(void) {
             case 0: s_workflow.state=FLOW_HOMING; break;
             case 1: s_workflow.state=FLOW_MEASURE_POSITION; break;
             case 2: start();break;
-            case 3: start();complete_capture();break;
+            case 3: start();complete_prepare();break;
             case 4: front();break;
             case 5: front();control(2,1,100,21);break;
             case 6: right();break;
@@ -196,6 +196,7 @@ LOW_LEVEL_STUBS = r'''
 #define ROBOT_RESET_RESULT_ABORTED 4
 #define ROBOT_SCAN_RESULT_RUNNING 1
 #define ROBOT_SCAN_RESULT_FRONT_READY 2
+#define ROBOT_SCAN_RESULT_LEFT_READY 6
 #define ROBOT_SCAN_RESULT_ABORTED 5
 #define taskENTER_CRITICAL() ((void)0)
 #define taskEXIT_CRITICAL() ((void)0)

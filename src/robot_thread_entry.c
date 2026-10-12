@@ -37,6 +37,7 @@ void robot_thread_entry(void * pvParameters)
 
     while (1)
     {
+        BSP_CAN_ProcessErrors();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

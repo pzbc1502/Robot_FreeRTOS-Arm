@@ -59,6 +59,7 @@ static struct {
 static uint32_t now_ms, batch_start, reply_after[6], reply_counts[6];
 static unsigned request_count, lock_count, unlock_count, drain_count;
 static bool locked, lock_fails, issued[6], invalid_payload;
+static uint8_t tx_fail_addr;
 static uint32_t HAL_GetTick(void) { return now_ms; }
 static TickType_t xTaskGetTickCount(void) { return now_ms; }
 static int xTaskGetSchedulerState(void) { return 1; }
@@ -69,9 +70,11 @@ static bool BSP_CAN_Lock(uint32_t timeout_ms) {
 }
 static void BSP_CAN_Unlock(void) { assert(locked); locked=false; unlock_count++; }
 static void BSP_CAN_DrainRxSem(void) { assert(locked); drain_count++; }
-static void Emm_V5_Read_Sys_Params(uint8_t addr,uint8_t param) {
+static bool Emm_V5_Read_Sys_Params(uint8_t addr,uint8_t param) {
     assert(locked && addr>=1 && addr<=6 && param==S_CPOS);
-    assert(!issued[addr-1]); issued[addr-1]=true; request_count++;
+    assert(!issued[addr-1]); request_count++;
+    if(addr==tx_fail_addr) return false;
+    issued[addr-1]=true; return true;
 }
 static void clock_step(void) {
     assert(locked); now_ms++;
@@ -89,7 +92,7 @@ static void clock_step(void) {
 #define taskYIELD() clock_step()
 #define __NOP() clock_step()
 static void reset_fixture(void) {
-    now_ms=0; batch_start=0; locked=false; lock_fails=false; invalid_payload=false;
+    now_ms=0; batch_start=0; locked=false; lock_fails=false; invalid_payload=false; tx_fail_addr=0;
     request_count=0; lock_count=0; unlock_count=0; drain_count=0;
     memset(issued,0,sizeof(issued)); memset(&g_can_context,0,sizeof(g_can_context));
     memcpy(g_robot.joints,g_joints_init,sizeof(g_joints_init));
@@ -191,7 +194,12 @@ int main(void) {
     assert(robot_update_all_angles(5,&missing,&elapsed)!=0);
     assert(missing==0x08 && elapsed<=12); assert_transaction(5);
 
-    puts("14 actual-C CAN batch feedback scenarios passed (no hardware)");
+    reset_fixture(); tx_fail_addr=4;
+    assert(robot_update_all_angles(5,&missing,&elapsed)!=0);
+    assert(missing==0x1F && elapsed==0 && request_count==4);
+    assert(unlock_count==1 && !locked && !issued[3] && !issued[4]);
+
+    puts("15 actual-C CAN batch feedback scenarios passed (no hardware)");
     return 0;
 }
 """

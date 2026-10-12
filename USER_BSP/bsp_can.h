@@ -48,6 +48,11 @@ typedef struct {
     /* Per-motor stop reply (0xFE) flag, set by ISR. */
     volatile uint8_t motor_stop_flag[6];
 
+    /* Only armed F6 transactions may publish a velocity acknowledgement. */
+    volatile uint8_t motor_velocity_flag[6];
+    volatile uint8_t motor_velocity_status[6];
+    volatile uint32_t velocity_reply_pending;
+
 } CAN_Context_t;
 
 /* ============================================================ */
@@ -89,13 +94,16 @@ void BSP_CAN_Init(void);
  */
 fsp_err_t BSP_CAN_Send(uint32_t id, can_id_mode_t id_mode, uint8_t *p_data, uint8_t dlc);
 void BSP_CAN_PrintInfo(const char *tag);
+/* Drain captured CAN errors from task context; never call from an ISR. */
+void BSP_CAN_ProcessErrors(void);
 
 /**
  * @brief 上层应用接口：发送电机指令
  * @param cmd 指向命令数据的指针 (首字节为电机地址)
  * @param len 命令总长度
+ * @return true if all CAN chunks were transmitted; not a motor acceptance ACK.
  */
-void can_SendCmd(uint8_t *cmd, uint8_t len);
+bool can_SendCmd(uint8_t *cmd, uint8_t len);
 
 /* ============================================================ */
 /*                 CAN 应答等待与总线互斥(请求-应答)              */
@@ -118,6 +126,11 @@ bool BSP_CAN_WaitAllMotors(uint8_t joint_num, uint32_t timeout_ms);
 void BSP_CAN_ClearStopFlags(uint8_t joint_num);
 bool BSP_CAN_WaitStopAll(uint8_t joint_num, uint32_t timeout_ms);
 void BSP_CAN_DrainRx(void);
+void BSP_CAN_ClearVelocityFlags(void);
+/* Caller holds the CAN lock; arm before sending, clear after completion/failure. */
+bool BSP_CAN_ExpectVelocityReply(uint8_t addr);
+bool BSP_CAN_WaitVelocityAll(uint8_t joint_num, uint32_t timeout_ms,
+                             uint32_t *missing_mask, uint32_t *rejected_mask);
 
 /**
  * @brief 等待指定电机(addr)的指定功能码(expected_func)回包。
