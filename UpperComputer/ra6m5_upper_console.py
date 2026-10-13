@@ -818,6 +818,10 @@ class QtUpperConsole(QMainWindow):
         self.scan_stop_failed = False
         self.scan_finish_seq = None
         self.scan_finish_deadline = None
+        self.scan_target_seq = None
+        self.scan_target_value = None
+        self.scan_target_deadline = None
+        self.scan_target_handed_off = False
         self.jetson_rx_buffer = bytearray()
         self._build_ui()
         self._set_status("PROTO", self.current_protocol_label())
@@ -1032,7 +1036,7 @@ class QtUpperConsole(QMainWindow):
         return group
 
     def _scan_group(self) -> QGroupBox:
-        group = QGroupBox("固定扫描调试（不执行激光）")
+        group = QGroupBox("固定扫描与原定靶联调")
         layout = QVBoxLayout(group)
         self.scan_stage = QLabel("未运行")
         self.scan_stage.setWordWrap(True)
@@ -1053,6 +1057,9 @@ class QtUpperConsole(QMainWindow):
         row.addWidget(self._button("终止并保持", self.scan_abort))
         row.addWidget(self._button("结束回HOME", self.scan_finish))
         layout.addLayout(row)
+        self.scan_target_start = self._button("进入原定靶", lambda: self.send_target_ctrl(True))
+        self.scan_target_start.setEnabled(False)
+        layout.addWidget(self.scan_target_start)
         return group
 
     def _scan_write(self, frame: bytes) -> bool:
@@ -1078,6 +1085,8 @@ class QtUpperConsole(QMainWindow):
         self.scan_abort_seq = None
         self.scan_finish_seq = None
         self.scan_finish_deadline = None
+        self.scan_target_seq = self.scan_target_value = self.scan_target_deadline = None
+        self.scan_target_handed_off = False
         if self._scan_write(build_unified_workflow_control_frame(WORKFLOW_START, self.scan_measure_seq)):
             self.heartbeat_enable.setChecked(True)
             self.start_heartbeat()
@@ -1106,7 +1115,8 @@ class QtUpperConsole(QMainWindow):
             self._scan_write(build_unified_safe_distance_frame(distance, True, self._next_unified_seq()))
 
     def scan_start(self) -> None:
-        if self.automatic_demo_owner != "scan" or not self.scan_distance_safe or self.scan_client.active:
+        if (self.automatic_demo_owner != "scan" or not self.scan_distance_safe or self.scan_client.active or
+                self.scan_target_handed_off or self.scan_target_deadline is not None):
             self.emit_log("SCAN", "WARN", "需要先完成本次测距许可，且没有正在运行的扫描")
             return
         if QMessageBox.question(self, "确认扫描运动", "仅限固定模型台架，激光关闭，运动范围无人，现场急停可用。现在启动扫描？") != QMessageBox.Yes:
@@ -1135,11 +1145,14 @@ class QtUpperConsole(QMainWindow):
         self._scan_write(self.scan_client.query(self._next_unified_seq()))
 
     def scan_finish(self) -> None:
-        if not self.scan_client.confirmed or self.automatic_demo_owner != "scan":
+        if (not (self.scan_client.confirmed or self.scan_target_handed_off) or
+                self.automatic_demo_owner != "scan" or self.scan_target_deadline is not None):
             self.emit_log("SCAN", "WARN", "只有最终正视到位后才允许正常结束返回")
             return
         self.scan_finish_seq = self._next_unified_seq()
         self.scan_finish_deadline = time.monotonic() + 47
+        self.scan_target_seq = self.scan_target_value = self.scan_target_deadline = None
+        self.scan_target_handed_off = False
         self.scan_client.abort()
         self._scan_write(build_unified_workflow_control_frame(WORKFLOW_FINISH, self.scan_finish_seq))
         self.scan_stage.setText("正常结束，等待 HOME 完成；未完成前保持控制锁")
@@ -1153,6 +1166,8 @@ class QtUpperConsole(QMainWindow):
         self.scan_abort_seq = self._next_unified_seq()
         self.scan_abort_deadline = time.monotonic() + 3.0
         self.scan_stop_failed = False
+        self.scan_target_seq = self.scan_target_value = self.scan_target_deadline = None
+        self.scan_target_handed_off = False
         self.scan_client.abort()
         self.scan_measure_ready = self.scan_distance_safe = False
         self.scan_photo_ok.setEnabled(False)
@@ -1552,7 +1567,8 @@ class QtUpperConsole(QMainWindow):
     def _next_unified_seq(self) -> int:
         with self.seq_lock:
             reserved = {self.scan_client.start_seq, self.scan_client.photo_seq,
-                        self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq} if self.automatic_demo_owner == "scan" else set()
+                        self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq,
+                        self.scan_target_seq} if self.automatic_demo_owner == "scan" else set()
             while True:
                 self.unified_seq = (self.unified_seq % 255) + 1
                 if self.unified_seq not in reserved:
@@ -2028,9 +2044,22 @@ class QtUpperConsole(QMainWindow):
         self.arm_history.blockSignals(False)
 
     def send_target_ctrl(self, enable: bool) -> bool:
-        if enable and self.automatic_demo_owner == "scan":
-            self.emit_log("SCAN", "SAFETY", "扫描调试不允许进入旧定靶流程")
+        scan_owned = self.automatic_demo_owner == "scan"
+        if scan_owned and self.current_jetson_protocol() != JETSON_PROTOCOL_NEW:
+            self.emit_log("SCAN", "SAFETY", "扫描交接只接受当前新协议，不发送旧格式定靶帧")
             return False
+        if enable and scan_owned:
+            if (not (self.scan_client.confirmed or
+                     (self.scan_target_handed_off and self.scan_target_value == 0)) or
+                    self.scan_client.cancelling or self.scan_abort_deadline is not None or
+                    self.scan_finish_deadline is not None or self.scan_stop_failed or
+                    self.scan_target_deadline is not None or self.current_jetson_protocol() != JETSON_PROTOCOL_NEW):
+                self.emit_log("SCAN", "SAFETY", "需最终正视已确认且没有待完成控制，才允许启动原定靶")
+                return False
+            if QMessageBox.question(self, "确认定靶联调",
+                    "将请求启动原视觉定靶，可能产生对准运动。\n"
+                    "仅限固定模型台架、激光物理断电、运动范围无人且现场急停可用。继续？") != QMessageBox.Yes:
+                return False
         if not self.jetson.is_open():
             self.emit_log("JETSON", "ERROR", "Jetson模拟串口未打开，控制帧未发送。")
             return False
@@ -2041,14 +2070,22 @@ class QtUpperConsole(QMainWindow):
                         self.start_heartbeat()
                     if self.safe_distance_enable.isChecked():
                         self.start_safe_distance()
-                frame = build_unified_target_control_frame(enable, self._next_unified_seq())
+                seq = self._next_unified_seq()
+                frame = build_unified_target_control_frame(enable, seq)
                 label = "TARGET_CTRL_START_NEW" if enable else "TARGET_CTRL_STOP_NEW"
             else:
                 frame = build_target_control_frame(enable)
                 label = "TARGET_CTRL_START" if enable else "TARGET_CTRL_STOP"
             self.jetson.write(frame, label)
+            if scan_owned:
+                self.scan_target_seq = seq
+                self.scan_target_value = int(enable)
+                self.scan_target_deadline = time.monotonic() + 5.0
+                self.scan_stage.setText("等待 MCU 定靶启动结果" if enable else "等待 MCU 定靶关闭结果")
         except Exception as exc:
             self.emit_log("JETSON", "ERROR", str(exc))
+            if scan_owned:
+                self.scan_abort()
             return False
         return True
 
@@ -2079,7 +2116,11 @@ class QtUpperConsole(QMainWindow):
 
     def stop_target_ctrl_with_reset(self) -> None:
         if self.automatic_demo_owner == "scan":
-            self.scan_abort()
+            if self.scan_target_handed_off:
+                if not self.send_target_ctrl(False):
+                    self.scan_abort()
+            else:
+                self.scan_abort()
             return
         self.stop_heartbeat()
         self.stop_safe_distance()
@@ -2351,7 +2392,7 @@ class QtUpperConsole(QMainWindow):
             frames, remaining = parse_ra6_status_stream(bytes(self.jetson_rx_buffer))
             self.jetson_rx_buffer = bytearray(remaining[-64:])
             for status in frames:
-                if status.msg_type == 0x82 or (status.is_formal and status.event == EVENT_WORKFLOW):
+                if status.is_formal:
                     self.scan_status_queue.put(status)
                 if status.is_formal:
                     self.formal_status_mailbox.publish(status)
@@ -2549,8 +2590,23 @@ class QtUpperConsole(QMainWindow):
                             self.scan_abort()
                     if self.scan_client.confirmed:
                         self.scan_stage.setText(f"扫描 {status.scan_id}：最终正视真实到位，激光保持关闭")
-            elif self.automatic_demo_owner == "scan" and status.seq in (0, self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq):
-                if (status.msg_type == 0x81 and status.event == EVENT_WORKFLOW and
+            elif self.automatic_demo_owner == "scan" and status.seq in (0, self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq, self.scan_target_seq):
+                if (status.msg_type == 0x81 and self.scan_target_seq is not None and
+                        status.seq == self.scan_target_seq and status.error == 0 and status.value == 1 and
+                        self.scan_target_value == 1 and status.event in (EVENT_TARGET_CTRL, EVENT_READY)):
+                    self.scan_target_deadline = None
+                    self.scan_target_handed_off = True
+                    self.scan_measure_ready = False
+                    self.scan_client.state, self.scan_client.flags = 12, 0
+                    self.scan_client.active = self.scan_client.confirmed = False
+                    self.scan_client.pending = self.scan_client.stage_deadline = None
+                    self.scan_stage.setText("已进入原定靶；固定正视就绪资格已消费")
+                elif (status.msg_type == 0x81 and self.scan_target_seq is not None and
+                        status.seq == self.scan_target_seq and status.error == 0 and status.value == 0 and
+                        self.scan_target_value == 0 and status.event == EVENT_TARGET_CTRL):
+                    self.scan_target_deadline = None
+                    self.scan_stage.setText("定靶已关闭，可恢复原定靶或正常结束回HOME")
+                elif (status.msg_type == 0x81 and status.event == EVENT_WORKFLOW and
                         self.scan_abort_seq is not None and status.seq == self.scan_abort_seq and
                         status.value == WORKFLOW_ABORTED_HOLD and status.error == 0):
                     if not self.scan_stop_failed:
@@ -2587,11 +2643,21 @@ class QtUpperConsole(QMainWindow):
         if self.scan_finish_deadline is not None and time.monotonic() >= self.scan_finish_deadline:
             self.emit_log("SCAN", "ERROR", "正常返回 HOME 等待超时，不能视为完成；已请求中止")
             self.scan_abort()
+        if self.scan_target_deadline is not None and time.monotonic() >= self.scan_target_deadline:
+            self.emit_log("SCAN", "ERROR", "定靶控制结果等待超时，已请求中止")
+            self.scan_abort()
         if self.scan_client.expired(time.monotonic()):
             self.emit_log("SCAN", "ERROR", "扫描阶段等待超时，请现场确认停止；已请求中止")
             self.scan_abort()
         for frame in self.scan_client.poll(time.monotonic(), self._next_unified_seq):
             self._scan_write(frame)
+        self.scan_target_start.setEnabled(
+            self.automatic_demo_owner == "scan" and not self.scan_client.cancelling and
+            (self.scan_client.confirmed or
+             (self.scan_target_handed_off and self.scan_target_value == 0)) and
+            self.scan_target_deadline is None and self.scan_abort_deadline is None and
+            self.scan_finish_deadline is None and not self.scan_stop_failed
+        )
         while True:
             try:
                 key, value, color = self.status_update_queue.get_nowait()

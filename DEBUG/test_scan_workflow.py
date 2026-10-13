@@ -44,6 +44,8 @@ struct position { float x,y,z; };
 struct { unsigned status; struct {unsigned status;} joints[6]; struct position cur_pos; } g_robot;
 static bool aborted, busy, capture_active, verify_ok, queue_ok, laser;
 static int segment_count, capture_count, target_starts, laser_on_count, reset_count;
+static unsigned pose_verify_calls;
+static bool target_start_ok=true, target_output;
 static bool stop_ack_ok=true, stop_feedback_ok=true;
 static bool receive_stop_hold;
 static unsigned abort_calls, feedback_calls;
@@ -77,7 +79,7 @@ static int robot_send_scan_segment_event(robot_scan_segment_t segment) {
     if(!queue_ok) return 0;
     requested_segment=segment; segment_count++; scan_result=ROBOT_SCAN_RESULT_RUNNING; return 1;
 }
-static bool robot_scan_verify_pose(uint8_t id) { (void)id; return verify_ok && !busy && !aborted; }
+static bool robot_scan_verify_pose(uint8_t id) { (void)id; pose_verify_calls++; return verify_ok && !busy && !aborted; }
 static robot_reset_result_t robot_reset_result_consume(void) {
     robot_reset_result_t r=reset_result; reset_result=ROBOT_RESET_RESULT_NONE; return r;
 }
@@ -101,8 +103,8 @@ robot_capture_result_t robot_capture_result_consume(uint8_t *a,uint8_t *id) {
 }
 void robot_target_init(void) {}
 void robot_target_stop_hold(void) {}
-bool robot_target_start_at_current_pose(void) { target_starts++; return true; }
-bool robot_target_output_requested(void) { return true; }
+bool robot_target_start_at_current_pose(void) { target_starts++; return target_start_ok; }
+bool robot_target_output_requested(void) { return target_output; }
 robot_target_event_t robot_target_event_consume(void) { return ROBOT_TARGET_EVENT_NONE; }
 void robot_target_step(const target_obs_t *p) { (void)p; }
 typedef struct { uint8_t seq,event,state,flags,action,result,error; uint32_t id; } Report;
@@ -128,6 +130,7 @@ static robot_workflow_obs_t obs;
 static void step(void) { mock_now=obs.now_ms; robot_workflow_step(&obs); assert(!laser && laser_on_count==0); obs.now_ms+=10; }
 static void fixture(void) {
     aborted=busy=capture_active=laser=false; verify_ok=queue_ok=true;
+    target_start_ok=true;target_output=false;pose_verify_calls=0;
     stop_ack_ok=stop_feedback_ok=true; abort_calls=feedback_calls=status_count=0;
     receive_stop_hold=false;
     feedback_delay=0; memset(stop_angles,0,sizeof(stop_angles));
@@ -181,7 +184,6 @@ int main(void) {
     control(0,0,100,22);assert(last().event==2 && last().state==11 && last().flags==7);
     control(0,0,99,23);assert(last().error==0x10 && last().flags==0 && last().id==99);
     control(2,0,100,21);assert(last().error==0x0D);
-    obs.has_target_control=true;obs.target_value=1;obs.target_seq=50;step();obs.has_target_control=false;
     obs.has_capture_control=true;obs.capture_action=3;obs.capture_point_id=2;obs.capture_seq=51;step();obs.has_capture_control=false;
     assert(target_starts==0 && capture_count==c && s_workflow.state==FLOW_SCAN_READY);
     verify_ok=false;control(0,0,100,24);assert(s_workflow.state==FLOW_FAULT_HOLD && last().flags==0);
@@ -230,7 +232,14 @@ int main(void) {
     fixture();start();obs.has_workflow_control=true;obs.workflow_action=3;obs.workflow_seq=60;step();
     obs.has_workflow_control=false;scan_result=ROBOT_SCAN_RESULT_LEFT_READY;step();
     assert(s_scan.state==JETSON_SCAN_ABORTED_HOLD && segment_count==1);
-    puts("actual-C scan workflow: normal chain, replay, faults, timeouts, legacy gate passed (no hardware)");
+    fixture();final();assert(s_workflow.selected_view_id==2 && s_workflow.capture_done_mask==0);
+    unsigned reads=pose_verify_calls;n=segment_count;c=capture_count;
+    obs.has_target_control=true;obs.target_value=1;obs.target_seq=50;step();obs.has_target_control=false;
+    assert(s_workflow.state==FLOW_TARGET_ACTIVE && target_starts==1 && pose_verify_calls==reads+1);
+    assert(s_scan.state==JETSON_SCAN_CHAIN_COMPLETED && s_scan.flags==0);
+    assert(segment_count==n && capture_count==c);
+    control(0,0,100,24);assert(last().state==JETSON_SCAN_CHAIN_COMPLETED && last().flags==0);
+    puts("actual-C scan workflow: normal chain, target handoff, replay, faults and timeouts passed (no hardware)");
 }
 '''
 

@@ -636,6 +636,22 @@ static uint8_t workflow_target_start_error(const robot_workflow_obs_t *obs)
     {
         return JETSON_ERROR_BUSY;
     }
+    if (s_workflow.state == FLOW_SCAN_READY)
+    {
+        if ((s_scan.id == 0u) ||
+            (s_scan.state != JETSON_SCAN_FRONT_OBSERVE_HOLD) ||
+            (s_scan.flags != (JETSON_SCAN_PHOTO_SAVED | JETSON_SCAN_FINISHED |
+                              JETSON_SCAN_HOME_VERIFIED)) ||
+            (s_scan.error != JETSON_ERROR_NONE) ||
+            (s_workflow.selected_view_id != 2u))
+        {
+            return JETSON_ERROR_INVALID_STATE;
+        }
+        if (!robot_scan_verify_pose(2u))
+        {
+            return JETSON_ERROR_POSE_INVALID;
+        }
+    }
     return JETSON_ERROR_NONE;
 }
 
@@ -805,8 +821,9 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
         return false;
     }
 
+    bool scan_handoff = (s_workflow.state == FLOW_SCAN_READY);
     if ((s_workflow.state != FLOW_SELECTED_VIEW) &&
-        (s_workflow.state != FLOW_TARGET_HOLD))
+        (s_workflow.state != FLOW_TARGET_HOLD) && !scan_handoff)
     {
         command_ack(entry, false, JETSON_ERROR_INVALID_STATE);
         command_business(JETSON_MSG_TARGET_CTRL, obs->target_seq,
@@ -818,6 +835,10 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
     uint8_t error_code = workflow_target_start_error(obs);
     if (error_code != JETSON_ERROR_NONE)
     {
+        if (scan_handoff && (error_code == JETSON_ERROR_POSE_INVALID))
+        {
+            workflow_fault(error_code, obs->now_ms);
+        }
         command_ack(entry, false, error_code);
         command_business(JETSON_MSG_TARGET_CTRL, obs->target_seq,
                          RA6_TO_JETSON_TARGET_CTRL, 0u, error_code);
@@ -836,6 +857,15 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
     s_workflow.target_seq = obs->target_seq;
     s_workflow.target_enabled = true;
     s_workflow.target_aligned = false;
+    if (scan_handoff)
+    {
+        /* Alignment may leave the fixed front pose; consume its ready claim. */
+        s_scan.state = JETSON_SCAN_CHAIN_COMPLETED;
+        s_scan.flags = 0u;
+        s_scan.error = JETSON_ERROR_NONE;
+        LOG("[WORKFLOW] scan id=%lu handed to target at front pose\r\n",
+            (unsigned long)s_scan.id);
+    }
     workflow_enter(FLOW_TARGET_ACTIVE, obs->now_ms);
     command_ack(entry, true, JETSON_ERROR_NONE);
     workflow_target_status(RA6_TO_JETSON_TARGET_CTRL, 1u, JETSON_ERROR_NONE);
@@ -969,9 +999,9 @@ static void workflow_handle_capture_result(uint32_t now_ms)
                 workflow_fault(JETSON_ERROR_POSE_INVALID, now_ms);
                 return;
             }
+            s_workflow.selected_view_id = 2u;
             s_scan.state = JETSON_SCAN_FRONT_OBSERVE_HOLD;
             workflow_enter(FLOW_SCAN_READY, now_ms);
-            /* No legacy SELECTED_VIEW: target identity/doctor permit not wired yet. */
             scan_report(s_scan.start_seq, JETSON_SCAN_FRONT_OBSERVE_READY,
                         JETSON_SCAN_START, 1u, JETSON_ERROR_NONE);
         }
