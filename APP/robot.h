@@ -217,8 +217,9 @@ enum robot_event_type
     ROBOT_SCAN_SEGMENT_EVENT,       /* Formal scan motion only; no protocol/workflow. */
 };
 
-/* Each segment starts at rest; tune only after fixed-model path validation. */
+/* Preparation starts at rest; the scan passes FRONT without a stop. */
 #define ROBOT_SCAN_SEGMENT_DURATION_MS      (12000U)
+#define ROBOT_SCAN_DURATION_MS              (2U * ROBOT_SCAN_SEGMENT_DURATION_MS)
 #define ROBOT_SCAN_MAX_SPEED_DEG_S          (8.0f)
 #define ROBOT_SCAN_MAX_TRACK_ERROR_DEG      (8.0f)
 #define ROBOT_SCAN_POSE_TOL_DEG             (3.0f)
@@ -227,9 +228,8 @@ enum robot_event_type
 
 typedef enum
 {
-    ROBOT_SCAN_LEFT_TO_FRONT = 0,
-    ROBOT_SCAN_FRONT_TO_RIGHT,
-    ROBOT_SCAN_MEASURE_TO_LEFT,     /* Internal preparation; no new wire action. */
+    ROBOT_SCAN_LEFT_TO_RIGHT = 0,
+    ROBOT_SCAN_MEASURE_TO_LEFT = 2, /* Internal preparation; no new wire action. */
 } robot_scan_segment_t;
 
 typedef enum

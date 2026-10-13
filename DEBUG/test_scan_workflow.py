@@ -161,16 +161,13 @@ static void start(void) {
 static void complete_prepare(void) {
     scan_result=ROBOT_SCAN_RESULT_LEFT_READY;step();
     assert(s_scan.state==2 && segment_count==2 && capture_count==0);
-    assert(requested_segment==ROBOT_SCAN_LEFT_TO_FRONT);
+    assert(requested_segment==ROBOT_SCAN_LEFT_TO_RIGHT);
 }
-static void front(void) {
-    start(); complete_prepare();
-    scan_result=ROBOT_SCAN_RESULT_FRONT_READY;step();assert(s_scan.state==3);
-}
+static void scanning(void) { start();complete_prepare(); }
 static void right(void) {
-    front();control(2,1,100,21);assert(s_scan.state==4 && segment_count==3);
-    assert(requested_segment==ROBOT_SCAN_FRONT_TO_RIGHT);
-    scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;step();assert(s_scan.state==5 && capture_count==1);
+    scanning();
+    scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;step();
+    assert(s_scan.state==5 && s_scan.flags==2 && capture_count==1 && segment_count==2);
 }
 static void final(void) {
     right();complete_capture();assert(s_scan.state==10 && capture_count==2 && requested_point==2);
@@ -178,60 +175,61 @@ static void final(void) {
 }
 static Report last(void){assert(report_count);return reports[report_count-1];}
 int main(void) {
-    fixture();final(); assert(s_scan.flags==7 && last().event==8 && last().seq==20);
-    int n=segment_count, c=capture_count;
-    obs.now_ms+=5000; control(1,0,100,20);control(2,1,100,21); assert(segment_count==n && capture_count==c);
-    control(0,0,100,22);assert(last().event==2 && last().state==11 && last().flags==7);
+    fixture();final();assert(s_scan.flags==6 && last().event==8 && last().seq==20);
+    int n=segment_count,c=capture_count;
+    for(int i=0;i<report_count;i++)assert(reports[i].event!=3 && reports[i].event!=4);
+    obs.now_ms+=5000;control(1,0,100,20);assert(segment_count==n && capture_count==c);
+    control(0,0,100,22);assert(last().event==2 && last().state==11 && last().flags==6);
     control(0,0,99,23);assert(last().error==0x10 && last().flags==0 && last().id==99);
-    control(2,0,100,21);assert(last().error==0x0D);
+    control(2,1,100,21);assert(last().error==JETSON_ERROR_INVALID_STATE && last().flags==0);
+    assert(s_workflow.state==FLOW_SCAN_READY && segment_count==n && capture_count==c);
     obs.has_capture_control=true;obs.capture_action=3;obs.capture_point_id=2;obs.capture_seq=51;step();obs.has_capture_control=false;
     assert(target_starts==0 && capture_count==c && s_workflow.state==FLOW_SCAN_READY);
     verify_ok=false;control(0,0,100,24);assert(s_workflow.state==FLOW_FAULT_HOLD && last().flags==0);
-    fixture();front();control(2,0,100,21);assert(s_scan.state==9 && last().error==0x11 && segment_count==2);
-    fixture();front();obs.now_ms=s_scan.deadline;step();assert(s_scan.error==0x12 && segment_count==2);
-    control(2,1,100,21);assert(segment_count==2);
-    fixture();front();control(2,1,101,21);assert(last().error==0x10 && segment_count==2);
-    control(2,1,100,20);assert(last().error==0x0D && segment_count==2);
-    fixture();start();control(2,1,100,21);assert(last().error==0x0C && segment_count==1);
-    fixture();front();queue_ok=false;control(2,1,100,21);assert(s_scan.state==9);
-    for(int phase=0;phase<6;phase++) {
+    for(int phase=0;phase<5;phase++) {
         fixture();
-        if(phase==0) start();
-        if(phase==1){start();complete_prepare();}
-        if(phase==2)front();
-        if(phase==3){front();control(2,1,100,21);}
-        if(phase==4)right();
-        if(phase==5){right();complete_capture();}
+        if(phase==0)start();
+        if(phase==1)scanning();
+        if(phase==2)right();
+        if(phase==3){right();complete_capture();}
+        if(phase==4)final();
         n=segment_count;c=capture_count;
+        control(2,1,100,21);assert(last().error==JETSON_ERROR_INVALID_STATE);
+        assert(segment_count==n && capture_count==c);
         obs.heartbeat_alive=false;step();assert(s_scan.state==9 && s_scan.flags==0);
         obs.heartbeat_alive=true;step();assert(n==segment_count && c==capture_count);
     }
-    fixture();front();obs.has_workflow_control=true;obs.workflow_action=3;obs.workflow_seq=60;step();
-    obs.has_workflow_control=false;assert(s_scan.state==8);scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;step();
+    fixture();scanning();obs.now_ms+=15000;step();
+    assert(s_scan.state==JETSON_SCAN_SCANNING && s_scan.flags==0 && segment_count==2);
+    assert(report_count==1); // No middle event or request is needed to continue.
+    control(0,0,100,22);assert(last().state==JETSON_SCAN_SCANNING && last().flags==0);
+    control(2,0,100,21);assert(last().error==JETSON_ERROR_INVALID_STATE);
+    scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;step();
+    assert(s_scan.state==JETSON_SCAN_RETURNING_HOME && s_scan.flags==2 && capture_count==1);
+    fixture();scanning();obs.now_ms=s_scan.deadline;step();assert(s_scan.error==0x13);
+    fixture();start();obs.now_ms=s_scan.deadline;step();assert(s_scan.error==0x13);
+    fixture();scanning();scan_result=ROBOT_SCAN_RESULT_FAILED;step();assert(s_scan.state==9);
+    fixture();scanning();scan_result=ROBOT_SCAN_RESULT_ABORTED;step();assert(s_scan.state==9);
+    fixture();scanning();obs.limit_triggered=true;step();assert(s_scan.error==8);
+    fixture();scanning();obs.has_workflow_control=true;obs.workflow_action=3;obs.workflow_seq=60;step();
+    obs.has_workflow_control=false;scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;step();
+    assert(s_scan.state==8 && capture_count==0);
     control(2,1,100,21);assert(segment_count==2 && capture_count==0);
     fixture();right();verify_ok=false;complete_capture();assert(s_scan.state==9 && capture_count==1);
     fixture();right();complete_capture();verify_ok=false;complete_capture();assert(s_scan.state==9);
-    fixture();start();obs.now_ms=s_scan.deadline;step();assert(s_scan.error==0x13);
-    fixture();front();verify_ok=false;obs.now_ms=s_scan.next_verify;step();assert(s_scan.error==4);
-    fixture();final();verify_ok=false;obs.now_ms=s_scan.next_verify;step();assert(s_scan.flags==0);
     fixture();right();complete_capture();obs.now_ms=s_scan.deadline;step();assert(s_scan.error==0x13);
-    fixture();start();scan_result=ROBOT_SCAN_RESULT_FAILED;step();assert(s_scan.state==9);
-    fixture();front();obs.limit_triggered=true;step();assert(s_scan.error==8);
+    fixture();final();verify_ok=false;obs.now_ms=s_scan.next_verify;step();assert(s_scan.flags==0);
     fixture();final();obs.has_workflow_control=true;obs.workflow_action=2;obs.workflow_seq=62;step();
     obs.has_workflow_control=false;assert(s_scan.state==12 && s_scan.flags==0);
     control(0,0,100,23);assert(last().state==12 && last().flags==0);
     fixture();control(0,0,0,23);assert(last().state==0 && capture_count==0);
-    fixture();front();control(1,0,101,24);assert(last().error==0x0C && capture_count==0);
+    fixture();scanning();control(1,0,101,24);assert(last().error==0x0C && capture_count==0);
     fixture();start();control(1,0,100,20);control(0,0,100,22);
     assert(s_scan.state==JETSON_SCAN_PREPARING && segment_count==1 && capture_count==0);
     assert(last().seq==22 && last().state==JETSON_SCAN_PREPARING && last().flags==0);
     fixture();start();queue_ok=false;scan_result=ROBOT_SCAN_RESULT_LEFT_READY;step();
     assert(s_scan.state==JETSON_SCAN_FAULT_HOLD && segment_count==1);
-    fixture();start();scan_result=ROBOT_SCAN_RESULT_ABORTED;step();
-    assert(s_scan.state==JETSON_SCAN_FAULT_HOLD && segment_count==1);
-    fixture();start();obs.has_workflow_control=true;obs.workflow_action=3;obs.workflow_seq=60;step();
-    obs.has_workflow_control=false;scan_result=ROBOT_SCAN_RESULT_LEFT_READY;step();
-    assert(s_scan.state==JETSON_SCAN_ABORTED_HOLD && segment_count==1);
+    fixture();start();scan_result=ROBOT_SCAN_RESULT_ABORTED;step();assert(s_scan.state==JETSON_SCAN_FAULT_HOLD);
     fixture();final();assert(s_workflow.selected_view_id==2 && s_workflow.capture_done_mask==0);
     unsigned reads=pose_verify_calls;n=segment_count;c=capture_count;
     obs.has_target_control=true;obs.target_value=1;obs.target_seq=50;step();obs.has_target_control=false;
@@ -239,8 +237,9 @@ int main(void) {
     assert(s_scan.state==JETSON_SCAN_CHAIN_COMPLETED && s_scan.flags==0);
     assert(segment_count==n && capture_count==c);
     control(0,0,100,24);assert(last().state==JETSON_SCAN_CHAIN_COMPLETED && last().flags==0);
-    puts("actual-C scan workflow: normal chain, target handoff, replay, faults and timeouts passed (no hardware)");
+    puts("actual-C continuous scan workflow: no middle handshake, replay, target handoff, faults and timeouts passed (no hardware)");
 }
+
 '''
 
 

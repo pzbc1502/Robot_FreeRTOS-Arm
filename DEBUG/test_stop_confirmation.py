@@ -39,7 +39,7 @@ static void deny_start(uint8_t seq,uint8_t error) {
 }
 int main(void) {
     unsigned cases=0;
-    fixture();front();abort_command(60);
+    fixture();scanning();abort_command(60);
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,1,0) && !successes(60));
     assert(s_stop.pending && aborted && s_scan.state==8 && s_scan.flags==0);
     assert(receive_stop_hold);
@@ -123,12 +123,12 @@ int main(void) {
     assert(reported(60,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,8));
     obs.limit_triggered=false;step();deny_start(61,6);cases++;
 
-    fixture();front();obs.heartbeat_alive=false;step();obs.heartbeat_alive=true;
+    fixture();scanning();obs.heartbeat_alive=false;step();obs.heartbeat_alive=true;
     deny_start(61,6);abort_command(62);sample();sample();assert(successes(62)==1);
     obs.has_workflow_control=true;obs.workflow_action=1;obs.workflow_seq=63;step();
     assert(s_workflow.state==FLOW_HOMING && reported(63,RA6_TO_JETSON_COMMAND_ACK,1,0));cases++;
 
-    fixture();front();stop_ack_ok=false;abort_command(60);
+    fixture();scanning();stop_ack_ok=false;abort_command(60);
     assert(s_scan.state==9 && s_scan.flags==0 && s_scan.error==6);
     scan_result=ROBOT_SCAN_RESULT_RIGHT_READY;control(0,0,100,70);
     assert(s_scan.state==9 && !successes(60));cases++;
@@ -141,7 +141,7 @@ int main(void) {
     obs.workflow_action=1;obs.workflow_seq=60;step();obs.has_workflow_control=false;
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,0,JETSON_ERROR_SEQ_CONFLICT));
     sample();sample();assert(successes(60)==1);cases++;
-    fixture();front();obs.heartbeat_alive=false;abort_command(60);
+    fixture();scanning();obs.heartbeat_alive=false;abort_command(60);
     assert(s_workflow.state==FLOW_ABORT_HOLD && s_stop.pending && receive_stop_hold);
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,1,0) && abort_calls==1);
     sample();sample();assert(successes(60)==1 && !receive_stop_hold);
@@ -154,8 +154,8 @@ int main(void) {
             case 1: s_workflow.state=FLOW_MEASURE_POSITION; break;
             case 2: start();break;
             case 3: start();complete_prepare();break;
-            case 4: front();break;
-            case 5: front();control(2,1,100,21);break;
+            case 4: scanning();break;
+            case 5: scanning();obs.now_ms+=15000;break;
             case 6: right();break;
             case 7: right();complete_capture();break;
         }
@@ -170,7 +170,7 @@ int main(void) {
         cases++;
     }
 
-    fixture();front();obs.limit_triggered=true;abort_command(60);
+    fixture();scanning();obs.limit_triggered=true;abort_command(60);
     assert(!successes(60) && receive_stop_hold);
     assert(reported(60,RA6_TO_JETSON_COMMAND_ACK,0,JETSON_ERROR_SAFETY));cases++;
     printf("actual-C stop workflow: %u offline scenarios passed (no hardware)\n",cases);

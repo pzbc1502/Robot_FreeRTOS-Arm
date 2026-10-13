@@ -1,0 +1,86 @@
+[18:54:48.743] [ARM-INFO] opened COM3 @ 115200
+[18:54:49.729] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:49.737] [ARM-TX] 发送命令 soft_reset: soft_reset
+[18:54:49.792] [ARM-RX] Found handler for 'soft_reset', executing...
+[18:54:49.792] [ARM-RX] ROBOT_SOFT_RESET_EVENT
+[18:54:49.794] [ARM-RX] --- Starting soft reset ---
+[18:54:49.978] [ARM-RX] Soft reset motors enabled (J1~J5, J6 skipped).
+[18:54:49.978] [ARM-RX] Soft resetting joint 4...
+[18:54:50.040] [ARM-RX] robot_update_current_angle 4...
+[18:54:50.041] [ARM-RX] [4] current:84.24, target:90.00, dir:1
+[18:54:50.724] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:50.724] [ARM-RX] Soft resetting joint 3...
+[18:54:50.787] [ARM-RX] robot_update_current_angle 3...
+[18:54:50.787] [ARM-RX] [3] current:-1.37, target:0.00, dir:1
+[18:54:51.098] [ARM-RX] Soft resetting joint 1...
+[18:54:51.098] [ARM-RX] robot_update_current_angle 1...
+[18:54:51.098] [ARM-RX] [1] current:120.68, target:90.00, dir:-1
+[18:54:51.719] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:52.711] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:53.022] [ARM-RX] soft reset joint 1 settle timeout, keep going
+[18:54:53.022] [ARM-RX] Soft resetting joint 2...
+[18:54:53.022] [ARM-RX] robot_update_current_angle 2...
+[18:54:53.022] [ARM-RX] [2] current:-50.97, target:-90.00, dir:-1
+[18:54:53.702] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:54.699] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:55.197] [ARM-RX] soft reset joint 2 settle timeout, keep going
+[18:54:55.198] [ARM-RX] Soft resetting joint 0...
+[18:54:55.259] [ARM-RX] robot_update_current_angle 0...
+[18:54:55.259] [ARM-RX] [0] current:91.30, target:90.00, dir:-1
+[18:54:55.635] [ARM-RX] soft reset verify not pass, start refine loop...
+[18:54:55.696] [ARM-RX] soft reset refine joint 2 round 1: cur=-87.46 target=-90.00 err=2.54 dir=-1
+[18:54:55.696] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:56.442] [ARM-RX] soft reset refine pass 1 success.
+[18:54:56.443] [ARM-RX] soft reset final verify PASS (issues:2), pose set HOME.
+[18:54:56.753] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:57.749] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:58.500] [ARM-TX] 发送命令 soft_reset: soft_reset
+[18:54:58.556] [ARM-RX] Found handler for 'soft_reset', executing...
+[18:54:58.557] [ARM-RX] ROBOT_SOFT_RESET_EVENT
+[18:54:58.557] [ARM-RX] --- Starting soft reset ---
+[18:54:58.740] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:54:58.740] [ARM-RX] Soft reset motors enabled (J1~J5, J6 skipped).
+[18:54:58.741] [ARM-RX] Soft resetting joint 4...
+[18:54:58.803] [ARM-RX] robot_update_current_angle 4...
+[18:54:58.803] [ARM-RX] [4] current:90.00, target:90.00, dir:-1
+[18:54:58.928] [ARM-RX] Soft resetting joint 3...
+[18:54:58.929] [ARM-RX] robot_update_current_angle 3...
+[18:54:58.929] [ARM-RX] [3] current:-0.00, target:0.00, dir:1
+[18:54:59.052] [ARM-RX] Soft resetting joint 1...
+[18:54:59.053] [ARM-RX] robot_update_current_angle 1...
+[18:54:59.053] [ARM-RX] [1] current:90.00, target:90.00, dir:1
+[18:54:59.177] [ARM-RX] Soft resetting joint 2...
+[18:54:59.241] [ARM-RX] robot_update_current_angle 2...
+[18:54:59.243] [ARM-RX] [2] current:-90.11, target:-90.00, dir:1
+[18:54:59.364] [ARM-RX] Soft resetting joint 0...
+[18:54:59.365] [ARM-RX] robot_update_current_angle 0...
+[18:54:59.365] [ARM-RX] [0] current:90.00, target:90.00, dir:1
+[18:54:59.615] [ARM-RX] soft reset final verify PASS (issues:0), pose set HOME.
+[18:54:59.739] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:55:00.735] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:55:01.729] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:55:02.725] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:55:02.810] [ARM-TX] 发送命令 read_all: read_all
+[18:55:02.837] [ARM-RX] Found handler for 'read_all', executing...
+[18:55:02.837] [ARM-RX] ROBOT_READ_ALL_EVENT
+[18:55:02.838] [ARM-RX] read_all ret=0 elapsed=2 ms missing=0x00
+[18:55:02.838] [ARM-RX] J1 angle=90.00
+[18:55:02.838] [ARM-RX] J2 angle=90.00
+[18:55:02.838] [ARM-RX] J3 angle=270.00
+[18:55:02.838] [ARM-RX] J4 angle=360.00
+[18:55:02.838] [ARM-RX] J5 angle=90.00
+[18:55:03.707] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:55:04.086] [ARM-TX] 发送命令 read_all: read_all
+[18:55:04.143] [ARM-RX] Found handler for 'read_all', executing...
+[18:55:04.143] [ARM-RX] ROBOT_READ_ALL_EVENT
+[18:55:04.143] [ARM-RX] read_all ret=0 elapsed=2 ms missing=0x00
+[18:55:04.143] [ARM-RX] J1 angle=90.00
+[18:55:04.144] [ARM-RX] J2 angle=90.00
+[18:55:04.144] [ARM-RX] J3 angle=270.00
+[18:55:04.144] [ARM-RX] J4 angle=0.00
+[18:55:04.144] [ARM-RX] J5 angle=90.00
+[18:55:04.705] [ARM-RX] [JETSON_UART] rx_bytes=82362 frames_ok=6862 crc_fail=0 overflow=0 tx_ok=21 tx_start_fail=0 tx_timeout=0 last_type=0x01 last_seq=239
+[18:55:04.869] [ARM-INFO] 已关闭串口
+[20:00:34.590] [JETSON-INFO] 已停止周期视觉发送
+[20:00:34.590] [JETSON-INFO] heartbeat stopped
+[20:00:34.591] [JETSON-INFO] safe distance stopped

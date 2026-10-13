@@ -100,6 +100,8 @@ static jetson_workflow_control_t s_workflow_queue[JETSON_WORKFLOW_QUEUE_SIZE];
 static uint8_t s_workflow_read, s_workflow_write, s_workflow_count;
 static uint8_t s_abort_queue[JETSON_WORKFLOW_QUEUE_SIZE];
 static uint8_t s_abort_read, s_abort_write, s_abort_count;
+static bool s_new_global_reset;
+static uint8_t s_global_reset_seq;
 static bool s_workflow_stop_hold;
 static bool s_release_drain_active;
 static uint32_t s_release_drain_bytes;
@@ -181,7 +183,7 @@ static bool jetson_rx_ring_pop(uint8_t *byte)
 
 static bool workflow_motion_blocked(void)
 {
-    return s_workflow_stop_hold || (s_abort_count != 0u) || s_release_drain_active;
+    return s_workflow_stop_hold || (s_abort_count != 0u) || s_new_global_reset || s_release_drain_active;
 }
 
 static void workflow_cancel_pending(void)
@@ -322,7 +324,8 @@ static void handle_workflow_control(uint8_t action, uint8_t seq)
 {
     if ((action != JETSON_WORKFLOW_ACTION_START_MEASURE) &&
         (action != JETSON_WORKFLOW_ACTION_FINISH_RETURN_HOME) &&
-        (action != JETSON_WORKFLOW_ACTION_ABORT_HOLD))
+        (action != JETSON_WORKFLOW_ACTION_ABORT_HOLD) &&
+        (action != JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET))
     {
         (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u,
                                 JETSON_ERROR_INVALID_PARAM);
@@ -331,6 +334,12 @@ static void handle_workflow_control(uint8_t action, uint8_t seq)
 
     if (action == JETSON_WORKFLOW_ACTION_ABORT_HOLD)
     {
+        if (s_new_global_reset)
+        {
+            (void)jetson_send_status(s_global_reset_seq, RA6_TO_JETSON_COMMAND_ACK,
+                                    0u, JETSON_ERROR_BUSY);
+            s_new_global_reset = false;
+        }
         workflow_cancel_pending();
         workflow_begin_release_drain();
         for (uint8_t i = 0u; i < s_abort_count; i++)
@@ -349,6 +358,20 @@ static void handle_workflow_control(uint8_t action, uint8_t seq)
         s_abort_queue[s_abort_write] = seq;
         s_abort_write = (uint8_t)((s_abort_write + 1u) % JETSON_WORKFLOW_QUEUE_SIZE);
         s_abort_count++;
+    }
+    else if (action == JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET)
+    {
+        if ((s_abort_count != 0u) || s_release_drain_active ||
+            (s_new_global_reset && (s_global_reset_seq != seq)))
+        {
+            (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+            return;
+        }
+        if (!s_new_global_reset)
+        {
+            s_new_global_reset = true;
+            s_global_reset_seq = seq;
+        }
     }
     else
     {
@@ -789,6 +812,8 @@ void jetson_vision_init(void)
     s_new_target_control = false;
     s_workflow_read = s_workflow_write = s_workflow_count = 0u;
     s_abort_read = s_abort_write = s_abort_count = 0u;
+    s_new_global_reset = false;
+    s_global_reset_seq = 0u;
     s_workflow_stop_hold = s_release_drain_active = false;
     s_release_drain_bytes = 0u;
     s_capture_cancelled = s_target_cancelled = false;
@@ -813,6 +838,7 @@ void jetson_vision_process(void)
 {
     uint8_t byte = 0u;
     for (uint32_t i = 0u; (i < JETSON_RX_PROCESS_BUDGET) && (s_abort_count == 0u) &&
+                         !s_new_global_reset &&
                          jetson_rx_ring_pop(&byte); i++)
     {
         if (s_release_drain_bytes != 0u)
@@ -995,6 +1021,13 @@ bool jetson_get_workflow_control(uint8_t *action, uint8_t *seq)
         *seq = s_abort_queue[s_abort_read];
         s_abort_read = (uint8_t)((s_abort_read + 1u) % JETSON_WORKFLOW_QUEUE_SIZE);
         s_abort_count--;
+        return true;
+    }
+    if (s_new_global_reset)
+    {
+        *action = JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET;
+        *seq = s_global_reset_seq;
+        s_new_global_reset = false;
         return true;
     }
     while (s_workflow_count != 0u)

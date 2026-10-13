@@ -121,7 +121,9 @@ static void pump(void) {
     robot_workflow_obs_t received={0};
     jetson_vision_process();received.now_ms=now_ms;mock_now=now_ms;
     received.has_workflow_control=jetson_get_workflow_control(&received.workflow_action,&received.workflow_seq);
-    if(!received.has_workflow_control || received.workflow_action!=JETSON_WORKFLOW_ACTION_ABORT_HOLD) {
+    if(!received.has_workflow_control ||
+       (received.workflow_action!=JETSON_WORKFLOW_ACTION_ABORT_HOLD &&
+        received.workflow_action!=JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET)) {
         received.has_scan_control=jetson_get_scan_control(&received.scan_control);
         received.has_capture_control=jetson_get_capture_control_ex(&received.capture_action,
             &received.capture_point_id,&received.capture_seq);
@@ -140,7 +142,7 @@ static void confirm(void) {
     assert(s_workflow.state==FLOW_ABORT_HOLD && !laser);
 }
 int main(void) {
-    fixture();front();jetson_vision_init();now_ms=obs.now_ms;
+    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;
     enqueue(start_frame,sizeof(start_frame));enqueue(abort_frame,sizeof(abort_frame));
     enqueue(home_frame,sizeof(home_frame));enqueue(capture,sizeof(capture));
     enqueue(target,sizeof(target));enqueue(scan_start,sizeof(scan_start));
@@ -153,7 +155,7 @@ int main(void) {
     enqueue(fresh_start,sizeof(fresh_start));pump();
     assert(s_workflow.state==FLOW_HOMING && reset_count==homes+1);
 
-    fixture();front();jetson_vision_init();now_ms=obs.now_ms;stop_ack_ok=false;
+    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;stop_ack_ok=false;
     enqueue(abort_frame,sizeof(abort_frame));enqueue(start_frame,sizeof(start_frame));
     enqueue(heartbeat,sizeof(heartbeat));homes=reset_count;pump();pump();
     assert(s_stop.restart_locked && s_workflow_stop_hold && reset_count==homes);
@@ -161,7 +163,7 @@ int main(void) {
     enqueue(fresh_start,sizeof(fresh_start));pump();
     assert(s_workflow.state==FLOW_HOMING && reset_count==homes+1);
 
-    fixture();front();jetson_vision_init();now_ms=obs.now_ms;
+    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;
     enqueue(abort_frame,sizeof(abort_frame));pump();
     assert(s_stop.pending && abort_calls==1 && !jetson_is_link_alive(now_ms));
     confirm();assert(!laser);
@@ -186,7 +188,7 @@ def main():
         "vision": uart.build_unified_frame(3, 35, bytes(4) + b"\x01"),
         "zero_seq": uart.build_unified_frame(6, 0, b"\x03"),
         "bad_len": uart.build_unified_frame(6, 65, b"\x03\x00"),
-        "bad_action": uart.build_unified_frame(6, 66, b"\x04"),
+        "bad_action": uart.build_unified_frame(6, 66, b"\x05"),
         "fresh_start": uart.build_unified_frame(6, 22, b"\x01"),
     }
     def declarations(checks):

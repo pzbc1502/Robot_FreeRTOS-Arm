@@ -69,6 +69,7 @@ extern "C" {
 #define JETSON_WORKFLOW_ACTION_START_MEASURE      0x01u
 #define JETSON_WORKFLOW_ACTION_FINISH_RETURN_HOME 0x02u
 #define JETSON_WORKFLOW_ACTION_ABORT_HOLD         0x03u
+#define JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET  0x04u
 
 #define JETSON_WORKFLOW_IDLE                       0x00u
 #define JETSON_WORKFLOW_START_ACCEPTED             0x01u
@@ -105,20 +106,20 @@ extern "C" {
 #define JETSON_SCAN_STATUS_LEN     10u
 #define JETSON_SCAN_QUERY          0x00u
 #define JETSON_SCAN_START          0x01u
-#define JETSON_SCAN_PHOTO_DONE     0x02u
+#define JETSON_SCAN_PHOTO_DONE     0x02u /* Retired: continuous scan rejects this action. */
 #define JETSON_SCAN_ACK            0x01u
 #define JETSON_SCAN_SNAPSHOT       0x02u
-#define JETSON_SCAN_FRONT_PHOTO_READY 0x03u
-#define JETSON_SCAN_PHOTO_ACCEPTED 0x04u
+#define JETSON_SCAN_FRONT_PHOTO_READY 0x03u /* Retired, never emitted. */
+#define JETSON_SCAN_PHOTO_ACCEPTED 0x04u    /* Retired, never emitted. */
 #define JETSON_SCAN_DONE           0x05u
 #define JETSON_SCAN_HOME_READY     0x06u
 #define JETSON_SCAN_TERMINATED     0x07u
 #define JETSON_SCAN_FRONT_OBSERVE_READY 0x08u
 #define JETSON_SCAN_NONE           0x00u
 #define JETSON_SCAN_PREPARING      0x01u
-#define JETSON_SCAN_LEFT_TO_FRONT  0x02u
-#define JETSON_SCAN_WAIT_PHOTO     0x03u
-#define JETSON_SCAN_FRONT_TO_RIGHT 0x04u
+#define JETSON_SCAN_SCANNING       0x02u /* One LEFT -> FRONT -> RIGHT motion. */
+#define JETSON_SCAN_WAIT_PHOTO     0x03u /* Retired state. */
+#define JETSON_SCAN_FRONT_TO_RIGHT 0x04u /* Retired state. */
 #define JETSON_SCAN_RETURNING_HOME 0x05u
 /* State 0x06/0x07 are reserved, not HOME_HOLD or SELECT_CONSUMED. */
 #define JETSON_SCAN_ABORTED_HOLD   0x08u
@@ -126,7 +127,7 @@ extern "C" {
 #define JETSON_SCAN_RETURNING_FRONT 0x0Au
 #define JETSON_SCAN_FRONT_OBSERVE_HOLD 0x0Bu
 #define JETSON_SCAN_CHAIN_COMPLETED 0x0Cu
-#define JETSON_SCAN_PHOTO_SAVED    0x01u
+#define JETSON_SCAN_PHOTO_SAVED    0x01u /* Reserved; must remain zero. */
 #define JETSON_SCAN_FINISHED       0x02u
 #define JETSON_SCAN_HOME_VERIFIED  0x04u
 

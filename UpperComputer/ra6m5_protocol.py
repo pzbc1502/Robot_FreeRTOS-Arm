@@ -41,6 +41,7 @@ EVENT_COMMAND_ACK = 0x21
 WORKFLOW_START = 0x01
 WORKFLOW_FINISH = 0x02
 WORKFLOW_ABORT = 0x03
+WORKFLOW_GLOBAL_SOFT_RESET = 0x04
 WORKFLOW_START_ACCEPTED = 0x01
 WORKFLOW_MEASURE_READY = 0x02
 WORKFLOW_SAFE_LATCHED = 0x03
@@ -186,19 +187,19 @@ def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -
 
 
 def build_unified_workflow_control_frame(action: int, seq: int) -> bytes:
-    if action not in (WORKFLOW_START, WORKFLOW_FINISH, WORKFLOW_ABORT):
+    if action not in (WORKFLOW_START, WORKFLOW_FINISH, WORKFLOW_ABORT, WORKFLOW_GLOBAL_SOFT_RESET):
         raise ValueError("workflow action must be START, FINISH, or ABORT")
     return build_unified_frame(JETSON_MSG_WORKFLOW_CTRL, seq, bytes([action]))
 
 
 SCAN_STATES = {
-    0: "NONE", 1: "PREPARING", 2: "LEFT_TO_FRONT", 3: "WAIT_PHOTO",
-    4: "FRONT_TO_RIGHT", 5: "RETURNING_HOME", 8: "ABORTED_HOLD",
+    0: "NONE", 1: "PREPARING", 2: "SCANNING",
+    5: "RETURNING_HOME", 8: "ABORTED_HOLD",
     9: "FAULT_HOLD", 10: "RETURNING_FRONT", 11: "FRONT_OBSERVE_HOLD",
     12: "SCAN_CHAIN_COMPLETED",
 }
 SCAN_EVENTS = {
-    1: "ACK", 2: "SNAPSHOT", 3: "FRONT_PHOTO_READY", 4: "PHOTO_ACCEPTED",
+    1: "ACK", 2: "SNAPSHOT",
     5: "SCAN_DONE", 6: "HOME_READY", 7: "TERMINATED", 8: "FRONT_OBSERVE_READY",
 }
 
@@ -206,10 +207,10 @@ SCAN_EVENTS = {
 def build_scan_control(action: int, value: int, scan_id: int, seq: int) -> bytes:
     if not 1 <= seq <= 255 or not 0 <= scan_id <= 0xFFFFFFFF:
         raise ValueError("invalid scan ID or SEQ")
-    if action not in (0, 1, 2) or value not in ((0, 1) if action == 2 else (0,)):
+    if action not in (0, 1) or value != 0:
         raise ValueError("invalid scan action/value")
     if action != 0 and scan_id == 0:
-        raise ValueError("START/PHOTO_DONE require nonzero scan ID")
+        raise ValueError("START requires nonzero scan ID")
     return build_unified_frame(7, seq, bytes([action, value]) + scan_id.to_bytes(4, "little"))
 
 
@@ -218,8 +219,10 @@ def decode_scan_status(raw: bytes) -> Ra6Status | None:
             crc16_modbus(raw[2:-2]) != int.from_bytes(raw[-2:], "little")):
         return None
     event, state, flags, action, result, error = raw[6:12]
-    if (event not in SCAN_EVENTS or state not in SCAN_STATES or flags & ~7 or
+    if (event not in SCAN_EVENTS or state not in SCAN_STATES or flags & ~6 or
             action not in (0, 1, 2) or result not in (0, 1) or raw[4] == 0):
+        return None
+    if action == 2 and not (event == 1 and state == 0 and flags == 0 and result == 0 and error != 0):
         return None
     return Ra6Status(raw, event, result, "SCAN_" + SCAN_EVENTS[event], raw[4], event,
                      error, 0x82, True, int.from_bytes(raw[12:16], "little"),

@@ -4,11 +4,13 @@
 
 业务修订名称：`FACE_SCAN_TARGET_V2`；本次流程修订标记：`AUTO_HOME_FRONT_20261009`。两者仅用于区分文档，不是已实现的线上能力标识或 schema 校验值。
 
-本文为“旧字节基线 + 已冻结并接入的扫描协议 + 选痣业务待冻结规格”。扫描布局标记为 `SCAN_WIRE_20261009`，用户已确认采用本地 `07/82`；`VER=01` 不变。消息、动作、状态和错误表中的两位编号均为十六进制，例如 `82` 表示 `0x82`；第 7 章的逻辑名称尚无线上编码。
+本文为“旧字节基线 + 已冻结并接入的扫描协议 + 选痣业务待冻结规格”。当前合同为 `CONTINUOUS_SCAN_20261013`，沿用本地 `07/82` 外壳、长度、偏移及CRC；`VER=01` 不变。消息、动作、状态和错误表中的两位编号均为十六进制，例如 `82` 表示 `0x82`；第 7 章的逻辑名称尚无线上编码。
 
 **2026-10-13 原定靶交接已补齐。** 当前固定模型演示沿用 `TARGET_CTRL=02/LEN=1` 和 `VISION_ERROR=03/LEN=5`，最终正视校验成功后可以显式启动原视觉状态机，不再等待第7章的新接口。第7章及第8章涉及目标会话、绑定视觉、医生许可字节的内容是未实现的后续扩展，不是本次原流程接入的前置；MCU不具有这些新身份/医生许可检查能力。当前可执行字节和阶段以第3.4、6.5节为准，不自动协商或放开Jetson界面的输出禁用门。
 
-**2026-10-11 中途免保存合同已获用户确认。** 第一段正视真实停稳后，Jetson 收到匹配本轮的 `FRONT_PHOTO_READY`，直接发送原 `PHOTO_DONE=1` 作为继续确认，不拍照、不等待文件保存。`PHOTO_DONE`、`PHOTO_ACCEPTED`、`WAIT_PHOTO`、`PHOTO_SAVED` 及错误 `11=PHOTO_SAVE_FAILED` 保留历史名称和冻结字节；它们不证明照片存在，也不构成最终就绪或输出许可。此项无线上模式协商，部署双方须人工核对同一中途语义，不能仅凭 `VER=01` 判断业务兼容。
+**2026-10-13 连续扫描已按用户要求实现。** 正视为途经参考点，不停车、不拍照、不等待确认。取消中途event03/04、state03/04；state02为整段SCANNING，bit0必须为0，最终正视flags由07改06。旧PHOTO_DONE(action02)拒绝。MCU/PC已改并离线通过；Jetson须同步更新后再联调，没有线上协商。见第6章。
+
+**以下2026-10-11合同为已被取代的历史说明，不用于新版部署。** 第一段正视真实停稳后，Jetson 收到匹配本轮的 `FRONT_PHOTO_READY`，直接发送原 `PHOTO_DONE=1` 作为继续确认，不拍照、不等待文件保存。`PHOTO_DONE`、`PHOTO_ACCEPTED`、`WAIT_PHOTO`、`PHOTO_SAVED` 及错误 `11=PHOTO_SAVE_FAILED` 保留历史名称和冻结字节；它们不证明照片存在，也不构成最终就绪或输出许可。此项无线上模式协商，部署双方须人工核对同一中途语义，不能仅凭 `VER=01` 判断业务兼容。
 
 ## 1. 范围与实现状态
 
@@ -18,50 +20,49 @@
 
 ```text
 开始 -> HOME / 公共测距位 -> 本轮安全距离确认
-  -> 左到正扫描 -> 中途正视真实停稳，FRONT_PHOTO_READY
-  -> Jetson 直接回 PHOTO_DONE=1，不拍照 / 保存 -> 本轮继续确认被 MCU 接受
-  -> 正到右扫描 -> 右端真实停稳，可报告 SCAN_DONE
-  -> MCU 自动 HOME，真实校验后可报告 HOME_READY
-  -> MCU 自动进入固定正式正视位，不等待 Jetson 新运动请求
-  -> 最终真实到位并停稳，FRONT_OBSERVE_READY，保持且输出关闭
-  -> Jetson候选可用后开放数字人选具体痣，目标记录留在Jetson，不产生运动
-  -> 当前新画面复核同一颗 -> 显式02启动 -> 原视觉状态机稳定对准
-  -> Jetson医生界面确认 -> MCU原P000/视觉及其他联锁 -> 输出
-  -> 输出关闭 -> 下一颗按原流程重新复核 / 正常完成返回
+  -> 正式左视准备 -> 左到右连续扫描（经过正式正视，不停车、不等待）
+  -> 右端真实停稳，SCAN_DONE
+  -> MCU自动HOME并校验，HOME_READY
+  -> MCU自动固定正式正视，不等待Jetson新运动请求
+  -> 最终真实到位停稳，FRONT_OBSERVE_READY，保持且输出关闭
+  -> 候选可用后数字人选具体痣，当前新画面复核同一颗
+  -> 显式02启动 -> 原视觉对准 -> Jetson医生确认及原P000等联锁
+  -> 输出关闭 -> 下一颗重新复核 / 正常完成返回
 ```
 
 左 / 正 / 右是扫描或观察姿态，不是候选身份。R01 等是界面短编号，不能写成 `point_id=1` 代替目标选择。
 
 预置 GLB 只承担展示和选择，不要求每轮重新生成整脸网格。供执行选择的标记须与真实目标可靠对应；预置展示与本轮检测如实区分。GLB 顶点、显示坐标和扫描进度不能直接作为运动坐标。
 
-**右端 → HOME → 固定正视由 MCU 在原扫描请求内自动完成。**Jetson 不再发送 HOME / GOTO / SELECT / APPROACH_REQUEST 推进这段运动，也不需要对中间到位逐步授权。中途继续确认是启动第二段的必要握手，实际照片保存不是前置；最终正视通知是进入选痣阶段的运动放行依据，不是输出许可。
+**右端 → HOME → 固定正视由 MCU 在原扫描请求内自动完成。**Jetson 不再发送 HOME / GOTO / SELECT / APPROACH_REQUEST 推进这段运动，也不需要对中间到位逐步授权。正视途经没有消息或握手，采集/保存不是运动前置；最终正视通知是进入选痣阶段的运动放行依据，不是输出许可。
 
 途中视频、检测和归档可由 Jetson 保留，但全脸分析完成、三维重建、逐帧 FK、手眼外参或痣基座 XYZ 均不是这条固定运动链的前置条件。MCU 内部仍复用原运动执行和安全检查。
 
 ### 1.2 当前事实与待实现能力
 
-| 内容 | 当前状态 | 本文处理 |
-| --- | --- | --- |
-| TYPE `01~06`、`81`、`FE`，旧逐点 / SELECT / 定靶 | 已有固件实现 | 原长度和旧模式字节含义保持 |
-| `robot_send_scan_segment_event()`、`robot_scan_result_get()` | 两段运动层已实现并通过离线检查 | 不是串口命令，不含中途确认握手、自动 HOME → 正视或目标选择 |
-| `SCAN_CTRL=07/LEN=6`、`SCAN_STATUS=82/LEN=10` | 已冻结并接入；离线通过，2026-10-12 MCU/PC三轮完整实机成功 | 最终正视事件 `08`，状态 `0A/0B/0C`不变；真实Jetson及执行链仍待验收 |
-| 最终正视 -> 原 TARGET_CTRL / VISION_ERROR | 2026-10-13 MCU和PC已补齐，离线通过 | 复用02/03/81，不新增XYZ、目标会话或许可字段；实机交接待验收 |
-| 目标绑定 / 复核、绑定视觉、医生单次许可 | 新接口及 MCU 门控未实现 | 第 7 章规定逻辑语义，TYPE / LEN / 偏移待双方冻结 |
-| 真实关节 / 位姿遥测和图像时间关联 | 未形成已验收新接口 | 不作为固定扫描与固定正视的前置，后续研究另行立项 |
-| FK / 相机安装变换 | 按队友说明未验收，`calibrated=false`、`T_tool_camera=null` | 继续如实记录，不虚报标定；本轮不实现 XYZ 自动到靶 |
-| Gemini 新选痣入口输出 | 按队友文档仍禁用 | 双端实现并验收全部条件后才可启用 |
 
-MCU和PC已接入扫描、中途确认等待、自动HOME -> 正视及查询/去重。2026-10-13最终正视仍在独立 `FLOW_SCAN_READY` 保持，旧CAPTURE SELECT继续拒绝；显式TARGET START通过当前五轴反馈和原条件后进入 `FLOW_TARGET_ACTIVE`，不再以第7章未实现为由拒绝原流程。此前2026-10-11仅同步免保存合同的记录保留为历史。本次未改Jetson、FK/DH、视觉参数或相机标定，未烧录、连接设备或输出；原定靶接通不代表新身份或医生许可接口已实现。
+| 内容                                                         | 当前状态                                                   | 本文处理                                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| TYPE`01~06`、`81`、`FE`，旧逐点 / SELECT / 定靶              | 已有固件实现                                               | 原长度和旧模式字节含义保持                                        |
+| `robot_send_scan_segment_event()`、`robot_scan_result_get()` | 单次左到右运动层已实现并通过离线检查                             | 不是串口命令；自动HOME → 正视由workflow串接       |
+| `SCAN_CTRL=07/LEN=6`、`SCAN_STATUS=82/LEN=10`                | 连续版已接入并离线通过；旧暂停版曾有三轮实机成功  | 最终正视事件`08`，状态 `0A/0B/0C`不变；真实Jetson及执行链仍待验收 |
+| 最终正视 -> 原 TARGET_CTRL / VISION_ERROR                    | 2026-10-13 MCU和PC已补齐，离线通过                         | 复用02/03/81，不新增XYZ、目标会话或许可字段；实机交接待验收       |
+| 目标绑定 / 复核、绑定视觉、医生单次许可                      | 新接口及 MCU 门控未实现                                    | 第 7 章规定逻辑语义，TYPE / LEN / 偏移待双方冻结                  |
+| 真实关节 / 位姿遥测和图像时间关联                            | 未形成已验收新接口                                         | 不作为固定扫描与固定正视的前置，后续研究另行立项                  |
+| FK / 相机安装变换                                            | 按队友说明未验收，`calibrated=false`、`T_tool_camera=null` | 继续如实记录，不虚报标定；本轮不实现 XYZ 自动到靶                 |
+| Gemini 新选痣入口输出                                        | 按队友文档仍禁用                                           | 双端实现并验收全部条件后才可启用                                  |
+
+MCU和PC已接入连续扫描、自动HOME -> 正视及查询/去重；中途确认等待已移除。2026-10-13最终正视仍在独立 `FLOW_SCAN_READY` 保持，旧CAPTURE SELECT继续拒绝；显式TARGET START通过当前五轴反馈和原条件后进入 `FLOW_TARGET_ACTIVE`，不再以第7章未实现为由拒绝原流程。此前2026-10-11仅同步免保存合同的记录保留为历史。本次未改Jetson、FK/DH、视觉参数或相机标定，未烧录、连接设备或输出；原定靶接通不代表新身份或医生许可接口已实现。
 
 ### 1.3 旧扫描草案撤回范围
 
 原 `SCAN_DEMO_V1` 的 `HOME_READY + flags=0F -> 旧 SELECT -> 旧 TARGET / P000` 不适用于本版。
 
 - 新 HOME 到位只是中间节点；MCU 自动继续固定正视，不等待候选分析或 Jetson 新指令，不放行选痣或 TARGET 输出。
-- 中途继续确认只允许第二段，不证明照片已保存或侧脸候选已识别、去重和归档。
+- 新版无中途确认；旧action02、event03/04、state03/04废弃，bit0必须为0。
 - 原 `SELECT_READY`、`SELECT_ALLOWED`、`SELECT_CONSUMED` 的扫描业务解释撤回；第 6 章为修订规格。
 - HOME 后等待 SELECT / 选痣后再伸出，以及必须先提交 TARGET_POSITION / POSITION_STAGED / 基座 XYZ 的方案撤回。
-- 旧草案 FRONT_READY 明确为中途继续就绪，逻辑名保留 FRONT_PHOTO_READY；最终观察位另用 FRONT_OBSERVE_READY，禁止混用。
+- FRONT_PHOTO_READY仅保留废弃定义，不再发送；最终就绪仍用FRONT_OBSERVE_READY=08。
 - 旧 07 / 82 HEX 示例撤下，避免另一端继续按 `flags=0F` 实现。
 - 双方须确认同一业务版本；只看到 `VER=01` 或 ACK 不证明兼容。
 - 本次确认采用 07 / 82；队友旧草案若占用这些值，须按本表更新，不混发两套布局。
@@ -69,7 +70,7 @@ MCU和PC已接入扫描、中途确认等待、自动HOME -> 正视及查询/去
 
 ### 1.4 2026-10-12 MCU/PC实机记录
 
-更换J4驱动板且其他配置不变后，MCU/PC日志核对三轮完整“扫描 -> HOME -> 固定正视”成功；最终事件08、state=0B、flags=07、error=00。另有一轮WAIT_PHOTO等待15秒后error=12，窗口内未见PHOTO_DONE，随后同SEQ停止完成；不能把这次确认超时当作J4通信故障或写成四轮全部通过。新中途免保存语义仍须发送继续确认，不跳过握手或扩大超时。
+本节仅记录旧暂停版本，不是连续版验收。更换J4驱动板且其他配置不变后，MCU/PC日志核对三轮完整“扫描 -> HOME -> 固定正视”成功；最终事件08、state=0B、flags=07、error=00。另有一轮WAIT_PHOTO等待15秒后error=12，窗口内未见PHOTO_DONE，随后同SEQ停止完成；不能把这次确认超时当作J4通信故障或写成四轮全部通过。该轮按旧合同等待继续确认；连续新版已取消此等待。不能把旧flags07和旧实机成功当成新版证据。
 
 本日未改冻结报文字节，也不宣称目标绑定、医生许可、真实Jetson视觉或激光执行完成。证据摘要与归档边界见[故障复盘](2026-10-12-扫描协调运动与J4通信故障复盘.md)。
 
@@ -77,14 +78,15 @@ MCU和PC已接入扫描、中途确认等待、自动HOME -> 正视及查询/去
 
 ### 2.1 数据表示
 
-| 项目 | 值 |
-| --- | --- |
-| UART | `115200`、`8N1`、无流控 |
-| 多字节整数 | 小端 |
-| 最大 payload | `32 bytes` |
-| 心跳周期 / MCU 超时 | `100~200 ms / 600 ms` |
-| 当前视觉有效期 | `500 ms`，建议新结果每 `100~200 ms` |
-| 相机采集设置 | 对齐 RGB / Depth `848x530`，设置 `30 FPS` |
+
+| 项目                | 值                                       |
+| --------------------- | ------------------------------------------ |
+| UART                | `115200`、`8N1`、无流控                  |
+| 多字节整数          | 小端                                     |
+| 最大 payload        | `32 bytes`                               |
+| 心跳周期 / MCU 超时 | `100~200 ms / 600 ms`                    |
+| 当前视觉有效期      | `500 ms`，建议新结果每 `100~200 ms`      |
+| 相机采集设置        | 对齐 RGB / Depth`848x530`，设置 `30 FPS` |
 
 FPS 设置不等于可靠目标结果频率，须记录新帧频率及采集到发送延迟。推理、保存和 Qt 切页不能阻塞独立心跳。
 
@@ -135,16 +137,17 @@ def build_frame(msg_type: int, seq: int, payload: bytes) -> bytes:
 
 ## 3. 已实现消息基线：字节含义保持
 
-| TYPE | 方向 | 名称 | LEN | payload |
-| --- | --- | --- | ---: | --- |
-| `01` | Jetson -> MCU | HEARTBEAT | 4 | `uint32 tick_ms` |
-| `02` | Jetson -> MCU | TARGET_CTRL | 1 | `uint8 enable` |
-| `03` | Jetson -> MCU | VISION_ERROR | 5 | `int16 dcx + int16 dcy + uint8 valid` |
-| `04` | Jetson -> MCU | CAPTURE_CTRL | 2 | `uint8 action + uint8 point_id` |
-| `05` | Jetson -> MCU | SAFE_DISTANCE | 3 | `uint16 distance_mm + uint8 valid` |
-| `06` | Jetson -> MCU | WORKFLOW_CTRL | 1 | `uint8 action` |
-| `81` | MCU -> Jetson | STATUS | 3 | `uint8 event + uint8 value + uint8 error_code` |
-| `FE` | MCU -> Jetson | ERROR | 1 | `uint8 error_code` |
+
+| TYPE | 方向          | 名称          | LEN | payload                                        |
+| ------ | --------------- | --------------- | ----: | ------------------------------------------------ |
+| `01` | Jetson -> MCU | HEARTBEAT     |   4 | `uint32 tick_ms`                               |
+| `02` | Jetson -> MCU | TARGET_CTRL   |   1 | `uint8 enable`                                 |
+| `03` | Jetson -> MCU | VISION_ERROR  |   5 | `int16 dcx + int16 dcy + uint8 valid`          |
+| `04` | Jetson -> MCU | CAPTURE_CTRL  |   2 | `uint8 action + uint8 point_id`                |
+| `05` | Jetson -> MCU | SAFE_DISTANCE |   3 | `uint16 distance_mm + uint8 valid`             |
+| `06` | Jetson -> MCU | WORKFLOW_CTRL |   1 | `uint8 action`                                 |
+| `81` | MCU -> Jetson | STATUS        |   3 | `uint8 event + uint8 value + uint8 error_code` |
+| `FE` | MCU -> Jetson | ERROR         |   1 | `uint8 error_code`                             |
 
 旧逐点模式保留；当前固定扫描演示在最终正视后显式复用02/03进入原定靶，不使用旧SELECT。第7章提出的增强身份/许可模式尚未实现，不能把原02/03称为包含这些字段的新接口。
 
@@ -152,11 +155,15 @@ def build_frame(msg_type: int, seq: int, payload: bytes) -> bytes:
 
 只有合法 HEARTBEAT 刷新全局心跳；视觉、测距或业务命令不能代替。tick_ms 为 Jetson 单调计时，不天然等于 MCU 时间。
 
-| WORKFLOW action | 名称 | 原行为 |
-| --- | --- | --- |
-| `01` | START_MEASURE | 关输出、清上轮、soft_reset、公共测距位 |
-| `02` | FINISH_RETURN_HOME | 关定靶和输出、soft_reset 校验后回 IDLE |
-| `03` | ABORT_HOLD | 关输出、中止并保持，不自动 HOME |
+
+| WORKFLOW action | 名称               | 原行为                                 |
+| ----------------- | -------------------- | ---------------------------------------- |
+| `01`            | START_MEASURE      | 关输出、清上轮、soft_reset、公共测距位 |
+| `02`            | FINISH_RETURN_HOME | 关定靶和输出、soft_reset 校验后回 IDLE |
+| `03`            | ABORT_HOLD         | 关输出、中止并保持，不自动 HOME        |
+| `04`            | GLOBAL_SOFT_RESET  | 全局取消、确认停止、软件HOME、清本轮后IDLE；2026-10-13新增 |
+
+新增04本地已实现，Jetson须按[全局软件复位对接](Jetson全局软件复位接口对接_20261013.md)接入；VER/LEN不变，不代表旧端已支持。ACK不是完成，只有同SEQ的81/20 05 00为复位成功。活动记录及终态60秒保护为04专用；新ABORT可取消它，不会自动继续HOME。
 
 新业务仍复用原 START / FINISH / ABORT，但后续 MCU 实现须同步失效扫描、目标及医生许可。扫后内部 HOME 不使用串口 FINISH_RETURN_HOME 来推进，不进入整轮 IDLE，也不清掉自动正视所需的有效本轮上下文。整轮结束返回和扫描中间 HOME 是不同语义。
 
@@ -178,12 +185,13 @@ valid=01 表示有效实测毫米值；00 忽略 distance。保留“一次测�
 
 ### 3.3 CAPTURE_CTRL：旧观察姿态接口
 
-| action | point_id | 原含义 |
-| --- | --- | --- |
-| `01` | `1/2/3` | GOTO：左 / 正 / 右逐点采集 |
-| `02` | `0` | 旧采集 HOME |
-| `03` | `1/2/3` | SELECT：固定观察姿态 |
-| `04` | `0` | 旧调试 CURRENT，新正式业务禁用 |
+
+| action | point_id | 原含义                         |
+| -------- | ---------- | -------------------------------- |
+| `01`   | `1/2/3`  | GOTO：左 / 正 / 右逐点采集     |
+| `02`   | `0`      | 旧采集 HOME                    |
+| `03`   | `1/2/3`  | SELECT：固定观察姿态           |
+| `04`   | `0`      | 旧调试 CURRENT，新正式业务禁用 |
 
 旧 SELECT 没有候选身份和目标会话，不能称为新“选痣”。
 
@@ -208,32 +216,34 @@ dcy = target_center_y - image_center_y
 
 ### 4.1 STATUS：TYPE=81，LEN=3
 
-| event | 名称 | value |
-| --- | --- | --- |
-| `01` | TARGET_READY | 01 等待视觉 |
-| `02` | ALIGN_DONE | 01 对准和二次确认通过 |
-| `03` | OUTPUT | 01 / 00 开 / 关 |
-| `04` | TARGET_CTRL | 01 / 00 启用 / 关闭或拒绝 |
-| `05` | HEARTBEAT_ALIVE | 01 可选响应 |
-| `06` | SAFE_DISTANCE | 01 / 00 合格 / 过近，非锁存证明 |
-| `07` | VISION_STATE | 01 / 00 有效 / 丢失 |
-| `10` | CAPTURE_POINT_READY | 1 / 2 / 3 旧拍摄点真实到位 |
-| `11` | CAPTURE_HOME_READY | 01 旧采集 HOME 校验通过 |
-| `12` | SELECTED_VIEW_READY | 1 / 2 / 3 旧选中姿态到位 |
-| `20` | WORKFLOW | 见下表 |
-| `21` | COMMAND_ACK | 01 / 00 接受 / 拒绝 |
 
-| WORKFLOW value | 名称 |
-| --- | --- |
-| `00` | IDLE |
-| `01` | START_ACCEPTED |
-| `02` | MEASURE_POSITION_READY |
-| `03` | DISTANCE_SAFE_LATCHED |
-| `04` | RETREAT_DONE_WAIT_RESTART |
-| `05` | RETURN_HOME_DONE |
-| `06` | ABORTED_HOLD |
-| `07` | FAULT_HOLD |
-| `08` | RETREAT_STEP_READY |
+| event | 名称                | value                           |
+| ------- | --------------------- | --------------------------------- |
+| `01`  | TARGET_READY        | 01 等待视觉                     |
+| `02`  | ALIGN_DONE          | 01 对准和二次确认通过           |
+| `03`  | OUTPUT              | 01 / 00 开 / 关                 |
+| `04`  | TARGET_CTRL         | 01 / 00 启用 / 关闭或拒绝       |
+| `05`  | HEARTBEAT_ALIVE     | 01 可选响应                     |
+| `06`  | SAFE_DISTANCE       | 01 / 00 合格 / 过近，非锁存证明 |
+| `07`  | VISION_STATE        | 01 / 00 有效 / 丢失             |
+| `10`  | CAPTURE_POINT_READY | 1 / 2 / 3 旧拍摄点真实到位      |
+| `11`  | CAPTURE_HOME_READY  | 01 旧采集 HOME 校验通过         |
+| `12`  | SELECTED_VIEW_READY | 1 / 2 / 3 旧选中姿态到位        |
+| `20`  | WORKFLOW            | 见下表                          |
+| `21`  | COMMAND_ACK         | 01 / 00 接受 / 拒绝             |
+
+
+| WORKFLOW value | 名称                      |
+| ---------------- | --------------------------- |
+| `00`           | IDLE                      |
+| `01`           | START_ACCEPTED            |
+| `02`           | MEASURE_POSITION_READY    |
+| `03`           | DISTANCE_SAFE_LATCHED     |
+| `04`           | RETREAT_DONE_WAIT_RESTART |
+| `05`           | RETURN_HOME_DONE          |
+| `06`           | ABORTED_HOLD              |
+| `07`           | FAULT_HOLD                |
+| `08`           | RETREAT_STEP_READY        |
 
 旧 COMMAND_ACK 用于 WORKFLOW / CAPTURE / TARGET，关联原请求 SEQ。接受 value=1/error=0，拒绝 value=0/error!=0，必须同时检查 event/value/error。
 
@@ -243,24 +253,25 @@ dcy = target_center_y - image_center_y
 
 异步故障 SEQ=00；未知 TYPE / 非法参数也可原请求 SEQ 拒绝。旧固件收到新 TYPE 的错误不算能力探测成功。
 
-| code | 名称 |
-| --- | --- |
-| `00` | NONE |
-| `01` | VERSION_MISMATCH |
-| `02` | UNKNOWN_TYPE |
-| `03` | INVALID_PARAM |
-| `04` | POSE_INVALID |
-| `05` | BUSY |
-| `06` | MOTION_FAILED |
-| `07` | HEARTBEAT_TIMEOUT |
-| `08` | SAFETY_INPUT |
+
+| code | 名称                    |
+| ------ | ------------------------- |
+| `00` | NONE                    |
+| `01` | VERSION_MISMATCH        |
+| `02` | UNKNOWN_TYPE            |
+| `03` | INVALID_PARAM           |
+| `04` | POSE_INVALID            |
+| `05` | BUSY                    |
+| `06` | MOTION_FAILED           |
+| `07` | HEARTBEAT_TIMEOUT       |
+| `08` | SAFETY_INPUT            |
 | `09` | SAFE_DISTANCE_TOO_CLOSE |
-| `0A` | VISION_LOST |
-| `0B` | SOFT_RESET_FAILED |
-| `0C` | INVALID_STATE |
-| `0D` | SEQ_CONFLICT |
-| `0E` | TARGET_GATE_DENIED |
-| `0F` | MOTION_ABORTED |
+| `0A` | VISION_LOST             |
+| `0B` | SOFT_RESET_FAILED       |
+| `0C` | INVALID_STATE           |
+| `0D` | SEQ_CONFLICT            |
+| `0E` | TARGET_GATE_DENIED      |
+| `0F` | MOTION_ABORTED          |
 
 扫描错误已冻结并加入头文件：10=SCAN_ID_MISMATCH，11=PHOTO_SAVE_FAILED，12=PHOTO_CONFIRM_TIMEOUT，13=SCAN_STAGE_TIMEOUT；旧 00~0F 不变。
 
@@ -270,15 +281,16 @@ dcy = target_center_y - image_center_y
 
 ### 5.1 身份层次
 
-| 逻辑字段 | 建议类型 | 含义 |
-| --- | --- | --- |
-| scan_session_id / 扫描报文 scan_id | uint32 非零 | 同一轮扫描，不建两套编号 |
-| candidate_id | uint32 非零 | 本轮真实候选；R01 字符串只在界面 |
-| target_session_id | uint32 非零 | 一次选痣 / 对准；换痣或重新定位建新会话 |
-| target_revision | uint32 非零 | 目标记录版本；身份等关键关联变化更新 |
-| observe_pose_id | uint8 | 本轮固定正视，可作为日志元信息；不是候选编号或运动请求 |
-| frame_id / vision_sample_id | uint32 | 新图像 / 视觉样本关联，不是 SEQ |
-| permit_id | uint32 非零 | 单次医生许可及撤销代次 |
+
+| 逻辑字段                           | 建议类型    | 含义                                                   |
+| ------------------------------------ | ------------- | -------------------------------------------------------- |
+| scan_session_id / 扫描报文 scan_id | uint32 非零 | 同一轮扫描，不建两套编号                               |
+| candidate_id                       | uint32 非零 | 本轮真实候选；R01 字符串只在界面                       |
+| target_session_id                  | uint32 非零 | 一次选痣 / 对准；换痣或重新定位建新会话                |
+| target_revision                    | uint32 非零 | 目标记录版本；身份等关键关联变化更新                   |
+| observe_pose_id                    | uint8       | 本轮固定正视，可作为日志元信息；不是候选编号或运动请求 |
+| frame_id / vision_sample_id        | uint32      | 新图像 / 视觉样本关联，不是 SEQ                        |
+| permit_id                          | uint32 非零 | 单次医生许可及撤销代次                                 |
 
 以上类型是建议，不是已冻结 payload。目标控制、视觉、许可和状态均关联：
 
@@ -297,115 +309,100 @@ target_key = (scan_session_id, candidate_id, target_session_id, target_revision)
 - 固定正视无法可靠观察的目标不执行；侧脸回访、任意接近、真实三维到靶均不在首版。
 - 真实固定路径、工作距离、像素瞄准参考和同目标复核仍须验收。无手眼矩阵不等于可以解除 Gemini 执行禁用或伪造 calibrated=true。
 
-## 6. 扫描握手：07 / 82 冻结规格
+## 6. 扫描握手：CONTINUOUS_SCAN_20261013
 
-2026-10-09 用户确认采用以下布局，已接入 MCU 和 PC 源码。2026-10-11 用户确认中途改为直接继续确认，字节不变。Jetson 按此表实现确认应答及最终到位门控；不要使用旧 flags=0F。编译和离线测试不代替现场路径及双端联调验收。
+MCU/PC已实现，Jetson采用及新版实机验收尚待确认。与旧SCAN_WIRE_20261009暂停版业务不兼容，**部署前人工核对双方构建**。TYPE/LEN/偏移/CRC/VER=01不变，没有线上协商，不混用新固件和旧客户端。
 
 ### 6.1 SCAN_CTRL：TYPE=07，LEN=6
 
-| payload 偏移 | 字段 | 类型 | 含义 |
+| payload偏移 | 字段 | 类型 | 当前含义 |
 | ---: | --- | --- | --- |
-| 0 | action | uint8 | QUERY=00、START=01、PHOTO_DONE=02 |
-| 1 | value | uint8 | QUERY/START 为 00；PHOTO_DONE 为 01 确认继续 / 00 中途失败 |
-| 2~5 | scan_id | uint32 LE | 非零本轮；仅 QUERY 可为 0 |
+| 0 | action | uint8 | QUERY=00、START=01；02已废弃 |
+| 1 | value | uint8 | QUERY/START必须为00 |
+| 2~5 | scan_id | uint32 LE | 非零本轮；仅QUERY可为0 |
 
-- QUERY 只读，先 ACK 再 SNAPSHOT；0 查询当前 / 最近，未知非零编号拒绝，不套用另一轮证据。
-- START 前 Jetson 已建立本轮、采集 / 记录就绪；MCU 查测距、心跳、故障 / 忙、起点及路径版本，接受后准备左视并执行第一段，不是即刻到位。
-- PHOTO_DONE=1 只在匹配本轮 WAIT_PHOTO 首次接受，表示 Jetson 已核对本轮中途就绪并确认继续，不表示照片实际保存；MCU 仍检查正视真实反馈 / 原安全条件，启动第二段一次。
-- PHOTO_DONE=0 接受失败通知后终止保持，不继续右扫、不自动 HOME。
-- LEN!=6 用原 ERROR / 请求 SEQ / INVALID_PARAM；合法长度非法参数用扫描 ACK 拒绝，不改变已有任务。
-- 取消复用 WORKFLOW ABORT_HOLD，不增加任意关节或激光开命令。
-
-START 前应保证中途继续确认任务可用。Jetson 收到同轮、原 START SEQ 的 FRONT_PHOTO_READY / WAIT_PHOTO 后，直接分配新非零确认 SEQ 发送 PHOTO_DONE=1；不能只收到 START ACK 就提前确认。扫描中可展示、记录 RGB-D 和候选，不强制取图 / 落盘或完成全脸分析；若自行保存，帧号、文件和质量留在 Jetson，不要求逐帧 FK。重复就绪不新建事务，确认重发沿用原 SEQ 和全部字节。
+- QUERY只读，先ACK再SNAPSHOT；0查询当前/最近，未知非零ID拒绝，不套用另一轮证据。
+- START须已有测距锁存和原条件，接受后准备左视并执行一次连续运动；ACK不是到位。
+- 正视仅为途经点，不发/等PHOTO消息，不以取图或保存推进。
+- 旧action02、value00/01返回82 ACK：state00/flags00/result00/error0C（INVALID_STATE），回显请求SEQ/ID；不推进、不清当前任务。
+- 非法LEN用原FE/请求SEQ/INVALID_PARAM；合法长度非法参数用82拒绝。取消复用06/action03，正常结束复用06/action02。
 
 ### 6.2 SCAN_STATUS：TYPE=82，LEN=10
 
-| payload 偏移 | 字段 | 类型 |
+| payload偏移 | 字段 | 类型 |
 | ---: | --- | --- |
 | 0 | event | uint8 |
 | 1 | state | uint8 |
 | 2 | flags | uint8 |
 | 3 | request_action | uint8 |
-| 4 | result | uint8，01 正常 / 接受，00 失败 / 拒绝 |
-| 5 | error_code | uint8，正常 00 |
+| 4 | result | uint8；01正常/接受，00失败/拒绝 |
+| 5 | error_code | uint8；正常00 |
 | 6~9 | scan_id | uint32 LE |
 
-| event | 名称 | SEQ / action | 含义 |
+| event | 名称 | SEQ/action | 含义 |
 | --- | --- | --- | --- |
-| `01` | ACK | 当前请求 / 当前 action | 接受或拒绝，不是到位 |
-| `02` | SNAPSHOT | 查询或重发请求 / 对应 action | 当前上下文，不运动 |
-| `03` | FRONT_PHOTO_READY | 最初 START / 01 | 第一段正视真实停稳，等待继续确认，保留历史名 |
-| `04` | PHOTO_ACCEPTED | PHOTO_DONE / 02 | 中途继续确认接受，第二段即将 / 正在执行 |
-| `05` | SCAN_DONE | 最初 START / 01 | 可选进度：右端真实停稳，MCU 自动 HOME，不放行选痣 |
-| `06` | HOME_READY | 最初 START / 01 | 可选进度：扫后 HOME 真实校验通过，MCU 自动继续正视，不要求应答 |
-| `07` | TERMINATED | 最初 START / 01 | 中止 / 故障，不自动返回 |
-| `08` | FRONT_OBSERVE_READY | 最初 START / 01 | 必需最终通知：本轮扫后 HOME 已验证，当前固定正视真实到位、停稳保持且输出关闭 |
+| 01 | ACK | 当前请求/当前action | 接受或拒绝，不是到位 |
+| 02 | SNAPSHOT | QUERY或重复START/对应action | 当前上下文，只读 |
+| 03/04 | 废弃 | 不发送 | 原FRONT_PHOTO_READY/PHOTO_ACCEPTED |
+| 05 | SCAN_DONE | 最初START/01 | 右端真实停稳，自动HOME；只是进度 |
+| 06 | HOME_READY | 最初START/01 | HOME验证成功，转入自动正视；只是进度 |
+| 07 | TERMINATED | 最初START/01 | 中止/故障，不自动HOME |
+| 08 | FRONT_OBSERVE_READY | 最初START/01 | 最终固定正视真实到位、停稳保持且输出关闭 |
 
 | state | 名称 | 含义 |
 | --- | --- | --- |
-| `00` | NONE | 无扫描上下文 |
-| `01` | PREPARING | 基础位置 / 左视准备 |
-| `02` | LEFT_TO_FRONT | 第一段 |
-| `03` | WAIT_PHOTO | 正视保持等待本轮继续确认，保留历史名 |
-| `04` | FRONT_TO_RIGHT | 第二段 |
-| `05` | RETURNING_HOME | 右端完成，准备 / 执行正常 HOME |
-| `06` | 保留 | 旧 HOME_HOLD 等待选痣分支撤回，不能作为本轮正常终态 |
-| `07` | 保留 | 原 SELECT_CONSUMED 撤回，不用于新目标选择 |
-| `08` | ABORTED_HOLD | 已取消 |
-| `09` | FAULT_HOLD | 故障保持 |
-| `0A` | RETURNING_FRONT | HOME 成功后执行正式正视；尚不能选痣 |
-| `0B` | FRONT_OBSERVE_HOLD | 当前最终正视已验证并保持；不是输出许可 |
-| `0C` | SCAN_CHAIN_COMPLETED | 已正常结束或转入原定靶；接受FINISH_RETURN_HOME或成功TARGET START时设置，后者清flags为00；查询不得重放固定正视就绪 |
+| 00 | NONE | 无上下文或拒绝响应 |
+| 01 | PREPARING | 基础定位/协调进入左视 |
+| 02 | SCANNING | 一次LEFT → FRONT → RIGHT连续运动 |
+| 03/04 | 废弃 | 原WAIT_PHOTO/FRONT_TO_RIGHT；不进入 |
+| 05 | RETURNING_HOME | 右端停稳后自动HOME |
+| 06/07 | 保留 | 不作为正常终态 |
+| 08 | ABORTED_HOLD | 已取消，不代替81停止完成 |
+| 09 | FAULT_HOLD | 故障保持 |
+| 0A | RETURNING_FRONT | HOME后自动正视，尚不能选痣 |
+| 0B | FRONT_OBSERVE_HOLD | 当前最终正视已验证保持，不是输出许可 |
+| 0C | SCAN_CHAIN_COMPLETED | 正常结束或显式原定靶交接；清flags，不重放就绪 |
 
-| flags | 名称 | 含义 |
-| --- | --- | --- |
-| bit0 / `01` | PHOTO_SAVED | 本轮中途继续确认被接受；保留历史名，不证明实际保存 |
-| bit1 / `02` | SCAN_FINISHED | 两段完成、右端真实停稳 |
-| bit2 / `04` | HOME_VERIFIED | 本轮扫后 HOME 曾校验，不代表后续仍在 HOME |
-| bit3~7 | 保留，必须为 0 | 原 SELECT_ALLOWED 撤回，不是目标 / 输出许可 |
+| flags | 含义 |
+| --- | --- |
+| bit0/01 | 保留，必须为0；不伪造PHOTO_SAVED |
+| bit1/02 | SCAN_FINISHED；右端真实停稳 |
+| bit2/04 | HOME_VERIFIED；本轮扫后HOME曾验证，不表示仍在HOME |
+| bit3~7 | 保留，必须为0 |
 
-历史完成位组合：WAIT_PHOTO=00，第二段=01，返回 HOME=03，HOME 成功后的自动正视阶段及最终就绪=07。**flags=07 不能单独证明最终正视到位，必须同时检查当前 event / state、result、error 和本轮关联。**不把 bit3 偷换为最终到位；旧 flags=0F 不合法。
+准备/扫描flags00；右端完成/返回HOME为02；HOME成功后自动正视及最终保持为06。旧01/03/07/0F不能作为新版资格。最终须同时核对本轮ID、原START关联、event08（或合法当前查询）、state0B、flags06、result1、error0。ACK、SCAN_DONE、HOME_READY不放行选痣/定靶。
 
-取消 / 故障清 flags 和当前正视就绪资格；终态快照 result=0 并给原因。查询接受不等于恢复；拒绝错误编号回显请求编号，state=NONE/flags=0，不挂另一轮证据。正常最终就绪要求 result=1/error=0、state=FRONT_OBSERVE_HOLD 且当前资格有效。
-
-HOME_READY 如发送，其 state 应表达正在转入 RETURNING_FRONT，不表示 HOME_HOLD 等待。中途 FRONT_PHOTO_READY 与最终 FRONT_OBSERVE_READY 不得共用事件编号。ROBOT_SCAN_RESULT_FRONT_READY 是现有 C 运动层结果名，不是最终观察就绪报文。
+取消/故障清flags和当前就绪，保留ID及错误快照；查询接受不是恢复。HOME_READY表达RETURNING_FRONT，不在HOME等新命令。旧错误11/12保留编号供历史诊断，不改名复用；新正常链不再产生照片/确认超时，阶段超时使用13。
 
 ### 6.3 幂等与完成边界
 
-- Jetson 持久化单调递增的非零 uint32 scan_id；新轮增加，重发沿用原 ID / SEQ。MCU 在本次启动内保存最近 ID 和已接受 ID 高水位，新 START 必须大于高水位；历史较小 ID 拒绝。MCU 断电不持久化上下文，重启 / 断连后清客户端待发动作并重新测距，禁止自动重发旧启动。ID 耗尽须停止并协商，不回绕。
-- 同本轮重复 START 回接受记录 / 当前快照，不再准备左视，不更改 start_seq。
-- PHOTO_DONE 已接受后重复只重放记录 / 当前快照，不再右扫、HOME 或进入正视；改写已接受结果拒绝。
-- 中途确认等待不阻塞心跳、反馈、取消和安全处理；位置偏离或反馈失效不能旧姿态续扫。
-- SCAN_DONE 只证明两段运动完成，HOME_READY 只证明曾经过 HOME；两者不是最终正视就绪，不放行选痣或定靶。
-- 右端 → HOME → 固定正视由 MCU 自动串接，每步成功后才能下一步；不等待额外运动命令、分析结果或对中间通知的确认。心跳、安全中止和真实反馈继续独立处理。
-- 最终 FRONT_OBSERVE_READY 不要求 Jetson 回一个运动许可。丢失时查询本轮当前状态；只读快照不重复 HOME、伸出或恢复失效资格。
-- 返回当前就绪快照前，MCU 仍须确认本轮未失效、当前阶段与反馈合格；保存历史终态供诊断不等于仍具备执行就绪资格。Jetson 发现阶段回退或错误即清本地就绪，禁止靠晚到包重新放行。
-- 开始视觉伺服、其他运动、取消、复位或故障后，初始正视资格失效，查询报告当前阶段，不把历史最终成功当作仍在固定正视。
-- 正常采集 HOME 保留必要本轮测距上下文，不进入整轮 IDLE；整轮 FINISH 撤销本轮。
-- 取消 / 故障 / 超时后迟到中途确认、HOME 或最终正视消息不恢复流程。
-- 运动 API 本身不自动返回；现已由 workflow 消费结果，自动串接 HOME 和正式正视。不向 Jetson 索要额外 HOME / SELECT。HOME 执行经原 capture 层清除基础姿态缓存，回正视时重新基础定位，避免从 HOME 跳过伸出。
-- START 和已接受 PHOTO_DONE 的去重记录保留到本轮结束，不使用旧命令 3 秒缓存。对同轮改写确认结果返回 SEQ_CONFLICT；查询不会重复运动。事件归属仍用最初 START SEQ，中途确认接受使用 PHOTO_DONE SEQ。
-- WAIT_PHOTO / 最终保持每 300 ms 刷新五轴反馈；当前就绪查询也刷新反馈。缺失、偏离、忙、限位 / 心跳 / 中止均不复用旧到位资格。该项是关节反馈检查，不是新增连续深度测距。
-- 当前 MCU RX 为 8 条扫描命令 FIFO；满时回扫描 ACK/result=0/error=BUSY，回显请求 ID、state=NONE/flags=0。控制不覆盖尚未消费的扫描请求，也不刷新心跳。
-- 新扫描最终保持不转入旧FLOW_SELECTED_VIEW，不伪造采集掩码；CAPTURE SELECT仍拒绝。最终正视验证成功后，允许显式TARGET START按6.5进入原流程。正常FINISH_RETURN_HOME和异常ABORT_HOLD继续保留。
+- Jetson持久化递增非零uint32 scan_id，新轮增加；重发原ID/SEQ/全部字节。MCU本次启动保存高水位，新START必须更大，不回绕。断电不持久化，重连显式重新测距，不自动续跑。
+- 同本轮重复START只回接受记录/当前快照，不重复准备、扫描、HOME或正视、不续期。
+- 没有中途事务；视频、候选或保存不能阻塞独立心跳，只跟踪state02至右端，不设PHOTO定时器。
+- 右端 → HOME → 正视由MCU在原请求内串接，仅成功分支推进，不等额外HOME/SELECT或进度确认。
+- 最终丢包QUERY，不重复运动。当前就绪查询及最终保持每300 ms刷新五轴；缺失、偏离、忙或故障不能沿用旧资格。
+- 显式定靶交接、其他运动、取消、复位或故障消费正视资格；查询不重放历史就绪，阶段回退/错误/晚到成功不能恢复客户端资格。
+- HOME清基础姿态缓存；自动正视重做基础定位及全部步骤，不只写三个角度或标志。
+- 扫描RX为8槽FIFO；满时82 ACK/result0/error05，回显请求ID、state00/flags00，不覆盖请求、不续心跳。
+- FLOW_SCAN_READY不转旧FLOW_SELECTED_VIEW，不伪造三张采集掩码。原02/03交接见6.5；06中止及同SEQ81停止完成保持。
 
 ### 6.4 字节核对示例
 
-以下只用于离线核对，`scan_id=100`，不能反复拿固定编号启动新轮。CRC 覆盖 VER 至 payload，小端附加：
+仅离线核对，scan_id=100；不可反复用固定ID启动新轮。CRC覆盖VER至payload，小端：
 
 ```text
-START       SEQ=14: A5 5A 01 07 14 06 01 00 64 00 00 00 7F EC
-PHOTO_DONE  SEQ=15: A5 5A 01 07 15 06 02 01 64 00 00 00 83 D3
-QUERY       SEQ=16: A5 5A 01 07 16 06 00 00 64 00 00 00 FF E4
-最终正视     SEQ=14: A5 5A 01 82 14 0A 08 0B 07 01 01 00 64 00 00 00 FF B6
+START    SEQ=14: A5 5A 01 07 14 06 01 00 64 00 00 00 7F EC
+QUERY    SEQ=16: A5 5A 01 07 16 06 00 00 64 00 00 00 FF E4
+右端完成 SEQ=14: A5 5A 01 82 14 0A 05 05 02 01 01 00 64 00 00 00 E2 13
+最终正视 SEQ=14: A5 5A 01 82 14 0A 08 0B 06 01 01 00 64 00 00 00 3E 7A
 ```
 
-负例：LEN 不等于 6、SEQ=0、START ID=0、保留 state=06/07、flags=0F、错 CRC、旧轮确认或改写成功为失败，不得放行。实际 C UART / workflow 和 PC 测试见第 10 章。
+负例：旧PHOTO_DONE、旧event03/04或state03/04、flags07、LEN错误、SEQ0、START ID0、错CRC、错ID/关联、晚到成功，不得放行。不把旧action02改成隐式START，不以ACK冒充就绪。
 
 ### 6.5 最终正视到原定靶：当前已实现合同
 
-1. Jetson确认本轮最终 `82/event=08/state=0B/flags=07/result=1/error=0`（或匹配本轮的有效查询快照），完成本地选痣及同一颗复核，再显式发送 `02/LEN=1/payload=01`，使用新非零SEQ；不是自动启动，也不另发SELECT、HOME或痣XYZ。
-2. MCU仍要求心跳、初始测距锁存、有效姿态及原安全/空闲条件。首次交接还核对非零scan_id、0B/07/error=0、正视标识，并重新读取五轴验证正视；反馈缺失或偏离进入故障保持，不启动定靶。
+1. Jetson确认本轮最终 `82/event=08/state=0B/flags=06/result=1/error=0`（或匹配本轮的有效查询快照），完成本地选痣及同一颗复核，再显式发送 `02/LEN=1/payload=01`，使用新非零SEQ；不是自动启动，也不另发SELECT、HOME或痣XYZ。
+2. MCU仍要求心跳、初始测距锁存、有效姿态及原安全/空闲条件。首次交接还核对非零scan_id、0B/06/error=0、正视标识，并重新读取五轴验证正视；反馈缺失或偏离进入故障保持，不启动定靶。
 3. 成功回同SEQ的 `81/LEN=3/payload=21 01 00` 和 `04 01 00`，原状态机随后回 `01 01 00`。前者仅为ACK接受；TARGET_CTRL_ON / TARGET_READY才表明启用，不是对准或输出完成。拒绝回ACK结果0及具体错误，不发成功通知。
 4. 成功交接进入 `FLOW_TARGET_ACTIVE`，扫描状态改为 `0C`、flags清00，保留原scan_id作诊断。此后查询不再验证/报告固定正视，因为正常视觉修正可以离开初始姿态。目标START不触发新HOME/SELECT/伸出；原视觉控制只在新有效误差到来后动作。
 5. START清空旧视觉/对准资格；保留原稳定帧、新鲜度、P000松开后再按下和输出硬上限。已按住P000、扫描到位或START ACK不能自动开光。MCU没有新增医生许可消息；医生确认及同目标复核在Jetson，不能声称已由MCU绑定验证。
@@ -463,7 +460,7 @@ Qt 开放本轮首次执行选痣的最低条件：
 
 本轮唯一模式是“MCU 自动固定正视已就绪 → 目标绑定 → 同一颗复核 → 像素对准”。APPROACH_REQUEST、TARGET_POSITION、POSITION_STAGED、VERIFIED_BASE_TARGET 均不纳入本轮，也不要求医生选左 / 正 / 右观察位。
 
-MCU 接受首次绑定须独立检查本轮中途确认、两段扫描、HOME 已验证和当前最终正视就绪；不要求照片文件，不信任 Qt 按钮，不伪造 capture_done_mask=07。绑定成功仅记录所选目标、清旧视觉 / 对准 / 许可，不启动移动或输出。
+未来增强绑定应检查本轮连续扫描、HOME已验证和当前最终正视就绪；不得恢复已取消的中途确认前置。不要求照片文件，不信任Qt按钮，不伪造capture_done_mask=07。绑定成功仅记录目标、清旧视觉/对准/许可，不启动移动或输出；本节未实现。
 
 绑定应答只表达接受 / 拒绝和对应 target_key；机械臂实际到位已经由此前 FRONT_OBSERVE_READY 证明，不再等待一个由选痣触发的 TARGET_POSITION_READY。最终就绪关联 scan_id 和扫描 START，而目标状态从绑定时才关联 target_key。
 
@@ -538,37 +535,25 @@ MCU -> Jetson: DISTANCE_SAFE_LATCHED
 
 过近按 RETREAT_STEP_READY / 新实测 / 等待重启，不直接扫描。
 
-### 8.2 扫描、中途确认、自动 HOME 与自动正视
+### 8.2 连续扫描、自动HOME与自动正视
 
 ```text
-Jetson: 建立 D，中途继续确认任务就绪
-Jetson -> MCU: SCAN START(D)，SEQ=s
-MCU -> Jetson: ACK(s)
-MCU: 左视准备真实校验 -> 左到正
-Jetson: 展示扫描，可记录 RGB-D、候选及来源
-
-MCU -> Jetson: FRONT_PHOTO_READY(D,s)，中途正视真实停稳
-Jetson: 核对本轮和最初 START SEQ，不拍照 / 保存
-Jetson -> MCU: PHOTO_DONE(D,value=1，确认继续)，SEQ=p（新非零SEQ）
-MCU -> Jetson: ACK(p) + PHOTO_ACCEPTED(D,p)
-MCU: 再查正视反馈，正到右
-Jetson: 继续展示 / 记录，独立心跳不停
-
-MCU -> Jetson: 可报告 SCAN_DONE(D,s)，右端真实停稳，只是进度
-MCU: 经验证路线正常 HOME
-MCU: 校验 HOME 真实到位
-MCU -> Jetson: 可报告 HOME_READY(D,s)，转入 RETURNING_FRONT，只是进度
-MCU: 不等待 Jetson 新命令，重建基础定位并执行正式正视配方
-MCU: 校验最终正视真实到位、停稳、运动结束，恢复正确观察上下文
-MCU -> Jetson: FRONT_OBSERVE_READY(D,s)，state=FRONT_OBSERVE_HOLD
-               本轮中途确认 / 扫描 / HOME 完成，当前正视就绪，result=1/error=0
-MCU: 保持且输出关闭，等待目标绑定与复核
-Jetson: 核对本轮最终到位及候选可用性，开放数字人选痣
+Jetson -> MCU: SCAN START，本轮ID，SEQ=s；独立心跳保持
+MCU -> Jetson: ACK(s)，只表示接受
+MCU: 正式左视准备，真实校验
+MCU: 一次左 → 正（途经）→ 右连续运动，state02/flags00
+Jetson: 展示/记录；不等中途事件、不发PHOTO_DONE
+MCU: 右端真实停稳 -> SCAN_DONE，本轮ID/s，state05/flags02
+MCU: 自动HOME并验证 -> HOME_READY，本轮ID/s，state0A/flags06
+MCU: 自动基础定位并执行正式正视全部步骤
+MCU: 最终五轴校验、停稳保持、输出关闭
+MCU -> Jetson: FRONT_OBSERVE_READY，本轮ID/s，0B/06/result1/error0
+Jetson: 核对当前最终就绪，候选可用后开放数字人选痣
 ```
 
-除持续心跳和原安全机制外，PHOTO_DONE 是本段推进运动所必需的业务回传；免保存不等于MCU跳过等待或自动伪造确认。右端 → HOME → 正视不等待新 HOME / SELECT、归档通知或对进度的确认。最终通知不要求再回一个运动许可；丢失时查询当前状态，绝不重复伸出。中途失败确认 / 超时、任一运动故障、取消或心跳超时均关输出并停止保持，不继续自动链。
+启动接受后没有中途业务回传，不等照片、额外HOME/SELECT或进度确认。最终丢包用只读QUERY，不重复伸出。原目标复核/02启动见6.5。故障、取消、心跳失效或阶段超时停止保持，不继续链。
 
-本批不新增HOME出画保护或保护模式切换握手，不改变上述自动链。MCU没有新增全流程深度保护；不能用此说明宣称Jetson已有连续保护或预检已关闭，Jetson端实际行为须由队友按本轮分工核对。
+本批不新增HOME出画保护、模式切换应答或全流程深度保护，也未修改Jetson保护设置；不据此宣称完整防碰撞或真实输出已验收。
 
 ### 8.3 已到正视后的选痣、复核与对准
 
@@ -591,17 +576,16 @@ MCU -> Jetson: ALIGN_DONE(K)
 
 ### 8.4 应答与放行判据
 
-| 交互 | 谁需要应答 | 可以推进什么 | 不能推导什么 |
+| 交互 | 谁应答 | 可以推进什么 | 不能推导什么 |
 | --- | --- | --- | --- |
-| SCAN START | MCU ACK，关联请求 | 接受后 MCU 准备左视和第一段 | 已到位、中途已确认或可以选痣 |
-| FRONT_PHOTO_READY | Jetson 核对本轮后直接回 PHOTO_DONE=1，不拍照 / 保存 | 匹配且接受成功后只执行一次第二段 | 照片已保存或最终观察位就绪 |
-| PHOTO_DONE | MCU ACK / PHOTO_ACCEPTED，关联中途确认请求 | 第二段及之后的正常自动链 | 照片存在、右端、HOME 或最终正视已经完成 |
-| SCAN_DONE / HOME_READY | 不要求 Jetson 逐步授权 | MCU 自行继续下一内部阶段；Qt 更新进度 | 开放执行选痣或启动定靶 |
-| FRONT_OBSERVE_READY | 无额外运动许可应答；丢失用只读 QUERY | 候选也可用时，Qt 开放选痣 / 绑定 | 目标身份已确认、已对准或可以输出 |
-| TARGET_BIND / REVERIFY / START_ALIGN | MCU 分别应答，身份与阶段一致 | 复核通过后启用原视觉状态机 | 绑定 ACK 已对准、医生已经确认 |
-| DOCTOR_PERMIT | MCU 应答并记录单次许可 | 所有原安全条件及 P000 通过后消费输出 | Qt 单方面直接开 P801 |
+| SCAN START | MCU匹配请求ACK | MCU准备及连续扫描 | 已到位/可以选痣 |
+| 正视途经 | 无消息、无应答 | 同一轨迹继续向右 | 当前停稳/可以选痣 |
+| SCAN_DONE/HOME_READY | 不需Jetson逐步授权 | MCU自行继续，Qt更新进度 | 最终正视就绪 |
+| FRONT_OBSERVE_READY | 不需运动许可；丢失QUERY | 同轮0B/06合格且候选可用后选痣 | 身份/对准/输出许可 |
+| 原TARGET_CTRL=02 | 同SEQ 81 ACK及ON/READY | 按6.5进入原视觉流程 | ACK已对准/开光 |
+| 第7章增强绑定/许可 | 未冻结、未实现 | 非当前原流程前置 | 不能发送自拟字节 |
 
-START 的 ACK 和 PHOTO_DONE 的 ACK 分别关联各自 SEQ；中途就绪、右端 / HOME 进度和最终正视通知关联最初 scan_id / start_seq。定靶 / 许可从选痣后才关联 target_key，不拿心跳 SEQ 或尚不存在的目标编号关联扫描到位。
+扫描进度/最终通知关联最初START SEQ及scan_id，查询关联QUERY SEQ，没有PHOTO请求SEQ。第7章及8.3/8.5仅描述未来增强接口，不表示当前MCU已支持。
 
 ### 8.5 医生确认、输出与结束
 
@@ -641,29 +625,29 @@ Jetson 必须由串口控制层独立完成“本轮失效 -> 优先发送 ABORT
 
 ### 9.1 分阶段预算
 
-| 阶段 | 现状 / 建议 |
-| --- | --- |
-| ACK | 300 ms，最多额外重发 3 次 |
-| ABORT 停止确认 | MCU2秒；Jetson建议自首次中止发送起3秒，重发 / ACK不续期；失败停心跳并显示停止未确认 |
-| 旧 HOME / soft_reset | MCU 上限 45 s |
-| 公共测距位移动 | 上限 15 s；含复位 START 总等待建议 62 s |
-| 扫描准备 | MCU 60 s；包含基础 AUTO 和 J1/J4/J5 三步；PC 等 62 s |
-| 每段扫描 | 默认运动 12 s、收敛 2 s、预算另留 4 s；workflow 30 s，PC 等 32 s |
-| 正视中途确认等待 | MCU 15 s不变；Jetson匹配中途就绪后直接确认，不等待保存；PC等17 s |
-| 扫后 HOME | MCU 45 s；PC 等 47 s |
-| HOME 后自动固定正视 | MCU 60 s；包含基础 AUTO 与 J1/J4/J5；PC 等 62 s |
-| Jetson 等最终就绪 | 覆盖准备、两段、中途确认、HOME 和自动正视；按阶段进度跟踪有限预算，收到 SCAN_DONE / HOME_READY 不结束等待 |
-| QUERY 快照 | 建议 2 s，每秒最多一次，心跳不停 |
-| 候选识别 / 页面准备 | Jetson 独立有限预算；不阻塞 MCU 自动 HOME / 正视 |
-| 目标绑定 / 同一颗复核 | 独立预算，无新增接近运动；失败不默认换痣 |
-| 医生确认 / TTL | 独立配置，数值待定；等待关输出并监测 |
-| 视觉 / 输出上限 | 当前 500 ms / 10000 ms，不随其他等待放宽 |
 
-超时停止推进并查询 / 安全停止，不当成功或无限延长。中途确认、HOME、最终正视、候选准备和许可不能共用一个定时器；最终通知超时也不能用 HOME 曾成功替代。
+| 阶段                  | 现状 / 建议                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| ACK                   | 300 ms，最多额外重发 3 次                                                                                 |
+| ABORT 停止确认        | MCU2秒；Jetson建议自首次中止发送起3秒，重发 / ACK不续期；失败停心跳并显示停止未确认                       |
+| 旧 HOME / soft_reset  | MCU 上限 45 s                                                                                             |
+| 公共测距位移动        | 上限 15 s；含复位 START 总等待建议 62 s                                                                   |
+| 扫描准备              | MCU60 s；基础AUTO及公共位到左视协调运动；PC等62 s                                                      |
+| 左到右连续扫描        | 默认24 s、右端收敛最多2 s、运动总预算30 s；workflow30 s，PC等32 s                                          |
+| 扫后 HOME             | MCU 45 s；PC 等 47 s                                                                                      |
+| HOME 后自动固定正视   | MCU 60 s；包含基础 AUTO 与 J1/J4/J5；PC 等 62 s                                                           |
+| Jetson 等最终就绪     | 覆盖准备、连续扫描、HOME 和自动正视；按阶段进度跟踪有限预算，收到 SCAN_DONE / HOME_READY 不结束等待 |
+| QUERY 快照            | 建议 2 s，每秒最多一次，心跳不停                                                                          |
+| 候选识别 / 页面准备   | Jetson 独立有限预算；不阻塞 MCU 自动 HOME / 正视                                                          |
+| 目标绑定 / 同一颗复核 | 独立预算，无新增接近运动；失败不默认换痣                                                                  |
+| 医生确认 / TTL        | 独立配置，数值待定；等待关输出并监测                                                                      |
+| 视觉 / 输出上限       | 当前 500 ms / 10000 ms，不随其他等待放宽                                                                  |
+
+超时停止推进并查询 / 安全停止，不当成功或无限延长。连续扫描、HOME、最终正视、候选准备和许可不能共用一个定时器；最终通知超时也不能用 HOME 曾成功替代。
 
 ### 9.2 并发门控
 
-一次一个运动业务；扫描准备至最终正视到位期间仅处理匹配中途确认、查询、心跳、安全中止，不插旧 GOTO/SELECT/TARGET。目标绑定本身不运动，开始视觉控制后初始正视就绪资格失效；其他运动不能混入目标业务，输出期间冻结运动。
+一次一个运动业务；扫描准备至最终正视到位期间保留只读查询、心跳、安全中止；旧PHOTO_DONE拒绝，不插旧 GOTO/SELECT/TARGET。目标绑定本身不运动，开始视觉控制后初始正视就绪资格失效；其他运动不能混入目标业务，输出期间冻结运动。
 
 视觉 / 遥测使用新样本策略，不积压旧误差。保存与分析后台执行，串口服务不阻塞。取消 / 新轮失效旧回调，迟到消息不能恢复按钮、流程或输出。
 
@@ -677,30 +661,32 @@ Jetson 必须由串口控制层独立完成“本轮失效 -> 优先发送 ABORT
 
 ### 10.1 必须确认
 
-| 决策 | 状态 |
-| --- | --- |
-| 两段扫描、中途直接确认后右扫 | 用户2026-10-11已确认免保存；MCU / PC原字节和推进逻辑可复用，对端报告已实现，真机未联调 |
-| 右端 → HOME → 固定正视 | MCU 自动完成已确认，不等待 Jetson 新运动命令 |
-| 最终 FRONT_OBSERVE_READY 后选痣 | 用户已确认；两种正视事件必须不同，中间进度不放行 |
-| 选痣绑定不运动，当前同一颗复核后像素对准 | 已确认；移除 XYZ 暂存、手眼矩阵和观察姿态选择前置 |
-| 正式姿态、工具与完整路径版本 | MCU 正式配方为候选，实物全程仍需验收 |
-| 能力 / 业务版本、启动 / 链路代次 | 必须定义，编码待冻结 |
-| 新 TYPE / 固定 LEN / 偏移 / 枚举 / 错误 | 扫描 07/82 及最终 08/0A/0B/0C 已冻结；第 7 章其余业务编码仍待确认 |
-| 激光参考、图方向和距离适用范围 | 待标定验证，不暗改旧 TYPE=03 |
-| 单次 TTL、撤销 / 消费 / 代次、P000 再武装 | 单次方向明确，数值 / 编码 / 边沿待确认 |
-| 扫描长上下文、查询 / 重发和预算 | 已按第 6 / 9 章实现，字节向量和离线用例已提供；目标业务另行冻结 |
+
+| 决策                                      | 状态                                                                                   |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 左到右连续扫描、正视途经不停车 | 用户2026-10-13已确认；MCU/PC已改离线通过，Jetson需同步连续合同和flags06 |
+| 右端 → HOME → 固定正视                  | MCU 自动完成已确认，不等待 Jetson 新运动命令                                           |
+| 最终 FRONT_OBSERVE_READY 后选痣           | 用户已确认；两种正视事件必须不同，中间进度不放行                                       |
+| 选痣绑定不运动，当前同一颗复核后像素对准  | 已确认；移除 XYZ 暂存、手眼矩阵和观察姿态选择前置                                      |
+| 正式姿态、工具与完整路径版本              | MCU 正式配方为候选，实物全程仍需验收                                                   |
+| 能力 / 业务版本、启动 / 链路代次          | 必须定义，编码待冻结                                                                   |
+| 新 TYPE / 固定 LEN / 偏移 / 枚举 / 错误   | 扫描 07/82 及最终 08/0A/0B/0C 已冻结；第 7 章其余业务编码仍待确认                      |
+| 激光参考、图方向和距离适用范围            | 待标定验证，不暗改旧 TYPE=03                                                           |
+| 单次 TTL、撤销 / 消费 / 代次、P000 再武装 | 单次方向明确，数值 / 编码 / 边沿待确认                                                 |
+| 扫描长上下文、查询 / 重发和预算           | 已按第 6 / 9 章实现，字节向量和离线用例已提供；目标业务另行冻结                        |
 
 本轮固定正视 + 像素对准不承诺任意模型点 / 侧脸目标 XYZ 直达。真实三维控制和同步位姿遥测不在本轮冻结清单；以后另行规划，不重新加入本次硬性前置。
 
 ### 10.2 分工
 
-| MCU / RA6M5 | Jetson / Qt |
-| --- | --- |
-| 安全准备、两段运动、中途保持、自动 HOME → 正视、最终到位 | 本轮启动、独立心跳、中途直接回继续确认、处理最终通知 |
-| 内部新鲜五轴反馈、完整配方结果、正视标识及有效状态 | 候选 / 模型对应及新画面复核，不要求接收逐帧 FK |
-| 目标键与当前阶段检查，绑定不运动 | 最终到位后选具体痣，不再发送 HOME / SELECT / XYZ 接近 |
-| 新视觉计数、许可消费 / 撤销、硬件最终裁决 | 同一颗复核、绑定视觉、再次确认 / 撤销 |
-| 故障关输出保持、终态 / 查询和幂等 | 独立心跳、异常提示、清旧请求 / 回调 |
+
+| MCU / RA6M5                                               | Jetson / Qt                                           |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| 安全准备、连续运动、自动 HOME → 正视、最终到位 | 本轮启动、独立心跳、无中途确认、处理最终通知  |
+| 内部新鲜五轴反馈、完整配方结果、正视标识及有效状态        | 候选 / 模型对应及新画面复核，不要求接收逐帧 FK        |
+| 目标键与当前阶段检查，绑定不运动                          | 最终到位后选具体痣，不再发送 HOME / SELECT / XYZ 接近 |
+| 新视觉计数、许可消费 / 撤销、硬件最终裁决                 | 同一颗复核、绑定视觉、再次确认 / 撤销                 |
+| 故障关输出保持、终态 / 查询和幂等                         | 独立心跳、异常提示、清旧请求 / 回调                   |
 
 MCU 不替代视觉识别；Qt 页面确认不替代硬件门。分别记录构建、烧录、标定及整机日志。
 
@@ -709,8 +695,8 @@ MCU 不替代视觉识别；Qt 页面确认不替代硬件门。分别记录构�
 1. 冻结字节表及正 / 负编码向量，验证 CRC / 长度 / 小端 / 身份，不运动。
 2. 验证候选、模型、所选 target_key 一致的软件链路，无运动 / 输出。
 3. 核对正式固定配方及当前五轴反馈；不混用 PC 旧点，不假报 FK / 手眼已标定。
-4. 固定模型无输出低速测两段、中途直接确认、自动 HOME → 正视；不发送额外运动命令也能最终就绪，中间状态不放行。不把PHOTO_SAVED位作为实际照片保存证据。
-5. 无输出测最终到位丢包后 QUERY 不重复运动、重复 PHOTO_DONE 不续跑第二次、HOME 成功而正视失败不放行；中止 / 断链全阶段停止。
+4. 固定模型、激光物理断电，测连续左到右及自动HOME → 正视；检查中途无停顿、整段包络/视野/线缆。旧暂停实机成功不等于新版通过。
+5. 无输出测QUERY/重复START不重复运动、旧PHOTO_DONE拒绝、HOME成功正视失败不放行；中止/断链各阶段停止，ACK不代替同SEQ81停止完成。
 6. 无输出测选痣绑定不运动、所选同一颗复核和像素对准；错目标、不可见、视觉失效均拒绝。
 7. 测许可重发不续期、一次消费、撤销后迟到授予、丢对准不自动恢复、SEQ 回绕、断链 / 重启。
 8. 隔离实际输出，用指示 / 负载验证门控；实际激光另需授权、防护和硬件验收，不因前七项自动开启。
@@ -721,24 +707,25 @@ MCU 不替代视觉识别；Qt 页面确认不替代硬件门。分别记录构�
 
 仅格式验证 / 独立旧模式回归，不是新选痣脚本。测距必须真实测量，不照抄示例作安全证据。
 
-| 场景 | HEX |
-| --- | --- |
-| HEARTBEAT，SEQ=01，tick=1234 | `A5 5A 01 01 01 04 D2 04 00 00 19 AF` |
-| START_MEASURE，SEQ=10 | `A5 5A 01 06 10 01 01 D8 DD` |
-| COMMAND_ACK 接受，SEQ=10 | `A5 5A 01 81 10 03 21 01 00 85 CC` |
-| MEASURE_POSITION_READY，SEQ=10 | `A5 5A 01 81 10 03 20 02 00 D4 FC` |
-| 测距 100 mm，SEQ=11 | `A5 5A 01 05 11 03 64 00 01 77 CD` |
-| 测距 100 mm，SEQ=12 | `A5 5A 01 05 12 03 64 00 01 33 CD` |
-| 测距 100 mm，SEQ=13 | `A5 5A 01 05 13 03 64 00 01 0E 0D` |
-| DISTANCE_SAFE_LATCHED，SEQ=10 | `A5 5A 01 81 10 03 20 03 00 D5 6C` |
-| 旧 SELECT 右视，SEQ=43 | `A5 5A 01 04 43 02 03 03 04 BF` |
-| 旧 SELECTED_VIEW_READY，SEQ=43 | `A5 5A 01 81 43 03 12 03 00 F0 AF` |
-| 旧 TARGET START，SEQ=44 | `A5 5A 01 02 44 01 01 98 3D` |
-| 旧 TARGET_READY，SEQ=44 | `A5 5A 01 81 44 03 01 01 00 B5 CA` |
-| 旧视觉 dcx=-7,dcy=-17，SEQ=45 | `A5 5A 01 03 45 05 F9 FF EF FF 01 4E 21` |
-| ABORT_HOLD，SEQ=48 | `A5 5A 01 06 48 01 03 D8 CF` |
-| FINISH_RETURN_HOME，SEQ=49 | `A5 5A 01 06 49 01 02 48 CF` |
-| RETURN_HOME_DONE，SEQ=49 | `A5 5A 01 81 49 03 20 05 00 CA C1` |
+
+| 场景                           | HEX                                      |
+| -------------------------------- | ------------------------------------------ |
+| HEARTBEAT，SEQ=01，tick=1234   | `A5 5A 01 01 01 04 D2 04 00 00 19 AF`    |
+| START_MEASURE，SEQ=10          | `A5 5A 01 06 10 01 01 D8 DD`             |
+| COMMAND_ACK 接受，SEQ=10       | `A5 5A 01 81 10 03 21 01 00 85 CC`       |
+| MEASURE_POSITION_READY，SEQ=10 | `A5 5A 01 81 10 03 20 02 00 D4 FC`       |
+| 测距 100 mm，SEQ=11            | `A5 5A 01 05 11 03 64 00 01 77 CD`       |
+| 测距 100 mm，SEQ=12            | `A5 5A 01 05 12 03 64 00 01 33 CD`       |
+| 测距 100 mm，SEQ=13            | `A5 5A 01 05 13 03 64 00 01 0E 0D`       |
+| DISTANCE_SAFE_LATCHED，SEQ=10  | `A5 5A 01 81 10 03 20 03 00 D5 6C`       |
+| 旧 SELECT 右视，SEQ=43         | `A5 5A 01 04 43 02 03 03 04 BF`          |
+| 旧 SELECTED_VIEW_READY，SEQ=43 | `A5 5A 01 81 43 03 12 03 00 F0 AF`       |
+| 旧 TARGET START，SEQ=44        | `A5 5A 01 02 44 01 01 98 3D`             |
+| 旧 TARGET_READY，SEQ=44        | `A5 5A 01 81 44 03 01 01 00 B5 CA`       |
+| 旧视觉 dcx=-7,dcy=-17，SEQ=45  | `A5 5A 01 03 45 05 F9 FF EF FF 01 4E 21` |
+| ABORT_HOLD，SEQ=48             | `A5 5A 01 06 48 01 03 D8 CF`             |
+| FINISH_RETURN_HOME，SEQ=49     | `A5 5A 01 06 49 01 02 48 CF`             |
+| RETURN_HOME_DONE，SEQ=49       | `A5 5A 01 81 49 03 20 05 00 CA C1`       |
 
 旧“扫描 → SELECT”的整段脚本已撤下，表中旧 SELECT 仅供独立旧模式回归，不插入新自动链。扫描新版向量见 6.4；第 7 章目标 / 许可消息仍不可自拟发送。测试入口：`DEBUG/test_scan_uart.py`、`test_scan_workflow.py`、`test_scan_protocol.py`、`test_scan_console.py`；均为无端口离线测试。禁止重复固定示例启动新动作。
 

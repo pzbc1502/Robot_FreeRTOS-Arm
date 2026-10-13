@@ -85,17 +85,15 @@ int main(void) {
     target(1,50);assert(s_workflow.state==FLOW_IDLE && !ROBOT_TARGET_ENABLED && target_starts==1);
     deny(JETSON_ERROR_INVALID_STATE);cases++;
 
-    for(unsigned stage=0;stage<6;stage++) {
+    for(unsigned stage=0;stage<5;stage++) {
         fixture();
-        if(stage==0) start();
-        if(stage==1){start();complete_prepare();}
-        if(stage==2) front();
-        if(stage==3){front();control(2,1,100,21);}
-        if(stage==4) right();
-        if(stage==5){right();complete_capture();}
+        if(stage==1) start();
+        if(stage==2) scanning();
+        if(stage==3) right();
+        if(stage==4){right();complete_capture();}
         deny(JETSON_ERROR_INVALID_STATE);cases++;
     }
-    for(unsigned bad=0;bad<6;bad++) {
+    for(unsigned bad=0;bad<7;bad++) {
         fixture();final();
         if(bad==0)s_scan.id=0;
         if(bad==1)s_scan.flags=3;
@@ -103,6 +101,7 @@ int main(void) {
         if(bad==3)s_scan.error=JETSON_ERROR_MOTION_FAILED;
         if(bad==4)s_workflow.selected_view_id=3;
         if(bad==5)s_workflow.selected_view_id=0;
+        if(bad==6)s_scan.flags=7; // Old middle-confirmation mode cannot qualify.
         deny(bad==5 ? JETSON_ERROR_TARGET_GATE_DENIED : JETSON_ERROR_INVALID_STATE);cases++;
     }
     fixture();final();verify_ok=false;deny(JETSON_ERROR_POSE_INVALID);
@@ -118,7 +117,7 @@ int main(void) {
     fixture();final();aborted=true;deny(JETSON_ERROR_MOTION_ABORTED);cases++;
     fixture();final();s_workflow.fault_latched=true;deny(JETSON_ERROR_MOTION_ABORTED);cases++;
     fixture();final();target_start_ok=false;target(1,50);
-    assert(s_scan.state==JETSON_SCAN_FRONT_OBSERVE_HOLD && s_scan.flags==7);
+    assert(s_scan.state==JETSON_SCAN_FRONT_OBSERVE_HOLD && s_scan.flags==6);
     assert(reported(50,RA6_TO_JETSON_COMMAND_ACK,0,JETSON_ERROR_MOTION_FAILED));
     target_start_ok=true;target(1,51);assert(s_workflow.state==FLOW_TARGET_ACTIVE);cases++;
 

@@ -19,6 +19,7 @@ extern "C" {
 #define ROBOT_WORKFLOW_RETREAT_WAIT_MS        (2000u)
 #define ROBOT_WORKFLOW_MOTION_TIMEOUT_MS      (15000u)
 #define ROBOT_WORKFLOW_RESET_TIMEOUT_MS       (45000u)
+#define ROBOT_WORKFLOW_GLOBAL_RESET_REPLAY_MS (60000u)
 /* Stop confirmation observes feedback stability, not a hardware emergency stop. */
 #define ROBOT_WORKFLOW_STOP_TIMEOUT_MS        (2000u)
 #define ROBOT_WORKFLOW_STOP_SAMPLE_MS         (100u)
@@ -27,7 +28,6 @@ extern "C" {
 #define ROBOT_WORKFLOW_STOP_TOL_DEG           (0.10f)
 #define ROBOT_SCAN_PREPARE_TIMEOUT_MS          (60000u)
 #define ROBOT_SCAN_SEGMENT_TIMEOUT_MS          (30000u)
-#define ROBOT_SCAN_PHOTO_TIMEOUT_MS            (15000u)
 
 typedef enum
 {

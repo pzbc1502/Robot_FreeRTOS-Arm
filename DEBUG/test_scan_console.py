@@ -41,7 +41,7 @@ def main():
         def workflow(value,seq,error=0,event=0x20):
             w.on_serial_data("JETSON",wire.build_unified_frame(0x81,seq,bytes([event,value,error])))
             w._flush_logs()
-        assert not w.scan_photo_ok.isEnabled()
+        assert not hasattr(w, 'scan_photo_ok')
         w.scan_begin_measure();assert(w.automatic_demo_owner=="scan")
         workflow(2,w.scan_measure_seq);assert w.scan_measure_ready
         # Another round's late safe event must not arm the scan.
@@ -53,17 +53,15 @@ def main():
         assert len(w.jetson.frames)==before and not w.scan_target_start.isEnabled()
         start_seq=w.scan_client.start_seq
         for _ in range(600):assert w._next_unified_seq()!=start_seq
-        reply(1,1);reply(3,3);assert w.scan_photo_ok.isEnabled()
-        w.scan_photo(True); assert not w.scan_photo_ok.isEnabled()
-        photo_seq=w.scan_client.photo_seq
-        reply(1,4,1,2,photo_seq);reply(4,4,1,2,photo_seq)
-        reply(5,5,3);reply(6,10,7);assert not w.scan_client.confirmed
-        reply(8,11,7);assert w.scan_client.confirmed
+        reply(1,1);reply(2,2,0,0,w.scan_client.query(w._next_unified_seq())[4])
+        assert w.scan_client.state==2 and not w.scan_client.confirmed
+        reply(5,5,2);reply(6,10,6);assert not w.scan_client.confirmed
+        reply(8,11,6);assert w.scan_client.confirmed
         assert w.scan_target_start.isEnabled()
         before=len(w.jetson.frames);w.send_capture_ctrl(3,2)
         assert len(w.jetson.frames)==before
         # Full scan issued no extra serial HOME/SELECT.
-        assert [f[6] for f in w.jetson.frames if f[3]==7 and f[6]!=0]==[1,2]
+        assert [f[6] for f in w.jetson.frames if f[3]==7 and f[6]!=0]==[1]
         assert not [f for f in w.jetson.frames if f[3]==4]
         QMessageBox.question=lambda *_args:QMessageBox.No
         assert not w.send_target_ctrl(True) and len(w.jetson.frames)==before
@@ -82,7 +80,7 @@ def main():
         assert not w.scan_target_start.isEnabled()
         before=len(w.jetson.frames);assert not w.send_target_ctrl(True)
         assert len(w.jetson.frames)==before
-        reply(8,11,7)  # A late scan-ready event must not restore the consumed pose claim.
+        reply(8,11,6)  # A late scan-ready event must not restore the consumed pose claim.
         assert not w.scan_client.confirmed and w.scan_client.state==12
         w.stop_target_ctrl_with_reset()
         assert w.jetson.frames[-1][3]==2 and w.jetson.frames[-1][6]==0
@@ -96,14 +94,14 @@ def main():
         workflow(5,w.scan_finish_seq);assert w.automatic_demo_owner is None
         # Target result timeout aborts; a late success cannot undo cancellation.
         w.scan_begin_measure();workflow(2,w.scan_measure_seq);workflow(3,w.scan_measure_seq)
-        w.scan_start();reply(8,11,7);assert w.send_target_ctrl(True)
+        w.scan_start();reply(8,11,6);assert w.send_target_ctrl(True)
         stale_target_seq=w.scan_target_seq;w.scan_target_deadline=0;w._flush_logs()
         assert w.scan_abort_deadline is not None and not w.scan_target_handed_off
         workflow(1,stale_target_seq,event=4);assert not w.scan_target_handed_off
         workflow(6,w.scan_abort_seq);assert w.automatic_demo_owner is None
         # Matching rejection is delivered through the independent target receive path.
         w.scan_begin_measure();workflow(2,w.scan_measure_seq);workflow(3,w.scan_measure_seq)
-        w.scan_start();reply(8,11,7);assert w.send_target_ctrl(True)
+        w.scan_start();reply(8,11,6);assert w.send_target_ctrl(True)
         rejected_seq=w.scan_target_seq
         workflow(0,rejected_seq,error=0x0A,event=0x21)
         assert w.scan_abort_deadline is not None and not w.scan_target_handed_off
@@ -115,7 +113,7 @@ def main():
         workflow(1,abort_seq,event=0x21);assert w.automatic_demo_owner=="scan"
         w.scan_abort();assert w.scan_abort_seq==abort_seq and w.scan_abort_deadline==deadline
         reply(7,8,error=0x0F);assert w.automatic_demo_owner=="scan"
-        reply(8,11,7);assert not w.scan_client.confirmed
+        reply(8,11,6);assert not w.scan_client.confirmed
         workflow(6,abort_seq+1);assert w.automatic_demo_owner=="scan"
         workflow(6,w.scan_abort_seq);assert w.automatic_demo_owner is None
         w.automatic_demo_owner="scan";w.scan_abort();workflow(7,w.scan_abort_seq,error=6)
@@ -129,7 +127,7 @@ def main():
         w.scan_abort();workflow(6,w.scan_abort_seq);assert w.automatic_demo_owner is None
         # An uncertain partial write must request ABORT, not retain ready permission.
         w.scan_begin_measure();workflow(2,w.scan_measure_seq);workflow(3,w.scan_measure_seq)
-        w.scan_start();reply(8,11,7)
+        w.scan_start();reply(8,11,6)
         def fail_write(_frame,_label):raise OSError("simulated partial serial failure")
         w.jetson.write=fail_write
         assert not w.send_target_ctrl(True)

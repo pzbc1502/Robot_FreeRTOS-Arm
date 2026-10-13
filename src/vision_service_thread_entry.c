@@ -18,9 +18,10 @@ void vision_service_thread_entry(void * pvParameters)
         obs.now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
         obs.has_workflow_control = jetson_get_workflow_control(&obs.workflow_action,
                                                                &obs.workflow_seq);
-        bool priority_abort = obs.has_workflow_control &&
-                              (obs.workflow_action == JETSON_WORKFLOW_ACTION_ABORT_HOLD);
-        if (!priority_abort)
+        bool priority_control = obs.has_workflow_control &&
+            ((obs.workflow_action == JETSON_WORKFLOW_ACTION_ABORT_HOLD) ||
+             (obs.workflow_action == JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET));
+        if (!priority_control)
         {
             obs.has_scan_control = jetson_get_scan_control(&obs.scan_control);
             obs.has_capture_control = jetson_get_capture_control_ex(&obs.capture_action,

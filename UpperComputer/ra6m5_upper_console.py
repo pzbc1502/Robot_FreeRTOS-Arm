@@ -88,6 +88,7 @@ EVENT_COMMAND_ACK = 0x21
 WORKFLOW_START = 0x01
 WORKFLOW_FINISH = 0x02
 WORKFLOW_ABORT = 0x03
+WORKFLOW_GLOBAL_SOFT_RESET = 0x04
 WORKFLOW_START_ACCEPTED = 0x01
 WORKFLOW_MEASURE_READY = 0x02
 WORKFLOW_SAFE_LATCHED = 0x03
@@ -246,7 +247,7 @@ def build_unified_safe_distance_frame(distance_mm: int, valid: bool, seq: int) -
 
 
 def build_unified_workflow_control_frame(action: int, seq: int) -> bytes:
-    if action not in (WORKFLOW_START, WORKFLOW_FINISH, WORKFLOW_ABORT):
+    if action not in (WORKFLOW_START, WORKFLOW_FINISH, WORKFLOW_ABORT, WORKFLOW_GLOBAL_SOFT_RESET):
         raise ValueError("workflow action must be START, FINISH, or ABORT")
     return build_unified_frame(JETSON_MSG_WORKFLOW_CTRL, seq, bytes([action]))
 
@@ -1036,7 +1037,7 @@ class QtUpperConsole(QMainWindow):
         return group
 
     def _scan_group(self) -> QGroupBox:
-        group = QGroupBox("固定扫描与原定靶联调")
+        group = QGroupBox("连续扫描与原定靶联调")
         layout = QVBoxLayout(group)
         self.scan_stage = QLabel("未运行")
         self.scan_stage.setWordWrap(True)
@@ -1047,12 +1048,6 @@ class QtUpperConsole(QMainWindow):
         row.addWidget(self._button("启动扫描", self.scan_start))
         layout.addLayout(row)
         row = QHBoxLayout()
-        self.scan_photo_ok = self._button("保存成功（模拟）", lambda: self.scan_photo(True))
-        self.scan_photo_fail = self._button("保存失败", lambda: self.scan_photo(False))
-        self.scan_photo_ok.setEnabled(False)
-        self.scan_photo_fail.setEnabled(False)
-        row.addWidget(self.scan_photo_ok)
-        row.addWidget(self.scan_photo_fail)
         row.addWidget(self._button("查询状态", self.scan_query))
         row.addWidget(self._button("终止并保持", self.scan_abort))
         row.addWidget(self._button("结束回HOME", self.scan_finish))
@@ -1132,15 +1127,6 @@ class QtUpperConsole(QMainWindow):
         self._scan_write(frame)
         self.scan_stage.setText(f"扫描 {scan_id}：等待接受")
 
-    def scan_photo(self, success: bool) -> None:
-        try:
-            frame = self.scan_client.photo(success, self._next_unified_seq(), time.monotonic())
-            self._scan_write(frame)
-            self.scan_photo_ok.setEnabled(False)
-            self.scan_photo_fail.setEnabled(False)
-        except ValueError as exc:
-            self.emit_log("SCAN", "WARN", str(exc))
-
     def scan_query(self) -> None:
         self._scan_write(self.scan_client.query(self._next_unified_seq()))
 
@@ -1170,8 +1156,6 @@ class QtUpperConsole(QMainWindow):
         self.scan_target_handed_off = False
         self.scan_client.abort()
         self.scan_measure_ready = self.scan_distance_safe = False
-        self.scan_photo_ok.setEnabled(False)
-        self.scan_photo_fail.setEnabled(False)
         self.scan_stage.setText("已请求终止，等待确认；未确认前不放行手动运动")
         if not self._scan_write(build_unified_workflow_control_frame(WORKFLOW_ABORT, self.scan_abort_seq)):
             self._scan_stop_unconfirmed()
@@ -1566,7 +1550,7 @@ class QtUpperConsole(QMainWindow):
 
     def _next_unified_seq(self) -> int:
         with self.seq_lock:
-            reserved = {self.scan_client.start_seq, self.scan_client.photo_seq,
+            reserved = {self.scan_client.start_seq,
                         self.scan_measure_seq, self.scan_abort_seq, self.scan_finish_seq,
                         self.scan_target_seq} if self.automatic_demo_owner == "scan" else set()
             while True:
@@ -2582,9 +2566,6 @@ class QtUpperConsole(QMainWindow):
                 if self.scan_client.receive(status, time.monotonic()):
                     if not self.scan_client.cancelling:
                         self.scan_stage.setText(f"扫描 {status.scan_id}：{scan_wire.SCAN_STATES[status.scan_state]}；error=0x{status.error:02X}")
-                    ready = self.scan_client.active and not self.scan_client.cancelling and self.scan_client.state == 3 and not self.scan_client.seen_photo and self.scan_client.pending is None
-                    self.scan_photo_ok.setEnabled(ready)
-                    self.scan_photo_fail.setEnabled(ready)
                     if status.error or status.scan_state in (8, 9):
                         if self.automatic_demo_owner == "scan" and not self.scan_client.cancelling:
                             self.scan_abort()

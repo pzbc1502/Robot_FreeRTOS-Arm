@@ -91,7 +91,7 @@ int main(void) {
     assert(!jetson_get_scan_control(&c));
     now_ms=100;feed(heartbeat,sizeof(heartbeat));assert(jetson_is_link_alive(100));
     now_ms=701;feed(query,sizeof(query));assert(!jetson_is_link_alive(701));
-    jetson_send_scan_status(20,8,11,7,1,1,0,0x12345678);
+    jetson_send_scan_status(20,8,11,6,1,1,0,0x12345678);
     assert(tx_len==18 && tx[5]==10 && tx[12]==0x78 && tx[15]==0x12);
     assert(crc_modbus(tx+2,14)==((uint16_t)tx[16]|((uint16_t)tx[17]<<8)));
     puts("actual-C UART scan: fragmentation, CRC, FIFO, overflow, heartbeat isolation, TX passed");

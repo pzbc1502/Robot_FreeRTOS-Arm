@@ -118,7 +118,6 @@ static volatile robot_joint_result_t g_robot_joint_result = ROBOT_JOINT_RESULT_N
 static volatile robot_reset_result_t g_robot_reset_result = ROBOT_RESET_RESULT_NONE;
 static volatile robot_scan_result_t g_robot_scan_result = ROBOT_SCAN_RESULT_NONE;
 static float s_scan_left_target[ROBOT_MAX_JOINT_NUM];
-static float s_scan_front_target[ROBOT_MAX_JOINT_NUM];
 static volatile bool g_soft_reset_done = false;
 static volatile bool g_hard_reset_done = false;
 
@@ -1889,6 +1888,8 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
 {
     float start[ROBOT_MAX_JOINT_NUM] = {0};
     float finish[ROBOT_MAX_JOINT_NUM] = {0};
+    float through[ROBOT_MAX_JOINT_NUM] = {0};
+    float control[ROBOT_MAX_JOINT_NUM] = {0};
     float target[ROBOT_MAX_JOINT_NUM] = {0};
     float feedforward[ROBOT_MAX_JOINT_NUM] = {0};
     uint32_t missing = 0u;
@@ -1896,12 +1897,14 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
     bool ok = false;
     bool measure_ready = robot_scan_measure_pose_valid();
     const uint32_t period_ms = (uint32_t)ROBOT_INTERPOLATION_TIME_RESOLUTION;
-    const uint32_t duration_ms = ROBOT_SCAN_SEGMENT_DURATION_MS;
+    const bool continuous = (segment == ROBOT_SCAN_LEFT_TO_RIGHT);
+    const uint32_t duration_ms = continuous ? ROBOT_SCAN_DURATION_MS : ROBOT_SCAN_SEGMENT_DURATION_MS;
 
     BSP_Laser_Off();
     ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_VALID);
     ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
-    if ((duration_ms < 10000u) || (duration_ms > 20000u) ||
+    if ((ROBOT_SCAN_SEGMENT_DURATION_MS < 10000u) || (ROBOT_SCAN_SEGMENT_DURATION_MS > 20000u) ||
+        (continuous && ((duration_ms < 20000u) || (duration_ms > 40000u))) ||
         (period_ms == 0u) || ((duration_ms % period_ms) != 0u) ||
         !isfinite(ROBOT_SCAN_MAX_SPEED_DEG_S) || (ROBOT_SCAN_MAX_SPEED_DEG_S <= 0.0f) ||
         !isfinite(ROBOT_SCAN_MAX_TRACK_ERROR_DEG) || (ROBOT_SCAN_MAX_TRACK_ERROR_DEG <= 0.0f) ||
@@ -1923,27 +1926,37 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
             }
         }
         memcpy(finish, start, sizeof(start));
-    } else if (segment == ROBOT_SCAN_LEFT_TO_FRONT) {
+    } else if (continuous) {
         if (!robot_scan_feedback_matches(s_scan_left_target, start)) {
             goto finish;
         }
         memcpy(finish, s_scan_left_target, sizeof(finish));
-    } else if (segment == ROBOT_SCAN_FRONT_TO_RIGHT) {
-        if (!robot_scan_feedback_matches(s_scan_front_target, start)) {
-            goto finish;
-        }
-        memcpy(finish, s_scan_front_target, sizeof(finish));
     } else {
         goto finish;
     }
-    uint8_t point_id = (segment == ROBOT_SCAN_MEASURE_TO_LEFT) ? 1u :
-                      ((segment == ROBOT_SCAN_LEFT_TO_FRONT) ? 2u : 3u);
+    uint8_t point_id = continuous ? 3u : 1u;
     if (!robot_scan_apply_view(point_id, finish)) {
         goto finish;
     }
+    if (continuous) {
+        memcpy(through, s_scan_left_target, sizeof(through));
+        if (!robot_scan_apply_view(2u, through)) {
+            goto finish;
+        }
+    }
     for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
-        /* Quintic profile peak ds/dt = 1.875 / duration. */
-        if ((fabsf(finish[j] - start[j]) * 1875.0f / (float)duration_ms) >
+        float slope = fabsf(finish[j] - start[j]);
+        if (continuous) {
+            control[j] = 2.0f * through[j] - 0.5f * (start[j] + finish[j]);
+            float mapped = 0.0f;
+            if ((robot_joint_compare_angle(j, control[j], &mapped) != 0) ||
+                (fabsf(mapped - control[j]) > 0.001f)) {
+                goto finish;
+            }
+            /* Convex-hull position bound and endpoint derivative speed bound. */
+            slope = 2.0f * fmaxf(fabsf(control[j] - start[j]), fabsf(finish[j] - control[j]));
+        }
+        if ((slope * 1875.0f / (float)duration_ms) >
             ROBOT_SCAN_MAX_SPEED_DEG_S) {
             goto finish;
         }
@@ -1964,8 +1977,14 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
         float ds_dt = 30.0f * t * t * (1.0f - t) * (1.0f - t) *
                       1000.0f / (float)duration_ms;
         for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
-            target[j] = start[j] + (finish[j] - start[j]) * s;
-            feedforward[j] = (finish[j] - start[j]) * ds_dt;
+            if (continuous) {
+                target[j] = robot_view_arc_bezier(start[j], through[j], finish[j], s);
+                feedforward[j] = 2.0f * ((1.0f - s) * (control[j] - start[j]) +
+                                         s * (finish[j] - control[j])) * ds_dt;
+            } else {
+                target[j] = start[j] + (finish[j] - start[j]) * s;
+                feedforward[j] = (finish[j] - start[j]) * ds_dt;
+            }
         }
         if (!robot_pid_one_period_limited(target, feedforward, NULL,
                 ROBOT_ARM_JOINT_NUM, true, ROBOT_SCAN_MAX_SPEED_DEG_S,
@@ -1994,8 +2013,6 @@ static void robot_scan_segment_move(robot_scan_segment_t segment)
          ((HAL_GetTick() - begin_ms) <= (duration_ms + ROBOT_SCAN_BUDGET_MARGIN_MS));
     if (ok && (segment == ROBOT_SCAN_MEASURE_TO_LEFT)) {
         memcpy(s_scan_left_target, finish, sizeof(finish));
-    } else if (ok && (segment == ROBOT_SCAN_LEFT_TO_FRONT)) {
-        memcpy(s_scan_front_target, finish, sizeof(finish));
     }
 
 finish:
@@ -2007,9 +2024,7 @@ finish:
     }
     taskENTER_CRITICAL();
     g_robot_scan_result = (ok && !g_robot_motion_abort_requested)
-        ? ((segment == ROBOT_SCAN_MEASURE_TO_LEFT) ? ROBOT_SCAN_RESULT_LEFT_READY :
-           ((segment == ROBOT_SCAN_LEFT_TO_FRONT) ? ROBOT_SCAN_RESULT_FRONT_READY
-                                                : ROBOT_SCAN_RESULT_RIGHT_READY))
+        ? (continuous ? ROBOT_SCAN_RESULT_RIGHT_READY : ROBOT_SCAN_RESULT_LEFT_READY)
         : (aborted ? ROBOT_SCAN_RESULT_ABORTED : ROBOT_SCAN_RESULT_FAILED);
     ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_AUTO_BUSY);
     taskEXIT_CRITICAL();
@@ -3240,7 +3255,7 @@ int robot_send_scan_segment_event(robot_scan_segment_t segment)
 {
     if ((g_robot.event_queue == NULL) ||
         ((segment != ROBOT_SCAN_MEASURE_TO_LEFT) &&
-         (segment != ROBOT_SCAN_LEFT_TO_FRONT) && (segment != ROBOT_SCAN_FRONT_TO_RIGHT)) ||
+         (segment != ROBOT_SCAN_LEFT_TO_RIGHT)) ||
         robot_capture_is_active() || ROBOT_TARGET_ENABLED) {
         return -1;
     }
@@ -3260,10 +3275,8 @@ int robot_send_scan_segment_event(robot_scan_segment_t segment)
         (g_robot_reset_result == ROBOT_RESET_RESULT_RUNNING) ||
         (uxQueueMessagesWaiting(g_robot.event_queue) != 0u) ||
         (g_robot_scan_result == ROBOT_SCAN_RESULT_RUNNING) ||
-        ((segment == ROBOT_SCAN_LEFT_TO_FRONT) &&
-         (g_robot_scan_result != ROBOT_SCAN_RESULT_LEFT_READY)) ||
-        ((segment == ROBOT_SCAN_FRONT_TO_RIGHT) &&
-         (g_robot_scan_result != ROBOT_SCAN_RESULT_FRONT_READY));
+        ((segment == ROBOT_SCAN_LEFT_TO_RIGHT) &&
+         (g_robot_scan_result != ROBOT_SCAN_RESULT_LEFT_READY));
     BaseType_t queued = pdFAIL;
     if (!busy) {
         event.generation = g_robot_motion_generation;
