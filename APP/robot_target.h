@@ -27,7 +27,7 @@ extern "C" {
 #define TARGET_USE_VISUAL_SERVO      (1)        /* 1=使用视觉伺服闭环，0=不使用视觉伺服闭环 */
 #endif
 
-
+ 
 
 //视觉伺服参数
 #define TARGET_VS_KX_MM_S_PER_PX      (-0.09f)    /* 200 mm 工作距离：X 轴约 0.5/s 闭环增益 */

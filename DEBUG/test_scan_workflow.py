@@ -93,7 +93,11 @@ bool robot_capture_request(uint8_t action,uint8_t id) {
     capture_active=true; capture_result=ROBOT_CAPTURE_RESULT_RUNNING; return true;
 }
 void robot_capture_step(uint32_t t) { (void)t; }
-void robot_capture_cancel(void) { capture_active=false; capture_result=ROBOT_CAPTURE_RESULT_NONE; }
+void robot_capture_cancel(void) {
+    if(capture_active) {
+        capture_active=false; capture_result=ROBOT_CAPTURE_RESULT_ABORTED;
+    }
+}
 bool robot_capture_is_active(void) { return capture_active; }
 robot_capture_result_t robot_capture_result_consume(uint8_t *a,uint8_t *id) {
     *a=requested_action; *id=requested_point;

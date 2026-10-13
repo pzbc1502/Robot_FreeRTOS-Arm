@@ -773,6 +773,8 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
             {
                 robot_capture_cancel();
             }
+            /* A previous cancellation must not fault the newly accepted round. */
+            robot_capture_init();
             workflow_clear_round();
             s_workflow.fault_latched = false;
             s_workflow.workflow_seq = obs->workflow_seq;
