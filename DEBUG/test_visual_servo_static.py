@@ -313,9 +313,11 @@ def test_robot_visual_servo_runtime_exists() -> None:
                  ("g_robot.status", "ROBOT_STATUS_AUTO_BUSY"),
                  "auto busy guard")
     servo = function_body(ROBOT_C, "static int robot_visual_servo_run(void)")
-    require_call(servo, "robot_pid_one_period",
+    require_call(servo, "robot_pid_one_period_limited",
                  ("target_angle", "feedforward", "NULL",
-                  "ROBOT_ARM_JOINT_NUM", "true"),
+                  "ROBOT_ARM_JOINT_NUM", "true",
+                  "ROBOT_VISUAL_SERVO_MAX_JOINT_SPEED_DEG_S",
+                  "ROBOT_VISUAL_SERVO_MAX_TRACK_ERROR_DEG"),
                  "strict-feedback PID use")
     require_call(ROBOT_C, "robot_motion_abort_is_requested", (), "motion abort check")
     require_call(ROBOT_C, "robot_auto_result_set", ("ROBOT_AUTO_RESULT_RUNNING",),
@@ -467,9 +469,11 @@ def test_visual_servo_requires_fresh_feedback_for_pid() -> None:
                  ("(uint8_t) joint_num",), "zero velocity on stale feedback")
 
     servo = function_body(ROBOT_C, "static int robot_visual_servo_run(void)")
-    require_call(servo, "robot_pid_one_period",
+    require_call(servo, "robot_pid_one_period_limited",
                  ("target_angle", "feedforward", "NULL",
-                  "ROBOT_ARM_JOINT_NUM", "true"),
+                  "ROBOT_ARM_JOINT_NUM", "true",
+                  "ROBOT_VISUAL_SERVO_MAX_JOINT_SPEED_DEG_S",
+                  "ROBOT_VISUAL_SERVO_MAX_TRACK_ERROR_DEG"),
                  "visual servo strict-feedback PID call")
 
 

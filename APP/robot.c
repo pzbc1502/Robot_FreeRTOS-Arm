@@ -28,6 +28,9 @@ extern CAN_Context_t g_can_context;
 #define ROBOT_VISUAL_SERVO_FEEDBACK_FAIL_LIMIT (3U)
 #define ROBOT_VISUAL_SERVO_FK_IK_TOL_DEG    (3.0f)
 #define ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT    (3U)
+/* Software bounds only; physical visual-servo performance still needs validation. */
+#define ROBOT_VISUAL_SERVO_MAX_JOINT_SPEED_DEG_S (8.0f)
+#define ROBOT_VISUAL_SERVO_MAX_TRACK_ERROR_DEG   (8.0f)
 #define ROBOT_VIEW_ARC_DURATION_MIN_MS       (4000U)
 #define ROBOT_VIEW_ARC_DURATION_MAX_MS (8000U)
 #define ROBOT_VIEW_ARC_ENTRY_DURATION_MS (2000U)
@@ -2735,6 +2738,52 @@ static void robot_visual_servo_wait_period(uint32_t *next_tick)
     }
 }
 
+static bool robot_visual_servo_target_valid(const float candidate_T[4][4],
+                                          float result[ROBOT_MAX_JOINT_NUM],
+                                          const float last_target[ROBOT_MAX_JOINT_NUM],
+                                          bool first_update)
+{
+    float solved_T[4][4];
+    float max_step = ROBOT_VISUAL_SERVO_MAX_JOINT_SPEED_DEG_S *
+                     (float)ROBOT_VISUAL_SERVO_PERIOD_MS / 1000.0f + 0.001f;
+    if (first_update) {
+        max_step += ROBOT_VISUAL_SERVO_FK_IK_TOL_DEG;
+    }
+    for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
+        float mapped;
+        if (!isfinite(last_target[j]) ||
+            (robot_joint_compare_angle(j, result[j], &mapped) != 0)) {
+            LOG("[VS_GUARD] J%u invalid target=%.5f previous=%.5f\r\n",
+                (unsigned)(j + 1u), result[j], last_target[j]);
+            return false;
+        }
+        float delta = fabsf(robot_angle_diff(last_target[j], mapped));
+        if (delta > max_step) {
+            LOG("[VS_GUARD] J%u target step=%.5f max=%.5f previous=%.5f target=%.5f\r\n",
+                (unsigned)(j + 1u), delta, max_step, last_target[j], mapped);
+            return false;
+        }
+        result[j] = mapped;
+    }
+    /* J6 is fixed: validate the five-axis position and tool Z axis, not free roll. */
+    result[ROBOT_JOINT_6] = 0.0f;
+    if (robot_kinematics_forward(result, solved_T) != 0) {
+        LOG("[VS_GUARD] solved FK invalid\r\n");
+        return false;
+    }
+    for (uint8_t row = 0u; row < 3u; row++) {
+        if (!isfinite(candidate_T[row][3]) || !isfinite(candidate_T[row][2]) ||
+            (fabsf(solved_T[row][3] - candidate_T[row][3]) > 0.01f) ||
+            (fabsf(solved_T[row][2] - candidate_T[row][2]) > 0.001f)) {
+            LOG("[VS_GUARD] FK residual row=%u position=%.5f axis=%.5f\r\n",
+                (unsigned)row, solved_T[row][3] - candidate_T[row][3],
+                solved_T[row][2] - candidate_T[row][2]);
+            return false;
+        }
+    }
+    return true;
+}
+
 static int robot_visual_servo_run(void)
 {
     float target_angle[ROBOT_MAX_JOINT_NUM] = {0};
@@ -2752,6 +2801,9 @@ static int robot_visual_servo_run(void)
     if (!robot_visual_servo_sync_actual_pose(T_cmd)) {
         LOG("robot visual servo start pose sync failed\r\n");
         goto finish;
+    }
+    for (uint8_t j = 0u; j < ROBOT_ARM_JOINT_NUM; j++) {
+        last_target[j] = g_robot.joints[j].current_angle;
     }
 
     uint32_t next_tick = xTaskGetTickCount();
@@ -2799,6 +2851,11 @@ static int robot_visual_servo_run(void)
             LOG("robot visual servo inverse failed count=%u/%u\r\n",
                 (unsigned)ik_fail_count,
                 (unsigned)ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT);
+            if (ik_fail_count == 1u) {
+                LOG("[VS_IK] rejected target matrix and candidates (stop requested)\r\n");
+                robot_kinematics_show_T(candidate_T);
+                robot_kinematics_show_result();
+            }
             if (ik_fail_count >= ROBOT_VISUAL_SERVO_IK_FAIL_LIMIT) {
                 robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_IK);
                 break;
@@ -2809,7 +2866,18 @@ static int robot_visual_servo_run(void)
         }
 
         ik_fail_count = 0u;
-        result[ROBOT_JOINT_6] = 0.0f;
+        if (!robot_visual_servo_target_valid(candidate_T, result, last_target, first_update)) {
+            if (!robot_joint_velocity_zero_all(ROBOT_ARM_JOINT_NUM)) {
+                robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+                LOG("[VS_GUARD] zero velocity failed; skip diagnostic dump\r\n");
+            } else {
+                robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_IK);
+                LOG("[VS_IK] rejected solved target matrix and candidates (stop requested)\r\n");
+                robot_kinematics_show_T(candidate_T);
+                robot_kinematics_show_result();
+            }
+            break;
+        }
         for (int j = 0; j < ROBOT_ARM_JOINT_NUM; j++) {
             target_angle[j] = robot_angle_normalize(result[j]);
             if (first_update) {
@@ -2819,8 +2887,9 @@ static int robot_visual_servo_run(void)
             }
         }
 
-        if (!robot_pid_one_period(target_angle, feedforward, NULL,
-                                  ROBOT_ARM_JOINT_NUM, true)) {
+        if (!robot_pid_one_period_limited(target_angle, feedforward, NULL,
+                ROBOT_ARM_JOINT_NUM, true, ROBOT_VISUAL_SERVO_MAX_JOINT_SPEED_DEG_S,
+                ROBOT_VISUAL_SERVO_MAX_TRACK_ERROR_DEG)) {
             if (robot_motion_abort_is_requested()) {
                 LOG("robot visual servo PID aborted by safety request\r\n");
                 break;

@@ -16,6 +16,7 @@
 
 static struct robot_kinematics g_robot_kinematics = {0};
 static float g_current_joint_angle[ROBOT_MAX_JOINT_NUM] = {0};
+static uint32_t g_geometry_invalid_mask;
 
 /* IK 分支锁定（移植自 MechanicalArm Inverse_Kinematics::SelectBestSolution）：
  * 记录上一帧选中的解索引，对非上次解施加惩罚，避免路径经过对称分支边界时关节角突变。 */
@@ -191,47 +192,23 @@ static void robot_kinematics_calc_theta2(void)
 }
 
 static bool __robot_kinematics_calc_theta1(float theta2, float theta3, float *theta1)
-{	
+{
 	float px = g_robot_kinematics.T[0][3];
 	float py = g_robot_kinematics.T[1][3];
+	float radial = a2 * cosf(theta2) + a3 * cosf(theta2 - theta3)
+	             + d4 * sinf(theta2 - theta3);
+	float planar = hypotf(px, py);
+	float tolerance = 1e-3f + 16.0f * FLT_EPSILON * fmaxf(planar, fabsf(radial));
 
-	float diff_theta2_3 = theta2 - theta3;
-	float cos_diff_theta2_3 = cosf(diff_theta2_3);
-	float sin_diff_theta2_3 = sinf(diff_theta2_3);
-	float cos_theta2 = cosf(theta2);
-	float sin_theta2 = sinf(theta2);
-	float cos_theta3 = cosf(theta3);
-	float sin_theta3 = sinf(theta3);
-
-	float eq1 = a2 * cos_theta2 + a3 * cos_diff_theta2_3 + d4 * sin_diff_theta2_3;
-	float denom = (px + eq1);
-	if (fabsf(denom) < 1e-6f)
-	{
+	if ((theta1 == NULL) || !isfinite(radial) || !isfinite(planar) ||
+	    (planar < 1e-6f) || (fabsf(radial) < 1e-6f) ||
+	    (fabsf(fabsf(radial) - planar) > tolerance)) {
 		return false;
 	}
-	float ratio = (-px + eq1) / denom;
-	if (ratio < -1e-6f)
-	{
-		return false;
-	}
-	if (ratio < 0.0f)
-	{
-		ratio = 0.0f;
-	}
-	float u_theta1 = sqrtf(ratio);
 
-	float eq2 = (2.0f * u_theta1 * (cos_theta2 * (a2 + a3 * cos_theta3 - d4 * sin_theta3)
-							+ sin_theta2 * (d4 * cos_theta3 + a3 * sin_theta3)))
-			 / (__robot_sqrf(u_theta1) + 1.0f);
-	
-	// u_theta1需满足(eq2 == py)
-	if (fabsf(py - eq2) > ROBOT_ERROR_RANGE) {
-		u_theta1 = -u_theta1;
-	}
-
-	*theta1 = atanf(u_theta1) * 2.0f;
-
-	return true;
+	/* The signed radius selects the branch; a rounded Y residual must not flip J1. */
+	*theta1 = (radial < 0.0f) ? atan2f(-py, -px) : atan2f(py, px);
+	return isfinite(*theta1);
 }
 
 static void robot_kinematics_calc_theta1(void)
@@ -416,13 +393,27 @@ static void robot_kinematics_calc(void)
 
 void robot_kinematics_show_result(void)
 {
+	LOG("[IK] geometry_invalid=0x%02lX invalid=0x%02lX\r\n",
+	    (unsigned long)g_geometry_invalid_mask,
+	    (unsigned long)g_robot_kinematics.result_invalid_mask);
 	for (unsigned int i = 0; i < ROBOT_KINEMATICS_RESULT_NUM; i++) {
 		LOG("result[%d]: ", i);
 		for (unsigned int j = 0; j < ROBOT_MAX_JOINT_NUM; j++) {
-			LOG("%.2f ", g_robot_kinematics.result[i][j]);
+			LOG("%.9g ", g_robot_kinematics.result[i][j]);
 		}
 		int valid = g_robot_kinematics.result_invalid_mask & (1 << i) ? 0 : 1;
 		LOG(" valid:%d\n", valid);
+		if (!valid && !(g_geometry_invalid_mask & (1u << i))) {
+			for (unsigned int j = 0; j < ROBOT_MAX_JOINT_NUM; j++) {
+				float angle = g_robot_kinematics.result[i][j];
+				if (!isfinite(angle) || (angle < g_robot.joints[j].min_angle) ||
+				    (angle > g_robot.joints[j].max_angle)) {
+					LOG("[IK_REJECT] candidate=%u J%u angle=%.5f bounds=[%.2f,%.2f]\r\n",
+					    i, j + 1u, angle, g_robot.joints[j].min_angle,
+					    g_robot.joints[j].max_angle);
+				}
+			}
+		}
 	}
 }
 
@@ -659,6 +650,7 @@ int robot_kinematics_inverse(float *T_target, volatile float *result, int show)
 	memcpy(g_robot_kinematics.T, T_target, sizeof(float)*16);
 
 	robot_kinematics_calc();
+	g_geometry_invalid_mask = g_robot_kinematics.result_invalid_mask;
 	if (show) {
 		LOG("target:[%f %f %f]\n", T_target[4 * 0 + 3], T_target[4 * 1 + 3], T_target[4 * 2 + 3]);
 		LOG("robot kinematics result(rad):\n");
@@ -705,9 +697,10 @@ void robot_kinematics_cal_T(const float T_in[4][4], float T_out[4][4], struct po
 
 void robot_kinematics_show_T(float T[4][4])
 {
+	/* Nine significant digits retain float32 values for offline failure replay. */
 	for (unsigned int i = 0; i < 4; i++) {
 		for (unsigned int j = 0; j < 4; j++) {
-			LOG("%.2f ", T[i][j]);
+			LOG("%.9g ", T[i][j]);
 		}
 		LOG("\n");
 	}

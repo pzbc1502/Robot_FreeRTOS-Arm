@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def function(source, name):
     code = effective_c(source)
     match = re.search(r"(?m)^\s*(?:static\s+)?(?:bool|int|float|void|uint32_t|"
-                      r"robot_scan_result_t|robot_capture_result_t|robot_target_event_t|const capture_step_t \*)\s*" + name +
+                      r"robot_scan_result_t|robot_capture_result_t|robot_visual_servo_fault_t|"
+                      r"robot_target_event_t|const capture_step_t \*)\s*" + name +
                       r"\s*\([^;{}]*\)\s*\{", code)
     assert match, name
     start = match.start()
