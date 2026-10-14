@@ -183,7 +183,7 @@ static void workflow_enter(workflow_state_t state, uint32_t now_ms)
 {
     if (s_workflow.state != state)
     {
-        LOG("[WORKFLOW] %s -> %s\r\n",
+        LOG_FAST("[WORKFLOW] %s -> %s\r\n",
             workflow_state_name(s_workflow.state), workflow_state_name(state));
     }
     s_workflow.state = state;
@@ -468,11 +468,11 @@ static void workflow_stop_finish(uint8_t error_code, uint32_t now_ms)
         scan_invalidate(JETSON_SCAN_FAULT_HOLD, error_code);
         workflow_enter(FLOW_FAULT_HOLD, now_ms);
         (void)jetson_send_error(s_workflow.workflow_seq, error_code);
-        LOG("[WORKFLOW] stop unconfirmed error=0x%02X\r\n", error_code);
+        LOG_FAST("[WORKFLOW] stop unconfirmed error=0x%02X\r\n", error_code);
     }
     else
     {
-        LOG("[WORKFLOW] stop confirmed by fresh J1-J5 feedback\r\n");
+        LOG_FAST("[WORKFLOW] stop confirmed by fresh J1-J5 feedback\r\n");
         if (s_global_reset.active)
         {
             /* Discard canceled capture results only after the old executor has exited. */
@@ -632,7 +632,7 @@ static bool workflow_begin_retreat_step(uint32_t now_ms)
     s_workflow.state_deadline_ms = now_ms + ROBOT_WORKFLOW_MOTION_TIMEOUT_MS;
     workflow_enter(FLOW_RETREAT_WAIT_RESTART, now_ms);
     s_workflow.state_deadline_ms = now_ms + ROBOT_WORKFLOW_MOTION_TIMEOUT_MS;
-    LOG("[WORKFLOW] retreat step=%u target_y=%.2f\r\n",
+    LOG_FAST("[WORKFLOW] retreat step=%u target_y=%.2f\r\n",
         (unsigned)s_workflow.retreat_steps, retreat.y);
     return true;
 }
@@ -850,7 +850,7 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
             workflow_clear_round();
             workflow_enter(FLOW_ABORT_HOLD, obs->now_ms);
             command_ack(entry, true, JETSON_ERROR_NONE);
-            LOG("[WORKFLOW] global soft reset seq=%u waiting for stop\r\n",
+            LOG_FAST("[WORKFLOW] global soft reset seq=%u waiting for stop\r\n",
                 (unsigned)obs->workflow_seq);
             if (!stopped)
             {
@@ -978,7 +978,7 @@ static bool workflow_handle_target_command(const robot_workflow_obs_t *obs)
         s_scan.state = JETSON_SCAN_CHAIN_COMPLETED;
         s_scan.flags = 0u;
         s_scan.error = JETSON_ERROR_NONE;
-        LOG("[WORKFLOW] scan id=%lu handed to target at front pose\r\n",
+        LOG_FAST("[WORKFLOW] scan id=%lu handed to target at front pose\r\n",
             (unsigned long)s_scan.id);
     }
     workflow_enter(FLOW_TARGET_ACTIVE, obs->now_ms);
@@ -1263,7 +1263,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
     if (obs->distance_seq == 0u)
     {
         workflow_clear_safe_samples();
-        LOG("[SAFE] zero seq rejected\r\n");
+        LOG_FAST("[SAFE] zero seq rejected\r\n");
         (void)jetson_send_error(0u, JETSON_ERROR_INVALID_PARAM);
         return;
     }
@@ -1273,7 +1273,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
         if (!obs->distance_valid)
         {
             workflow_clear_safe_samples();
-            LOG("[SAFE] seq=%u invalid, streak cleared\r\n",
+            LOG_FAST("[SAFE] seq=%u invalid, streak cleared\r\n",
                 (unsigned)obs->distance_seq);
             return;
         }
@@ -1282,7 +1282,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
         {
             if (workflow_safe_seq_seen(obs->distance_seq))
             {
-                LOG("[SAFE] duplicate seq=%u ignored streak=%u\r\n",
+                LOG_FAST("[SAFE] duplicate seq=%u ignored streak=%u\r\n",
                     (unsigned)obs->distance_seq,
                     (unsigned)s_workflow.safe_sample_count);
                 return;
@@ -1294,7 +1294,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
                     obs->distance_seq;
                 s_workflow.safe_sample_count++;
             }
-            LOG("[SAFE] seq=%u mm=%u streak=%u/%u\r\n",
+            LOG_FAST("[SAFE] seq=%u mm=%u streak=%u/%u\r\n",
                 (unsigned)obs->distance_seq,
                 (unsigned)obs->distance_mm,
                 (unsigned)s_workflow.safe_sample_count,
@@ -1333,7 +1333,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
     }
     if (!obs->distance_valid)
     {
-        LOG("[SAFE] retreat measurement seq=%u invalid\r\n",
+        LOG_FAST("[SAFE] retreat measurement seq=%u invalid\r\n",
             (unsigned)obs->distance_seq);
         return;
     }
@@ -1346,7 +1346,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
         s_workflow.retreat_phase = RETREAT_PHASE_DONE;
         workflow_status(JETSON_WORKFLOW_RETREAT_DONE_WAIT_RESTART,
                         JETSON_ERROR_NONE);
-        LOG("[SAFE] retreat complete steps=%u mm=%u, wait restart\r\n",
+        LOG_FAST("[SAFE] retreat complete steps=%u mm=%u, wait restart\r\n",
             (unsigned)s_workflow.retreat_steps,
             (unsigned)obs->distance_mm);
         return;
@@ -1355,7 +1355,7 @@ static void workflow_handle_safe_distance(const robot_workflow_obs_t *obs)
     (void)jetson_send_status(obs->distance_seq,
                              RA6_TO_JETSON_SAFE_DISTANCE, 0u,
                              JETSON_ERROR_SAFE_DISTANCE_TOO_CLOSE);
-    LOG("[SAFE] retreat still close step=%u mm=%u\r\n",
+    LOG_FAST("[SAFE] retreat still close step=%u mm=%u\r\n",
         (unsigned)s_workflow.retreat_steps,
         (unsigned)obs->distance_mm);
     if (!workflow_begin_retreat_step(obs->now_ms))
@@ -1697,6 +1697,13 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
         workflow_reject_pending_commands(obs, JETSON_ERROR_HEARTBEAT_TIMEOUT);
         return;
     }
+    if ((s_workflow.state == FLOW_TARGET_ACTIVE) &&
+        (robot_visual_servo_fault_get() != ROBOT_VISUAL_SERVO_FAULT_NONE))
+    {
+        workflow_fault(JETSON_ERROR_MOTION_FAILED, obs->now_ms);
+        workflow_reject_pending_commands(obs, JETSON_ERROR_MOTION_FAILED);
+        return;
+    }
     if (workflow_is_active() && !s_stop.pending && robot_motion_abort_latched() &&
         (s_workflow.state != FLOW_HOMING) &&
         (s_workflow.state != FLOW_RETURN_HOME))
@@ -1762,6 +1769,7 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
             .dcx = obs->dcx,
             .dcy = obs->dcy,
             .now_ms = obs->now_ms,
+            .vision_received_ms = obs->vision_received_ms,
             .fire_button = obs->fire_button,
         };
         robot_target_step(&target_obs);

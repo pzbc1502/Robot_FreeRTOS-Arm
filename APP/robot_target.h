@@ -32,8 +32,8 @@ extern "C" {
 //视觉伺服参数
 #define TARGET_VS_KX_MM_S_PER_PX      (-0.09f)    /* 200 mm 工作距离：X 轴约 0.5/s 闭环增益 */
 #define TARGET_VS_KZ_MM_S_PER_PX      (0.09f)   /* 图像向下对应机械臂 -Z，保留已验证方向 */
-#define TARGET_VS_MAX_SPEED_MM_S      (1.0f)     /* 粗调速度上限，避免大误差阶段收敛过慢 */
-#define TARGET_VS_FINE_MAX_SPEED_MM_S (0.5f)     /* 30 px 内精调速度上限，约 1.2 px/200 ms */
+#define TARGET_VS_MAX_SPEED_MM_S      (1.2f)     /* 粗调速度上限，避免大误差阶段收敛过慢 */
+#define TARGET_VS_FINE_MAX_SPEED_MM_S (0.8f)     /* 30 px 内精调速度上限 */
 #define TARGET_VS_CMD_TIMEOUT_MS      (300u)     /* 容忍一次 200 ms 视觉帧抖动，仍小于视觉失效时间 */
 
 
@@ -44,7 +44,7 @@ extern "C" {
 #define TARGET_MAX_STEP_MM           (2.5f)      /* 单次视觉对准最大修正步长，单位 mm */
 #define TARGET_ALIGN_TOL_PX_COARSE   (30.0f)     /* 粗/精定位切换阈值，单位 px */
 #define TARGET_MAX_STEP_MM_FINE      (0.8f)      /* 精定位阶段单次最大修正步长，单位 mm */
-#define TARGET_ALIGN_TOL_PX          (2.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
+#define TARGET_ALIGN_TOL_PX          (4.0f)     /* 视觉误差进入该像素阈值内视为单帧对准 */
 #define TARGET_ALIGN_STABLE_COUNT    (3u)        /* 连续满足对准阈值的帧数，达到后进入确认状态 */  
 #define TARGET_CONFIRM_STABLE_COUNT  (2u)        /* 输出前二次确认所需连续新视觉帧数，3+2 共 5 帧 */
 #define TARGET_ALIGN_PERIOD_MS       (250u)      /* 视觉闭环小步修正周期，单位 ms */
@@ -84,6 +84,7 @@ typedef struct
     int16_t dcx;
     int16_t dcy;
     uint32_t now_ms;
+    uint32_t vision_received_ms;
     bool fire_button;
 } target_obs_t;
 

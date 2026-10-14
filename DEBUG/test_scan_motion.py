@@ -99,6 +99,7 @@ static void mock_log(const char *format, ...) {
     }
 }
 #define LOG(...) mock_log(__VA_ARGS__)
+#define LOG_FAST(...) LOG(__VA_ARGS__)
 #define taskENTER_CRITICAL() ((void)0)
 #define taskEXIT_CRITICAL() ((void)0)
 #define pdMS_TO_TICKS(x) (x)

@@ -455,11 +455,17 @@ bool BSP_CAN_WaitStopAll(uint8_t joint_num, uint32_t timeout_ms)
     while ((TickType_t)(xTaskGetTickCount() - start) <= timeout_ticks)
     {
         bool all_ok = true;
+        bool rejected = false;
         __disable_irq();
         for (uint8_t i = 0; i < joint_num; i++) {
-            if (g_can_context.motor_stop_flag[i] == 0u) { all_ok = false; break; }
+            if (g_can_context.motor_stop_flag[i] == 2u) { rejected = true; }
+            if (g_can_context.motor_stop_flag[i] != 1u) { all_ok = false; }
         }
         __enable_irq();
+        if (rejected) {
+            BSP_CAN_DrainRxSem();
+            return false;
+        }
         if (all_ok) {
             BSP_CAN_DrainRxSem();
             return true;
@@ -616,11 +622,19 @@ void canfd0_callback(can_callback_args_t *p_args)
             /* Per-motor stop reply (0xFE) flag. */
             if ((motor_addr >= 1u) &&
                 (motor_addr <= 6u) &&
-                (copy_len >= 2u) &&
+                (p_args->frame.id == ((uint32_t)motor_addr << 8)) &&
+                (p_args->frame.id_mode == CAN_ID_MODE_EXTENDED) &&
+                (p_args->frame.type == CAN_FRAME_TYPE_DATA) &&
+                (g_can_context.CAN_RxMsg.DLC == 3u) &&
                 (g_can_context.rxData[0] == 0xFEu) &&
-                (g_can_context.rxData[copy_len - 1u] == 0x6Bu))
+                (g_can_context.rxData[2] == 0x6Bu))
             {
-                g_can_context.motor_stop_flag[motor_addr - 1u] = 1u;
+                uint8_t index = (uint8_t)(motor_addr - 1u);
+                if (g_can_context.motor_stop_flag[index] != 2u)
+                {
+                    g_can_context.motor_stop_flag[index] =
+                        (g_can_context.rxData[1] == 0x02u) ? 1u : 2u;
+                }
             }
 
             /* --- 业务逻辑处理 --- */

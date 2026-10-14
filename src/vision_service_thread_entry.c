@@ -15,7 +15,6 @@ void vision_service_thread_entry(void * pvParameters)
         robot_workflow_obs_t obs = {0};
 
         jetson_vision_process();
-        obs.now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
         obs.has_workflow_control = jetson_get_workflow_control(&obs.workflow_action,
                                                                &obs.workflow_seq);
         bool priority_control = obs.has_workflow_control &&
@@ -29,13 +28,15 @@ void vision_service_thread_entry(void * pvParameters)
                                                                     &obs.capture_seq);
             obs.has_target_control = jetson_get_target_control_value(&obs.target_value,
                                                                      &obs.target_seq);
-            obs.has_vision = jetson_get_vision_error_ex(&obs.dcx, &obs.dcy,
+            obs.has_vision = jetson_get_vision_error_timed(&obs.dcx, &obs.dcy,
                                                         &obs.vision_valid,
-                                                        &obs.vision_seq);
+                                                        &obs.vision_seq,
+                                                        &obs.vision_received_ms);
             obs.has_distance = jetson_get_safe_distance_ex(&obs.distance_mm,
                                                            &obs.distance_valid,
                                                            &obs.distance_seq);
         }
+        obs.now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
         obs.heartbeat_alive = jetson_is_link_alive(obs.now_ms);
         obs.fire_button = BSP_Laser_FireKey_IsPressed();
         robot_workflow_step(&obs);

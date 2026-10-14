@@ -133,6 +133,7 @@ static void reset_fixture(void) {
 static void receive(uint32_t id, const uint8_t *data, uint8_t dlc) {
     can_callback_args_t args={.event=CAN_EVENT_RX_COMPLETE};
     args.frame.id=id; args.frame.data_length_code=dlc;
+    args.frame.id_mode=CAN_ID_MODE_EXTENDED;args.frame.type=CAN_FRAME_TYPE_DATA;
     memcpy(args.frame.data,data,dlc);
     ipsr=16; canfd0_callback(&args); ipsr=0;
 }

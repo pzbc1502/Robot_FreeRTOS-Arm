@@ -15,11 +15,15 @@ void BSP_UART_Init(void);
 
 /* 任务级线程安全打印 */
 void safe_printf(const char *format, ...);
+/* Best-effort task logging: never wait for a mutex or UART completion. */
+void safe_printf_nonblocking(const char *format, ...);
+uint32_t BSP_UART_LogDropped(void);
 /* 中断安全打印（可能存在冲突风险，仅用于紧急情况） */
 void safe_printf_from_isr(const char *format, ...);
 
 /* 打印宏封装，方便移植 */
 #define LOG(format, ...)            safe_printf(format, ##__VA_ARGS__)
+#define LOG_FAST(format, ...)       safe_printf_nonblocking(format, ##__VA_ARGS__)
 #define LOG_FROM_ISR(format, ...)   safe_printf_from_isr(format, ##__VA_ARGS__)
 
 

@@ -6,6 +6,7 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
+#include "queue.h"
 
 /* ============================================================ */
 /*                        变量定义                              */
@@ -23,6 +24,25 @@ static volatile bool g_uart1_tx_complete = true; // 发送完成标志
 static SemaphoreHandle_t g_log_mutex = NULL;
 /* 发送完成信号量，用于任务与中断同步 */
 static SemaphoreHandle_t g_uart1_tx_sem = NULL;
+static uint8_t s_uart1_tx_buffer[256];
+typedef struct { char text[256]; } uart_log_line_t;
+static QueueHandle_t s_log_queue;
+static TaskHandle_t s_log_task;
+static StaticQueue_t s_log_queue_control;
+static uint8_t s_log_queue_storage[8u * sizeof(uart_log_line_t)];
+static StaticTask_t s_log_task_control;
+static StackType_t s_log_task_stack[512];
+static volatile uint32_t s_log_dropped;
+
+static void uart_log_task(void *arg)
+{
+    (void)arg;
+    uart_log_line_t line;
+    while (xQueueReceive(s_log_queue, &line, portMAX_DELAY) == pdTRUE)
+    {
+        safe_printf("%s", line.text);
+    }
+}
 
 /* ============================================================ */
 /*                        初始化                                */
@@ -49,6 +69,16 @@ void BSP_UART_Init(void)
     /* 2. 初始化 MQTT 串口 */
     err = R_SCI_UART_Open(&robot_mqtt_ctrl, &robot_mqtt_cfg);
     if(FSP_SUCCESS != err) __BKPT(0);
+    if (s_log_queue == NULL)
+    {
+        s_log_queue = xQueueCreateStatic(8u, sizeof(uart_log_line_t),
+                                         s_log_queue_storage, &s_log_queue_control);
+    }
+    if ((s_log_queue != NULL) && (s_log_task == NULL))
+    {
+        s_log_task = xTaskCreateStatic(uart_log_task, "uart_log", 512u, NULL, 1u,
+                                       s_log_task_stack, &s_log_task_control);
+    }
 }
 
 /* ============================================================ */
@@ -100,6 +130,7 @@ void robot_uart1_callback(uart_callback_args_t * p_args)
         }
         case UART_EVENT_TX_COMPLETE:
         {
+            g_uart1_tx_complete = true;
             /* 根据调度器状态，选择不同的同步方式 */
             if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED)
             {
@@ -179,9 +210,24 @@ void safe_printf(const char *format, ...)
         {
             if (xSemaphoreTake(g_log_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
             {
-                xSemaphoreTake(g_uart1_tx_sem, 0); 
-                R_SCI_UART_Write(&robot_uart1_ctrl, (uint8_t *)buffer, len);
-                xSemaphoreTake(g_uart1_tx_sem, pdMS_TO_TICKS(100));
+                if (!g_uart1_tx_complete)
+                {
+                    (void)xSemaphoreTake(g_uart1_tx_sem, pdMS_TO_TICKS(100));
+                }
+                if (g_uart1_tx_complete)
+                {
+                    (void)xSemaphoreTake(g_uart1_tx_sem, 0);
+                    memcpy(s_uart1_tx_buffer, buffer, len);
+                    g_uart1_tx_complete = false;
+                    if (R_SCI_UART_Write(&robot_uart1_ctrl, s_uart1_tx_buffer, len) == FSP_SUCCESS)
+                    {
+                        (void)xSemaphoreTake(g_uart1_tx_sem, pdMS_TO_TICKS(100));
+                    }
+                    else
+                    {
+                        g_uart1_tx_complete = true;
+                    }
+                }
                 BSP_USB_CDC_WriteBestEffort(buffer, len);
                 xSemaphoreGive(g_log_mutex);
             }
@@ -206,6 +252,27 @@ void safe_printf(const char *format, ...)
         while(!g_uart1_tx_complete && timeout--);
         BSP_USB_CDC_WriteBestEffort(buffer, len);
     }
+}
+
+void safe_printf_nonblocking(const char *format, ...)
+{
+    uart_log_line_t line;
+    va_list args;
+    va_start(args, format);
+    vsnprintf(line.text, sizeof(line.text), format, args);
+    va_end(args);
+    if ((s_log_queue == NULL) || (s_log_task == NULL) ||
+        (xQueueSendToBack(s_log_queue, &line, 0u) != pdTRUE))
+    {
+        taskENTER_CRITICAL();
+        s_log_dropped++;
+        taskEXIT_CRITICAL();
+    }
+}
+
+uint32_t BSP_UART_LogDropped(void)
+{
+    return s_log_dropped;
 }
 
 /**

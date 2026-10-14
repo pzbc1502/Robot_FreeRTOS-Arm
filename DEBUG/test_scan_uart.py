@@ -28,6 +28,7 @@ static uint32_t now_ms;
 static uint8_t tx[64];
 static unsigned tx_len, tx_count;
 #define LOG(...) ((void)0)
+#define LOG_FAST(...) LOG(__VA_ARGS__)
 #define __disable_irq() ((void)0)
 #define __enable_irq() ((void)0)
 #define __DMB() ((void)0)
@@ -41,6 +42,7 @@ static unsigned tx_len, tx_count;
 #define pdMS_TO_TICKS(x) (x)
 #define portYIELD_FROM_ISR(x) ((void)(x))
 static uint32_t xTaskGetTickCount(void) { return now_ms; }
+#define xTaskGetTickCountFromISR xTaskGetTickCount
 static SemaphoreHandle_t xSemaphoreCreateBinary(void) { return (void*)1; }
 static int xSemaphoreTake(SemaphoreHandle_t s, unsigned timeout) { (void)s;(void)timeout;return 1; }
 static void xSemaphoreGiveFromISR(SemaphoreHandle_t s, BaseType_t *wake) { (void)s;*wake=0; }

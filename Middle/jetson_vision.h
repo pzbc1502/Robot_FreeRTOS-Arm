@@ -39,6 +39,8 @@ extern "C" {
 #define JETSON_MSG_ERROR           0xFEu
 
 #define JETSON_HEARTBEAT_TIMEOUT_MS 600u
+/* MCU receive age, not a new wire field or continuous distance threshold. */
+#define JETSON_SAMPLE_VALID_MS      500u
 
 #define RA6_TO_JETSON_SOF          0xCCu
 #define RA6_TO_JETSON_EOF          0xDDu
@@ -142,6 +144,8 @@ typedef struct
 void jetson_vision_init(void);
 void jetson_vision_process(void);
 bool jetson_get_vision_error_ex(int16_t *dcx, int16_t *dcy, bool *valid, uint8_t *seq);
+bool jetson_get_vision_error_timed(int16_t *dcx, int16_t *dcy, bool *valid,
+                                   uint8_t *seq, uint32_t *received_ms);
 bool jetson_get_target_control_value(uint8_t *value, uint8_t *seq);
 bool jetson_get_target_control_ex(bool *enable, uint8_t *seq);
 bool jetson_get_capture_control_ex(uint8_t *action, uint8_t *point_id, uint8_t *seq);

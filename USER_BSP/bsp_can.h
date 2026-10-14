@@ -46,7 +46,7 @@ typedef struct {
     volatile uint8_t motor_rx_flag[6];
 
     /* Per-motor stop reply (0xFE) flag, set by ISR. */
-    volatile uint8_t motor_stop_flag[6];
+    volatile uint8_t motor_stop_flag[6]; /* 0=waiting, 1=FE/02 success, 2=rejected */
 
     /* Only armed F6 transactions may publish a velocity acknowledgement. */
     volatile uint8_t motor_velocity_flag[6];

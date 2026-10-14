@@ -73,7 +73,8 @@ static void target_hold_visual_servo(void)
 
 static void target_set_event(robot_target_event_t event)
 {
-    if (s_target.event == ROBOT_TARGET_EVENT_NONE)
+    if ((s_target.event == ROBOT_TARGET_EVENT_NONE) ||
+        (event == ROBOT_TARGET_EVENT_FAULT))
     {
         s_target.event = event;
     }
@@ -90,7 +91,16 @@ static void enter_state(robot_target_state_t state, uint32_t now_ms)
 {
     if (s_target.state != state)
     {
-        LOG("[TARGET] %s -> %s\r\n",
+        if ((state != ROBOT_TARGET_STATE_CONFIRM) &&
+            (state != ROBOT_TARGET_STATE_OUTPUT))
+        {
+            /* Old fire permission cannot survive loss, recovery or output exit. */
+            s_target.fire_release_seen = false;
+            s_target.fire_debounced = true;
+            s_target.fire_raw_change_ms = now_ms;
+            ROBOT_TARGET_FIRE_ENABLE = false;
+        }
+        LOG_FAST("[TARGET] %s -> %s\r\n",
             target_state_name(s_target.state), target_state_name(state));
         reset_alignment_counts();
     }
@@ -116,6 +126,7 @@ static void target_update_fire_button(bool pressed, uint32_t now_ms)
     {
         s_target.fire_raw = pressed;
         s_target.fire_raw_change_ms = now_ms;
+        s_target.fire_debounced = false;
     }
 
     if ((now_ms - s_target.fire_raw_change_ms) >= TARGET_FIRE_KEY_DEBOUNCE_MS)
@@ -130,8 +141,9 @@ static void target_update_fire_button(bool pressed, uint32_t now_ms)
 
 static bool target_fire_allowed(void)
 {
-    return (s_target.fire_release_seen && s_target.fire_debounced) ||
-           ROBOT_TARGET_FIRE_ENABLE;
+    return s_target.fire_raw &&
+           ((s_target.fire_release_seen && s_target.fire_debounced) ||
+            ROBOT_TARGET_FIRE_ENABLE);
 }
 
 #if TARGET_USE_VISUAL_SERVO
@@ -156,7 +168,7 @@ static void target_update_visual_servo_velocity(uint32_t now_ms)
 
     robot_visual_servo_set_velocity(vx, 0.0f, vz);
     s_target.last_step_ms = now_ms;
-    LOG("[TARGET] visual servo vx=%.2f vz=%.2f dcx=%d dcy=%d\r\n",
+    LOG_FAST("[TARGET] visual servo vx=%.2f vz=%.2f dcx=%d dcy=%d\r\n",
         vx, vz, (int)s_target.dcx, (int)s_target.dcy);
 }
 #else
@@ -220,6 +232,7 @@ bool robot_target_start_at_current_pose(void)
     s_target.fire_debounced = true;
     s_target.fire_raw_change_ms = now_ms;
     s_target.fire_release_seen = false;
+    ROBOT_TARGET_FIRE_ENABLE = false;
     reset_alignment_counts();
     ROBOT_TARGET_ENABLED = true;
     enter_state(ROBOT_TARGET_STATE_WAIT_DETECT, now_ms);
@@ -278,13 +291,14 @@ void robot_target_step(const target_obs_t *obs)
 
     if (new_vision)
     {
-        if (obs->vision_valid)
+        if (obs->vision_valid &&
+            ((uint32_t)(now_ms - obs->vision_received_ms) <= TARGET_VISION_VALID_MS))
         {
             s_target.dcx = obs->dcx;
             s_target.dcy = obs->dcy;
-            s_target.last_vision_ms = now_ms;
+            s_target.last_vision_ms = obs->vision_received_ms;
             s_target.has_vision = true;
-            LOG("[TARGET] vision state=%s dcx=%d dcy=%d stable=%u\r\n",
+            LOG_FAST("[TARGET] vision state=%s dcx=%d dcy=%d stable=%u\r\n",
                 target_state_name(s_target.state), (int)s_target.dcx,
                 (int)s_target.dcy, (unsigned)s_target.stable_count);
         }
@@ -414,7 +428,7 @@ void robot_target_step(const target_obs_t *obs)
                 target_set_event(ROBOT_TARGET_EVENT_ALIGNMENT_LOST);
                 enter_state(ROBOT_TARGET_STATE_ALIGN, now_ms);
             }
-            else if (!target_fire_allowed() ||
+            else if (!s_target.fire_raw || !target_fire_allowed() ||
                      ((now_ms - s_target.enter_ms) >= TARGET_OUTPUT_MAX_MS))
             {
                 target_set_event(ROBOT_TARGET_EVENT_HOLD);

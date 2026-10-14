@@ -56,10 +56,14 @@ typedef struct
     uint8_t unified_crc_data[4u + JETSON_UNIFIED_MAX_PAYLOAD];
     uint8_t unified_crc_len;
     uint8_t unified_crc_lo;
+    uint32_t received_ms;
 } jetson_parser_t;
 
 static jetson_parser_t s_parser = { .state = JETSON_PARSER_WAIT_SOF };
 static uint8_t s_rx_ring[JETSON_RX_RING_SIZE];
+static uint32_t s_rx_time_ring[JETSON_RX_RING_SIZE];
+static uint32_t s_rx_byte_ms;
+static uint32_t s_previous_rx_byte_ms;
 static volatile uint32_t s_rx_write_index = 0u;
 static volatile uint32_t s_rx_read_index = 0u;
 static volatile uint32_t s_rx_byte_count = 0u;
@@ -74,11 +78,13 @@ static uint32_t s_last_uart_report_ms = 0u;
 static int16_t s_latest_dcx = 0;
 static int16_t s_latest_dcy = 0;
 static bool s_latest_vision_valid = false;
+static uint32_t s_latest_vision_received_ms;
 static uint8_t s_latest_vision_seq = 0u;
 static bool s_vision_seq_seen = false;
 static volatile bool s_new_error = false;
 static uint16_t s_latest_distance_mm = 0u;
 static bool s_latest_distance_valid = false;
+static uint32_t s_latest_distance_received_ms;
 static uint8_t s_latest_distance_seq = 0u;
 static bool s_distance_seq_seen = false;
 static volatile bool s_new_safe_distance = false;
@@ -137,6 +143,7 @@ static void parser_reset(void)
     s_parser.unified_len = 0u;
     s_parser.unified_crc_len = 0u;
     s_parser.unified_crc_lo = 0u;
+    s_parser.received_ms = 0u;
 }
 
 static void parser_start_unified_frame(void)
@@ -149,6 +156,7 @@ static void parser_start_unified_frame(void)
 static void parser_resync(uint8_t byte)
 {
     parser_reset();
+    s_parser.received_ms = s_rx_byte_ms;
 #if JETSON_LEGACY_PROTOCOL_ENABLE
     if (byte == JETSON_SOF)
     {
@@ -176,6 +184,8 @@ static bool jetson_rx_ring_pop(uint8_t *byte)
     }
 
     *byte = s_rx_ring[read_index];
+    s_previous_rx_byte_ms = s_rx_byte_ms;
+    s_rx_byte_ms = s_rx_time_ring[read_index];
     __DMB();
     s_rx_read_index = (read_index + 1u) & JETSON_RX_RING_MASK;
     return true;
@@ -235,7 +245,7 @@ static void handle_vision_error(int16_t dcx, int16_t dcy, bool valid, uint8_t se
     if (s_unified_protocol_active && s_vision_seq_seen &&
         (seq == s_latest_vision_seq))
     {
-        LOG("[JETSON_RX] duplicate vision seq=%u ignored\r\n", (unsigned)seq);
+        LOG_FAST("[JETSON_RX] duplicate vision seq=%u ignored\r\n", (unsigned)seq);
         return;
     }
 
@@ -243,12 +253,13 @@ static void handle_vision_error(int16_t dcx, int16_t dcy, bool valid, uint8_t se
     s_latest_dcx = dcx;
     s_latest_dcy = dcy;
     s_latest_vision_valid = valid;
+    s_latest_vision_received_ms = s_parser.received_ms;
     s_latest_vision_seq = seq;
     s_vision_seq_seen = true;
     s_new_error = true;
     __enable_irq();
 
-    LOG("[JETSON_RX] vision seq=%u valid=%u dcx=%d dcy=%d\r\n",
+    LOG_FAST("[JETSON_RX] vision seq=%u valid=%u dcx=%d dcy=%d\r\n",
         (unsigned)seq, valid ? 1u : 0u, (int)dcx, (int)dcy);
 }
 
@@ -262,10 +273,30 @@ static void handle_valid_error_frame(void)
 
 static void handle_target_control(uint8_t value, uint8_t seq)
 {
+    if (value > 1u)
+    {
+        (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_INVALID_PARAM);
+        return;
+    }
     if ((value != 0u) && workflow_motion_blocked())
     {
         (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
         return;
+    }
+    if (s_new_target_control)
+    {
+        if ((value == s_target_control_value) && (seq == s_target_control_seq))
+        {
+            return;
+        }
+        if ((value != 0u) || (s_target_control_value == 0u))
+        {
+            (void)jetson_send_status(seq, RA6_TO_JETSON_COMMAND_ACK, 0u, JETSON_ERROR_BUSY);
+            return;
+        }
+        /* A STOP replaces a pending START, never the other way round. */
+        (void)jetson_send_status(s_target_control_seq, RA6_TO_JETSON_COMMAND_ACK,
+                                0u, JETSON_ERROR_BUSY);
     }
     __disable_irq();
     s_target_control_value = value;
@@ -274,7 +305,7 @@ static void handle_target_control(uint8_t value, uint8_t seq)
     s_target_cancelled = false;
     __enable_irq();
 
-    LOG("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)value);
+    LOG_FAST("[JETSON_RX] target_ctrl=%u\r\n", (unsigned)value);
 }
 
 static void handle_safe_distance(uint16_t distance_mm, bool valid, uint8_t seq)
@@ -282,7 +313,7 @@ static void handle_safe_distance(uint16_t distance_mm, bool valid, uint8_t seq)
     if (s_unified_protocol_active && s_distance_seq_seen &&
         (seq == s_latest_distance_seq))
     {
-        LOG("[JETSON_RX] duplicate safe_distance seq=%u ignored\r\n",
+        LOG_FAST("[JETSON_RX] duplicate safe_distance seq=%u ignored\r\n",
             (unsigned)seq);
         return;
     }
@@ -290,12 +321,13 @@ static void handle_safe_distance(uint16_t distance_mm, bool valid, uint8_t seq)
     __disable_irq();
     s_latest_distance_mm = distance_mm;
     s_latest_distance_valid = valid;
+    s_latest_distance_received_ms = s_parser.received_ms;
     s_latest_distance_seq = seq;
     s_distance_seq_seen = true;
     s_new_safe_distance = true;
     __enable_irq();
 
-    LOG("[JETSON_RX] safe_distance=%u valid=%u\r\n",
+    LOG_FAST("[JETSON_RX] safe_distance=%u valid=%u\r\n",
         (unsigned)distance_mm,
         valid ? 1u : 0u);
 }
@@ -315,7 +347,7 @@ static void handle_capture_control(uint8_t action, uint8_t point_id, uint8_t seq
     s_capture_cancelled = false;
     __enable_irq();
 
-    LOG("[JETSON_RX] capture_ctrl action=%u point=%u\r\n",
+    LOG_FAST("[JETSON_RX] capture_ctrl action=%u point=%u\r\n",
         (unsigned)action,
         (unsigned)point_id);
 }
@@ -385,7 +417,7 @@ static void handle_workflow_control(uint8_t action, uint8_t seq)
         s_workflow_count++;
     }
 
-    LOG("[JETSON_RX] workflow_ctrl seq=%u action=%u\r\n",
+    LOG_FAST("[JETSON_RX] workflow_ctrl seq=%u action=%u\r\n",
         (unsigned)seq, (unsigned)action);
 }
 
@@ -416,7 +448,7 @@ static void mark_heartbeat_alive(void)
     __disable_irq();
     s_unified_protocol_active = true;
     s_heartbeat_seen = true;
-    s_last_heartbeat_ms = jetson_now_ms();
+    s_last_heartbeat_ms = s_parser.received_ms;
     s_last_unified_seq = s_parser.unified_seq;
     __enable_irq();
 }
@@ -425,7 +457,7 @@ static void handle_valid_unified_frame(void)
 {
     if (s_parser.unified_seq == 0u)
     {
-        LOG("[JETSON_RX] invalid zero seq type=0x%02X\r\n",
+        LOG_FAST("[JETSON_RX] invalid zero seq type=0x%02X\r\n",
             (unsigned)s_parser.unified_type);
         (void)jetson_send_error(0u, JETSON_ERROR_INVALID_PARAM);
         return;
@@ -439,7 +471,7 @@ static void handle_valid_unified_frame(void)
             if (s_parser.unified_len == 4u)
             {
                 mark_heartbeat_alive();
-                LOG("[JETSON_RX] heartbeat seq=%u\r\n", (unsigned)s_parser.unified_seq);
+                LOG_FAST("[JETSON_RX] heartbeat seq=%u\r\n", (unsigned)s_parser.unified_seq);
             }
             else
             {
@@ -553,7 +585,7 @@ static void handle_valid_unified_frame(void)
             break;
 
         default:
-            LOG("[JETSON_RX] unsupported unified type=0x%02X len=%u\r\n",
+            LOG_FAST("[JETSON_RX] unsupported unified type=0x%02X len=%u\r\n",
                 (unsigned)s_parser.unified_type,
                 (unsigned)s_parser.unified_len);
             (void)jetson_send_error(s_parser.unified_seq, JETSON_ERROR_UNKNOWN_TYPE);
@@ -566,6 +598,7 @@ static void process_byte(uint8_t byte)
     switch (s_parser.state)
     {
         case JETSON_PARSER_WAIT_SOF:
+            s_parser.received_ms = s_rx_byte_ms;
 #if JETSON_LEGACY_PROTOCOL_ENABLE
             if (byte == JETSON_SOF)
             {
@@ -749,13 +782,14 @@ static void process_byte(uint8_t byte)
                     (s_parser.unified_crc_lo == JETSON_UNIFIED_SOF0) &&
                     (byte == JETSON_UNIFIED_SOF1);
                 s_rx_crc_fail++;
-                LOG("[JETSON_RX] crc failed type=0x%02X rx=0x%04X calc=0x%04X\r\n",
+                LOG_FAST("[JETSON_RX] crc failed type=0x%02X rx=0x%04X calc=0x%04X\r\n",
                     (unsigned)s_parser.unified_type,
                     (unsigned)rx_crc,
                     (unsigned)calc_crc);
                 if (next_header_in_crc)
                 {
                     parser_reset();
+                    s_parser.received_ms = s_previous_rx_byte_ms;
                     parser_start_unified_frame();
                 }
                 else
@@ -784,6 +818,7 @@ void jetson_notify_rx_char_from_isr(uint8_t byte)
     }
 
     s_rx_ring[write_index] = byte;
+    s_rx_time_ring[write_index] = (uint32_t)(xTaskGetTickCountFromISR() * portTICK_PERIOD_MS);
     __DMB();
     s_rx_write_index = next_index;
 }
@@ -807,7 +842,9 @@ void jetson_vision_init(void)
     s_tx_timeout_count = 0u;
     s_last_uart_report_ms = 0u;
     s_new_error = false;
+    s_latest_vision_received_ms = 0u;
     s_new_safe_distance = false;
+    s_latest_distance_received_ms = 0u;
     s_new_capture_control = false;
     s_new_target_control = false;
     s_workflow_read = s_workflow_write = s_workflow_count = 0u;
@@ -829,7 +866,7 @@ void jetson_vision_init(void)
     fsp_err_t err = R_SCI_UART_Open(&robot_jeston_ctrl, &robot_jeston_cfg);
     if (FSP_SUCCESS != err)
     {
-        LOG("Jetson UART open failed, err=%d\r\n", (int)err);
+        LOG_FAST("Jetson UART open failed, err=%d\r\n", (int)err);
         __BKPT(0);
     }
 }
@@ -856,7 +893,7 @@ void jetson_vision_process(void)
     if ((uint32_t)(now_ms - s_last_uart_report_ms) >= JETSON_UART_REPORT_PERIOD_MS)
     {
         s_last_uart_report_ms = now_ms;
-        LOG("[JETSON_UART] rx_bytes=%lu frames_ok=%lu crc_fail=%lu overflow=%lu "
+        LOG_FAST("[JETSON_UART] rx_bytes=%lu frames_ok=%lu crc_fail=%lu overflow=%lu "
             "tx_ok=%lu tx_start_fail=%lu tx_timeout=%lu last_type=0x%02X last_seq=%u\r\n",
             (unsigned long)s_rx_byte_count,
             (unsigned long)s_rx_frames_ok,
@@ -867,11 +904,20 @@ void jetson_vision_process(void)
             (unsigned long)s_tx_timeout_count,
             (unsigned)s_last_unified_type,
             (unsigned)s_last_unified_seq);
+        LOG_FAST("[JETSON_UART] log_dropped=%lu\r\n", (unsigned long)BSP_UART_LogDropped());
     }
 }
 bool jetson_get_vision_error_ex(int16_t *dcx, int16_t *dcy, bool *valid, uint8_t *seq)
 {
-    if ((dcx == NULL) || (dcy == NULL) || (valid == NULL) || (seq == NULL))
+    uint32_t received_ms;
+    return jetson_get_vision_error_timed(dcx, dcy, valid, seq, &received_ms);
+}
+
+bool jetson_get_vision_error_timed(int16_t *dcx, int16_t *dcy, bool *valid,
+                                   uint8_t *seq, uint32_t *received_ms)
+{
+    if ((dcx == NULL) || (dcy == NULL) || (valid == NULL) || (seq == NULL) ||
+        (received_ms == NULL))
     {
         return false;
     }
@@ -884,7 +930,9 @@ bool jetson_get_vision_error_ex(int16_t *dcx, int16_t *dcy, bool *valid, uint8_t
     __disable_irq();
     *dcx = s_latest_dcx;
     *dcy = s_latest_dcy;
-    *valid = s_latest_vision_valid;
+    *received_ms = s_latest_vision_received_ms;
+    *valid = s_latest_vision_valid &&
+             ((uint32_t)(jetson_now_ms() - *received_ms) <= JETSON_SAMPLE_VALID_MS);
     *seq = s_latest_vision_seq;
     s_new_error = false;
     __enable_irq();
@@ -995,7 +1043,8 @@ bool jetson_get_safe_distance_ex(uint16_t *distance_mm, bool *valid, uint8_t *se
 
     __disable_irq();
     *distance_mm = s_latest_distance_mm;
-    *valid = s_latest_distance_valid;
+    *valid = s_latest_distance_valid &&
+             ((uint32_t)(jetson_now_ms() - s_latest_distance_received_ms) <= JETSON_SAMPLE_VALID_MS);
     *seq = s_latest_distance_seq;
     s_new_safe_distance = false;
     __enable_irq();
@@ -1093,11 +1142,6 @@ bool jetson_is_link_alive(uint32_t now_ms)
         return false;
     }
 
-    if (now_ms < s_last_heartbeat_ms)
-    {
-        return true;
-    }
-
     return ((now_ms - s_last_heartbeat_ms) <= JETSON_HEARTBEAT_TIMEOUT_MS);
 }
 
@@ -1156,14 +1200,14 @@ static bool jetson_send_tx_frame(uint32_t tx_len)
     if (FSP_SUCCESS != err)
     {
         s_tx_start_fail_count++;
-        LOG("Jetson TX start failed, err=%d\r\n", (int)err);
+        LOG_FAST("Jetson TX start failed, err=%d\r\n", (int)err);
         return false;
     }
 
     if (xSemaphoreTake(s_tx_sem, pdMS_TO_TICKS(20)) != pdTRUE)
     {
         s_tx_timeout_count++;
-        LOG("Jetson TX wait complete timeout\r\n");
+        LOG_FAST("Jetson TX wait complete timeout\r\n");
         return false;
     }
 

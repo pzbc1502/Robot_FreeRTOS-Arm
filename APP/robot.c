@@ -106,7 +106,7 @@ static struct joint g_joints_init[ROBOT_MAX_JOINT_NUM] = {
 	{90.0f,  MOTOR_DIR_CW,  99.99f, &JOINT_LIMIT_2,  88.0f, 180.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 2 */
 	{-90.0f, MOTOR_DIR_CW,  50.89f, &JOINT_LIMIT_3, -92.0f,  90.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 3 */
 	{0.0f,   MOTOR_DIR_CW,  51.0f,  &JOINT_LIMIT_6, -90.0f,  90.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 4 */
-	{90.0f,  MOTOR_DIR_CCW, 26.85f, &JOINT_LIMIT_5,   0.0f,  92.0f, DIR_POSITIVE, 0u, 0.0f, 0.0f},  /* 关节 5 */
+	{90.0f,  MOTOR_DIR_CCW, 26.85f, &JOINT_LIMIT_5,   0.0f,  95.0f, DIR_POSITIVE, 0u, 0.0f, 0.0f},  /* 关节 5 */
 	{0.0f,   MOTOR_DIR_CW,  51.0f,  &JOINT_LIMIT_4,   0.0f, 360.0f, DIR_NEGATIVE, 0u, 0.0f, 0.0f},  /* 关节 6 */
 };
 
@@ -418,6 +418,7 @@ static uint32_t robot_joint_rotate_to(uint32_t joint_id, enum dir dir, float ang
 	
    uint8_t _dir;
    struct joint *joint = &g_robot.joints[joint_index];
+    float next_angle = joint->current_angle;
 
     if (absolute) {
         float target_angle = angle;
@@ -455,11 +456,23 @@ static uint32_t robot_joint_rotate_to(uint32_t joint_id, enum dir dir, float ang
 		rel_angle = fabsf(rel_angle);
 
 		// LOG_FROM_ISR("id:%d current:%f, target:%f, rel:%f dir:%d\n", joint_id, joint->current_angle, angle, rel_angle, dir);
-		joint->current_angle = target_angle;
+		next_angle = target_angle;
 	} else {
 		/* 相对旋转分支：按给定角度增量改变当前角度 */
+        float current_angle;
+        if (robot_joint_compare_angle(joint_index, joint->current_angle, &current_angle) != 0) {
+            return 1;
+        }
+        next_angle = current_angle + ((dir == DIR_POSITIVE) ? angle : -angle);
+        /* Do not wrap a relative path back into a restricted joint's angle domain. */
+        if (!isfinite(next_angle) ||
+            (!robot_joint_is_full_turn(joint_index) &&
+             ((next_angle < joint->min_angle) || (next_angle > joint->max_angle)))) {
+            LOG("ERROR: rel target angle out of range, joint:%u target:%.2f\r\n",
+                (unsigned)joint_id, next_angle);
+            return 1;
+        }
         rel_angle = angle;
-        joint->current_angle += (dir == DIR_POSITIVE) ? angle : -angle;
 		_dir = (dir == DIR_POSITIVE) ? (uint8_t)joint->postive_direction : (uint8_t)(!joint->postive_direction);
 		if (rel_angle < 0) {
 			_dir = !_dir;
@@ -468,10 +481,17 @@ static uint32_t robot_joint_rotate_to(uint32_t joint_id, enum dir dir, float ang
 
 	/* 计算需要旋转的步数并发送位置控制命令 */
 	// 16 microstep * 200 步进分辨率示例，3200 步为一圈的细分值
-    uint32_t steps = (uint32_t)fabsf(roundf(rel_angle * joint->reduction_ratio * 3200.0f / 360.0f));
-	uint16_t _velocity = (uint16_t)fabsf(velocity * 600.0f * joint->reduction_ratio / 360.0f);
+    float step_count = fabsf(roundf(rel_angle * joint->reduction_ratio * 3200.0f / 360.0f));
+    float motor_velocity = fabsf(velocity * 600.0f * joint->reduction_ratio / 360.0f);
+    if (!isfinite(step_count) || (step_count >= 4294967296.0f) ||
+        !isfinite(motor_velocity) || (motor_velocity >= 65536.0f)) {
+        return 1;
+    }
+    uint32_t steps = (uint32_t)step_count;
+	uint16_t _velocity = (uint16_t)motor_velocity;
     uint8_t addr = (uint8_t)(joint_id + 1u); // 电机CAN地址从1开始
     ROBOT_STATUS_CLEAR(joint->status, ROBOT_STATUS_READY);
+    joint->current_angle = next_angle;
     Emm_V5_Pos_Control(addr, _dir, _velocity, (uint8_t)acceleration, steps, false, false);
     return 0;
 }
@@ -662,16 +682,21 @@ static bool robot_joint_hard_reset(void)
 
 static int robot_angle_map(float angle, float min_angle, float max_angle, float *result)
 {
-    if (result == NULL) {
+    if ((result == NULL) || !isfinite(angle) || !isfinite(min_angle) ||
+        !isfinite(max_angle) || (min_angle > max_angle)) {
 		return 1;
 	}
 
-	// 处理边界情况，避免限位附近的微小误差被卷绕到另一圈
-	if (fabsf(angle - min_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+    /* A legal IK angle must not be snapped using the motion arrival tolerance. */
+    if ((angle >= min_angle) && (angle <= max_angle)) {
+        *result = angle;
+        return 0;
+    }
+	if (fabsf(angle - min_angle) <= ROBOT_ERROR_RANGE) {
         *result = min_angle;
         return 0;
     }
-    if (fabsf(angle - max_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+    if (fabsf(angle - max_angle) <= ROBOT_ERROR_RANGE) {
         *result = max_angle;
         return 0;
     }
@@ -684,22 +709,20 @@ static int robot_angle_map(float angle, float min_angle, float max_angle, float 
     	tmp_angle -= 360.0f;
     }
 
-	// 再次处理边界情况
-	if (fabsf(tmp_angle - min_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+    if ((tmp_angle >= min_angle) && (tmp_angle <= max_angle)) {
+        *result = tmp_angle;
+        return 0;
+    }
+	if (fabsf(tmp_angle - min_angle) <= ROBOT_ERROR_RANGE) {
         *result = min_angle;
         return 0;
     }
-    if (fabsf(tmp_angle - max_angle) <= ROBOT_JOINT_ANGLE_ERROR_RANGE) {
+    if (fabsf(tmp_angle - max_angle) <= ROBOT_ERROR_RANGE) {
         *result = max_angle;
         return 0;
     }
 
-	if ((tmp_angle < min_angle) || (tmp_angle > max_angle)) {
-        return 1;
-    }
-
-    *result = tmp_angle;
-    return 0;
+    return 1;
 }
 
 static int robot_update_current_angle_retry(uint8_t joint_id, uint8_t retry_times)
@@ -2473,7 +2496,7 @@ static void robot_visual_servo_fault_set(robot_visual_servo_fault_t fault)
     taskEXIT_CRITICAL();
 
     if (first_fault) {
-        LOG("robot visual servo fault latched: %u\r\n", (unsigned)fault);
+        LOG_FAST("robot visual servo fault latched: %u\r\n", (unsigned)fault);
     }
 }
 
@@ -2927,8 +2950,17 @@ static int robot_visual_servo_run(void)
     }
 
 finish:
-    robot_joint_velocity_zero_all(ROBOT_ARM_JOINT_NUM);
-    robot_joint_stop_all(ROBOT_ARM_JOINT_NUM);
+    {
+        bool zero_sent = robot_joint_velocity_zero_all(ROBOT_ARM_JOINT_NUM);
+        bool stop_acknowledged = robot_joint_stop_all_checked(ROBOT_ARM_JOINT_NUM);
+        if (!zero_sent || !stop_acknowledged) {
+            BSP_Laser_Off();
+            robot_visual_servo_fault_set(ROBOT_VISUAL_SERVO_FAULT_FEEDBACK);
+            (void)robot_motion_abort();
+            LOG_FAST("[VS_STOP] stop unconfirmed zero=%u ack=%u; recovery required\r\n",
+                (unsigned)zero_sent, (unsigned)stop_acknowledged);
+        }
+    }
     taskENTER_CRITICAL();
     g_visual_servo.vx = 0.0f;
     g_visual_servo.vy = 0.0f;
@@ -3672,7 +3704,8 @@ static int robot_joint_stop(uint8_t joint_id)
 
     uint8_t rx[8] = {0};
     uint8_t dlc = 0;
-    if (!BSP_CAN_WaitReply(addr, 0xFEu, rx, &dlc, 50u, NULL))
+    if (!BSP_CAN_WaitReply(addr, 0xFEu, rx, &dlc, 50u, NULL) ||
+        (dlc != 3u) || (rx[0] != 0xFEu) || (rx[1] != 0x02u) || (rx[2] != 0x6Bu))
     {
         BSP_CAN_Unlock();
         LOG("joint %u stop timeout.\n", joint_id);

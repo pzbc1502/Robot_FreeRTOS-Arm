@@ -18,7 +18,8 @@ def build_source(checks=None):
     robot = (ROOT / "APP/robot.h").read_text(encoding="utf-8")
     enums = "\n".join(re.search(r'typedef enum\s*\{[^}]*\}\s*' + name + ';', robot).group()
                       for name in ("robot_auto_result_t", "robot_reset_result_t",
-                                   "robot_scan_segment_t", "robot_scan_result_t"))
+                                   "robot_scan_segment_t", "robot_scan_result_t",
+                                   "robot_visual_servo_fault_t"))
     return (PREAMBLE + enums + "\n" + stripped("Middle/jetson_vision.h") + stripped("APP/robot_workflow.h") +
             stripped("APP/robot_capture.h") + stripped("APP/robot_target.h") + MOCKS +
             stripped("APP/robot_workflow.c") + (CHECKS if checks is None else checks))
@@ -37,6 +38,7 @@ PREAMBLE = r'''
 #define ROBOT_STATUS_LIMIT_HAPPENED 2u
 #define ROBOT_STATUS_IS(s,f) (((s)&(f))!=0)
 #define LOG(...) ((void)0)
+#define LOG_FAST(...) LOG(__VA_ARGS__)
 #define pdPASS 1
 #define taskENTER_CRITICAL() ((void)0)
 #define taskEXIT_CRITICAL() ((void)0)
@@ -46,6 +48,7 @@ static bool aborted, busy, capture_active, verify_ok, queue_ok, laser;
 static int segment_count, capture_count, target_starts, laser_on_count, reset_count;
 static unsigned pose_verify_calls;
 static bool target_start_ok=true, target_output;
+static unsigned servo_fault;
 static bool stop_ack_ok=true, stop_feedback_ok=true;
 static bool receive_stop_hold;
 static unsigned abort_calls, feedback_calls;
@@ -111,6 +114,7 @@ bool robot_target_start_at_current_pose(void) { target_starts++; return target_s
 bool robot_target_output_requested(void) { return target_output; }
 robot_target_event_t robot_target_event_consume(void) { return ROBOT_TARGET_EVENT_NONE; }
 void robot_target_step(const target_obs_t *p) { (void)p; }
+static robot_visual_servo_fault_t robot_visual_servo_fault_get(void) { return (robot_visual_servo_fault_t)servo_fault; }
 typedef struct { uint8_t seq,event,state,flags,action,result,error; uint32_t id; } Report;
 static Report reports[512];
 static int report_count;
@@ -131,10 +135,10 @@ bool jetson_send_error(uint8_t seq,uint8_t error) { (void)seq;(void)error;return
 
 CHECKS = r'''
 static robot_workflow_obs_t obs;
-static void step(void) { mock_now=obs.now_ms; robot_workflow_step(&obs); assert(!laser && laser_on_count==0); obs.now_ms+=10; }
+static void step(void) { mock_now=obs.now_ms; if(obs.has_vision)obs.vision_received_ms=obs.now_ms; robot_workflow_step(&obs); assert(!laser && laser_on_count==0); obs.now_ms+=10; }
 static void fixture(void) {
     aborted=busy=capture_active=laser=false; verify_ok=queue_ok=true;
-    target_start_ok=true;target_output=false;pose_verify_calls=0;
+    target_start_ok=true;target_output=false;pose_verify_calls=0;servo_fault=0;
     stop_ack_ok=stop_feedback_ok=true; abort_calls=feedback_calls=status_count=0;
     receive_stop_hold=false;
     feedback_delay=0; memset(stop_angles,0,sizeof(stop_angles));

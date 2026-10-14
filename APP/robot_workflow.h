@@ -78,6 +78,7 @@ typedef struct
     int16_t dcx;
     int16_t dcy;
     uint8_t vision_seq;
+    uint32_t vision_received_ms;
 
     bool has_distance;
     bool distance_valid;
