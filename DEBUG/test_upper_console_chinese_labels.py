@@ -33,7 +33,17 @@ def test_capture_buttons_do_not_use_old_english_labels() -> None:
         assert label not in SOURCE
 
 
+def test_fire_key_prompts_use_p002_switch() -> None:
+    assert "视觉对准完成，请先断开再接通 P002 开关" in SOURCE
+    assert "激光已开启，断开 P002 开关可关闭" in SOURCE
+    assert 'QCheckBox("对准后提示拨动P002")' in SOURCE
+    assert "请按住 P000" not in SOURCE
+    assert "请松开 P000" not in SOURCE
+    assert "demo_prompt_p000" in SOURCE  # Keep the existing settings field compatible.
+
+
 if __name__ == "__main__":
     test_capture_buttons_are_chinese()
     test_capture_buttons_do_not_use_old_english_labels()
+    test_fire_key_prompts_use_p002_switch()
     print("upper console Chinese label checks passed")

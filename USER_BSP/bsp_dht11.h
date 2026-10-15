@@ -4,7 +4,7 @@
 #include "hal_data.h"
 #include <stdint.h>
 
-/* 选择接 DHT11 DATA 的引脚，这里默认 P0_02。若需更换，改成对应 BSP_IO_PORT_xx_PIN_xx。 */
+/* 历史驱动，当前无调用。P002 已分配给发射许可开关；重新启用 DHT11 前必须另选引脚。 */
 #ifndef DHT11_PIN
 #define DHT11_PIN   BSP_IO_PORT_00_PIN_02
 #endif

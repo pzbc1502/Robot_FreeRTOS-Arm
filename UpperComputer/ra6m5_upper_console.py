@@ -617,9 +617,9 @@ class FormalWorkflowRunner:
         self.start_vision(config.vision_steps)
         try:
             self._wait(EVENT_ALIGN_DONE, 1, target_seq, 30.0)
-            self.set_stage("视觉对准完成，请按住 P000 开启激光")
+            self.set_stage("视觉对准完成，请先断开再接通 P002 开关")
             self._wait(EVENT_OUTPUT, 1, target_seq, 60.0)
-            self.set_stage("激光已开启，请松开 P000")
+            self.set_stage("激光已开启，断开 P002 开关可关闭")
             self._wait(EVENT_OUTPUT, 0, target_seq, 60.0)
         finally:
             self.stop_vision()
@@ -1184,7 +1184,7 @@ class QtUpperConsole(QMainWindow):
 
         self.demo_send_enable = QCheckBox("先启动状态机")
         self.demo_wait_ready = QCheckBox("等待READY")
-        self.demo_prompt_p000 = QCheckBox("对准后提示按P000")
+        self.demo_prompt_p000 = QCheckBox("对准后提示拨动P002")
         self.demo_auto_stop = QCheckBox("输出关闭后自动停止")
         self.demo_use_current_prestart = QCheckBox("当前位置作为定靶起点")
         for checkbox, key, default in (
@@ -2314,9 +2314,9 @@ class QtUpperConsole(QMainWindow):
         self.emit_log("DEMO", "INFO", "开始发送视觉序列")
 
         if prompt_p000 and self._wait_ra6_event("ALIGN_DONE", 30.0):
-            self.emit_log("DEMO", "ACTION", "已对准：请按住 P000 KEY 允许激光输出。")
+            self.emit_log("DEMO", "ACTION", "已对准：请先断开再接通 P002 开关，满足全部联锁后允许输出。")
         if prompt_p000 and self._wait_ra6_event("OUTPUT_ON", 30.0):
-            self.emit_log("DEMO", "ACTION", "激光已输出：需要关闭时松开 P000 KEY。")
+            self.emit_log("DEMO", "ACTION", "激光已输出：需要关闭时断开 P002 开关。")
         if auto_stop and self._wait_ra6_event("OUTPUT_OFF", 60.0):
             self.stop_periodic_vision()
             self.stop_target_ctrl_with_reset()

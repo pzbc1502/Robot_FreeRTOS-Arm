@@ -9,7 +9,8 @@
 #endif
 
 #ifndef LASER_FIRE_KEY_PIN
-#define LASER_FIRE_KEY_PIN BSP_IO_PORT_00_PIN_00
+/* P002 -- switch -- GND; the internal pull-up makes an open switch inactive. */
+#define LASER_FIRE_KEY_PIN BSP_IO_PORT_00_PIN_02
 #endif
 
 #ifndef LASER_FIRE_KEY_ACTIVE_LEVEL

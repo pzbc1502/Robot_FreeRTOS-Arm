@@ -180,7 +180,7 @@ J4 使用 `JOINT_LIMIT_6`，J6 使用 `JOINT_LIMIT_4`，这是当前硬件接线
 | 4.8  | S 曲线轨迹规划       | 已完成         | 末端笛卡尔目标按正弦速度剖面生成平滑路径                               |
 | 4.9  | 到位确认             | 已完成         | 单关节和 AUTO 结束后都读取真实角度确认结果                             |
 | 4.10 | Jetson 视觉通信      | 已完成         | 解析视觉误差帧和状态机启停帧，回传 RA6M5 状态                          |
-| 4.11 | 激光定靶状态机       | 已完成         | 视觉闭环对准、P000 安全许可、P801 激光输出                             |
+| 4.11 | 激光定靶状态机       | 已完成         | 视觉闭环对准、P002 安全许可、P801 激光输出                             |
 | 4.12 | 末端精度与分辨率提升 | 已完成当前实现 | 两段式视觉步长、AUTO 防排队、输出前二次确认                            |
 
 ### 4.3 前馈 + P 控制
@@ -324,7 +324,7 @@ A5   5A   01  xx   xx  nn  ...        xx       xx
 
 `STATUS.event` 当前沿用现有语义：`1` 预定位完成，`2` 对准完成，`3` 输出开关，`4` 状态机启停结果，`5` 心跳响应。项目演示流程需要扩展时，保留 `0x10` 表示三视图拍摄点位到达，`0x11` 表示三视图拍摄完成，`0x12` 表示已进入 Jetson 选中的定靶预开始点。
 
-心跳建议由 Jetson 每 `100~200 ms` 发送一次。RA6M5 超过 `600 ms` 没收到心跳时，判定 Jetson 通信失效，执行：停止视觉伺服、关闭 P801、退出或冻结定靶状态机，并回传 `ERROR`。心跳不能替代 P000 发射许可，它只用于确认上位视觉链路仍然在线。
+心跳建议由 Jetson 每 `100~200 ms` 发送一次。RA6M5 超过 `600 ms` 没收到心跳时，判定 Jetson 通信失效，执行：停止视觉伺服、关闭 P801、退出或冻结定靶状态机，并回传 `ERROR`。心跳不能替代 P002 发射许可，它只用于确认上位视觉链路仍然在线。
 
 文本分隔协议如 `502,task,#` 便于人工调试，但正式 Jetson 通信用二进制长度 + CRC 更合适：解析边界清晰、抗串口噪声更强、不会因为逗号/换行丢失导致字段错位。上位机调试界面可以继续显示解析后的文本，不要求串口本身改成文本协议。
 
@@ -373,7 +373,7 @@ PROJECT_IDLE
 | 回 HOME      | 三张图拍完后执行`soft_reset`                                                                   | `soft reset final verify PASS`        |
 | Jetson 选择  | Jetson QT 同屏显示左/正/右三张图，医生只选择其中一张视图；目标痣由 Jetson 自动识别和跟踪       | Jetson 得到`point_id=1/2/3`           |
 | 进入预开始点 | Jetson 下发`point_id`，机械臂移动到对应左/正/右预开始点                                        | 回传`TARGET_PRESTART_READY`           |
-| 定靶输出     | 复用当前一键定靶：心跳、`TARGET_CTRL enable`、READY、视觉误差、ALIGN_DONE、P000、OUTPUT_ON/OFF | P000 松开或视觉超时后 P801 关闭       |
+| 定靶输出     | 复用当前一键定靶：心跳、`TARGET_CTRL enable`、READY、视觉误差、ALIGN_DONE、P002、OUTPUT_ON/OFF | P002 松开或视觉超时后 P801 关闭       |
 
 推荐协议复用 `TYPE=0x04 CAPTURE_CTRL`：
 
@@ -397,14 +397,14 @@ PROJECT_IDLE
 
 - 三视图拍摄和回 HOME 阶段必须保持 P801 关闭。
 - `point_id` 只允许 `1/2/3`，非法值直接丢弃并回传 `ERROR`。
-- 进入定靶预开始点后，激光仍必须满足现有条件：状态机启用、视觉稳定、P000 按住、无心跳超时、无限位。
-- `TARGET_CTRL disable`、心跳超时、限位或 P000 松开时，仍按现有规则关闭 P801 并退出输出。
+- 进入定靶预开始点后，激光仍必须满足现有条件：状态机启用、视觉稳定、P002 按住、无心跳超时、无限位。
+- `TARGET_CTRL disable`、心跳超时、限位或 P002 松开时，仍按现有规则关闭 P801 并退出输出。
 
 ### 4.11 激光定靶状态机
 
 **是什么**：一个 10 ms 周期运行的安全状态机，负责预定位、视觉对准、输出确认和激光开关。
 
-**好处**：激光不会被单帧视觉误差或串口误触发直接打开；必须视觉稳定、状态机启用、P000 按住后才允许 P801 输出。
+**好处**：激光不会被单帧视觉误差或串口误触发直接打开；必须视觉稳定、状态机启用、P002 按住后才允许 P801 输出。
 
 **核心方法**：状态按 `INIT -> PRE_POSITION -> WAIT_DETECT -> ALIGN -> CONFIRM -> OUTPUT -> DONE/RECOVER` 流转。`PRE_POSITION` 只负责粗定位到视觉可接管区域，AUTO 结束后由 `robot_auto_result_t` 回传 `OK/FAILED/ABORTED`；只有 `OK` 才进入 `WAIT_DETECT`。`WAIT_DETECT` 等待视觉误差期间每 `300 ms` 周期回传 READY，避免单帧状态回传丢失导致 Jetson 或上位机误判未就绪。最后对准由视觉伺服继续闭环完成，非输出状态持续关激光。
 
@@ -422,7 +422,7 @@ if ((s_target.confirm_stable_count >= TARGET_CONFIRM_STABLE_COUNT) && fire_allow
 }
 ```
 
-P801 为激光输出，高电平开；P000 为发射许可 KEY，默认按下低电平。P003 为“视觉已确认、可以按 P000”指示灯，P503 为“P801 已实际输出”确认灯，两者均为低电平点亮。P003 只在顶层状态为 `FLOW_TARGET_ACTIVE` 且收到 `ALIGN_DONE` 后点亮；P503 只跟随 `robot_workflow` 的真实 `laser_active` 状态。视觉丢失、误差超限、P000 松开、状态机退出或故障时相应指示灯熄灭。
+P801 为激光输出，高电平开；P002 为发射许可开关，输入内部上拉，接通GND为低电平有效，断开无效，不连接3V3。下文“按下/松开”对应拨动开关“接通/断开”；新一轮对准必须先断开再接通，持续接通不重复输出。P003 为“视觉已确认、可以接通 P002”指示灯，P503 为“P801 已实际输出”确认灯，两者均为低电平点亮。P003 只在顶层状态为 `FLOW_TARGET_ACTIVE` 且收到 `ALIGN_DONE` 后点亮；P503 只跟随 `robot_workflow` 的真实 `laser_active` 状态。视觉丢失、误差超限、P002 断开、状态机退出或故障时相应指示灯熄灭。接线见[P002迁移说明](2026-10-15-P002发射许可开关迁移.md)。
 
 ### 4.12 末端精度与分辨率提升
 
@@ -477,7 +477,7 @@ if (robot_is_auto_busy()) {
 | 输出前确认        |                                 `2` 帧 | `TARGET_CONFIRM_STABLE_COUNT`  |
 | 视觉有效期        |                               `500 ms` | 超时关闭输出                   |
 | 激光输出          |                                 `P801` | 高电平开                       |
-| 发射许可          |                                 `P000` | 按下低电平                     |
+| 发射许可          |                                 `P002` | 内部上拉，开关接地有效，断开无效 |
 | 可按键提示灯      |                                 `P003` | 低电平亮，收到 ALIGN_DONE 后亮 |
 | 输出确认灯        |                                 `P503` | 低电平亮，仅 P801 实际输出时亮 |
 
@@ -492,8 +492,8 @@ if (robot_is_auto_busy()) {
 5. `abs_rotate <joint> <angle>`：单关节命令能等待真实角度到位。
 6. Jetson 使用正式 `A5 5A + CRC16` 协议发送 `TARGET_CTRL enable=1`：安全条件满足时回传 `STATUS TARGET_CTRL_ON`。
 7. 连续视觉误差进入阈值：回传 `STATUS ALIGN_DONE`。
-8. 按住 P000 且二次确认完成：回传 `STATUS OUTPUT_ON`，P801 输出。
-9. 松开 P000、视觉超时、误差超限、限位触发或状态机关闭：P801 拉低并回传 `STATUS OUTPUT_OFF`。
+8. 按住 P002 且二次确认完成：回传 `STATUS OUTPUT_ON`，P801 输出。
+9. 松开 P002、视觉超时、误差超限、限位触发或状态机关闭：P801 拉低并回传 `STATUS OUTPUT_OFF`。
 10. 收到 `ALIGN_DONE` 后 P003 点亮；P801 实际打开后 P503 点亮；退出输出或异常时对应 LED 熄灭。
 
 ## 8. 控制流程
@@ -524,7 +524,7 @@ if (robot_is_auto_busy()) {
 | --------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | Qt 界面 | 接收医生的“开始”“采集人脸图”“选择视图”“开始点痣”“完成/返回”操作并显示状态 | 不直接控制电机或激光 GPIO                          |
 | Jetson  | 维护界面流程、采集 RGB-D/三视图、自动识别目标痣、计算`dcx/dcy`、组帧和解析回传      | 不下发任意笛卡尔坐标、关节角、电机速度或激光开命令 |
-| RA6M5   | 执行固化点位、复位、视觉伺服、状态机、安全判断和 P801 输出                          | 不因单帧视觉数据或单独按下 P000 直接打开激光       |
+| RA6M5   | 执行固化点位、复位、视觉伺服、状态机、安全判断和 P801 输出                          | 不因单帧视觉数据或单独按下 P002 直接打开激光       |
 
 RA6M5 是运动和激光安全的最终裁决者。Jetson 请求“开始”只表示请求，RA6M5 必须检查当前状态后决定接受或拒绝。
 
@@ -618,7 +618,7 @@ RA6M5 是运动和激光安全的最终裁决者。Jetson 请求“开始”只�
 |    4 | RA6M5 -> Jetson  | `STATUS TARGET_READY`                  | 定靶子状态机已进入`WAIT_DETECT`                          |
 |    5 | Jetson -> RA6M5  | 周期发送`VISION_ERROR dcx,dcy,valid=1` | 只在收到`TARGET_READY` 后开始发送                        |
 |    6 | RA6M5 -> Jetson  | `STATUS ALIGN_DONE`                    | 先连续 3 帧、再连续 2 帧满足`abs(dcx/dcy)<=5 px`         |
-|    7 | Qt/Jetson        | 提示操作者按住 P000                    | P000 只是发射许可，不直接控制 P801                       |
+|    7 | Qt/Jetson        | 提示操作者按住 P002                    | P002 只是发射许可，不直接控制 P801                       |
 
 启动请求至少需要同时满足：
 
@@ -648,7 +648,7 @@ workflow_active
 && vision_fresh
 && vision_in_tolerance
 && alignment_confirmed
-&& P000_pressed
+&& P002_pressed
 && !limit_triggered
 && !estop_active
 && !fault_latched
@@ -658,7 +658,7 @@ workflow_active
 - 输出期间：Jetson 继续发送视觉误差，仅用于安全监测，机械臂不在激光开启时运动。
 - 误差重新超限：RA6M5 立即关闭 P801，回传 `OUTPUT_OFF`，退回 `TARGET_ALIGN` 重新对准。
 - 视觉超过 `500 ms` 未更新或 `valid=0`：立即关闭 P801 并回传 `VISION_LOST`；机械臂原地保持，退回 `WAIT_DETECT`，视觉恢复后可继续，无需再次点击“开始点痣”。
-- P000 松开：立即关闭 P801 并回传 `OUTPUT_OFF`，进入 `TARGET_HOLD`。机械臂保持当前位置，等待 Qt“完成/返回”。
+- P002 松开：立即关闭 P801 并回传 `OUTPUT_OFF`，进入 `TARGET_HOLD`。机械臂保持当前位置，等待 Qt“完成/返回”。
 - 单次 P801 输出有独立硬上限 `TARGET_OUTPUT_MAX_MS=10000 ms`；到时自动关闭并进入 `TARGET_HOLD`，避免按键或上位机异常造成持续输出。
 - Qt“完成/返回”：Jetson 发送 `WORKFLOW_CTRL action=FINISH_RETURN_HOME`。RA6M5 关闭定靶状态机和 P801，执行 `soft_reset`；只有 final verify PASS 后才回传 `WORKFLOW RETURN_HOME_DONE` 并进入 `IDLE`。
 
@@ -692,8 +692,8 @@ workflow_active
 | 医生选择一张视图    | `CAPTURE_CTRL SELECT, point_id`         | `SELECTED_VIEW_READY`                           |
 | 点击“开始点痣”    | `TARGET_CTRL enable=1`                  | `TARGET_CTRL_ON`，随后 `TARGET_READY`           |
 | 自动识别目标        | 周期`VISION_ERROR`                      | 稳定后`ALIGN_DONE`                              |
-| 按住 P000           | 不发送激光开命令                        | 满足全部条件后`OUTPUT_ON`                       |
-| 松开 P000           | 无需 Qt 命令                            | `OUTPUT_OFF`，机械臂保持当前位置                |
+| 按住 P002           | 不发送激光开命令                        | 满足全部条件后`OUTPUT_ON`                       |
+| 松开 P002           | 无需 Qt 命令                            | `OUTPUT_OFF`，机械臂保持当前位置                |
 | 点击“完成/返回”   | `WORKFLOW_CTRL FINISH_RETURN_HOME`      | `RETURN_HOME_DONE`                              |
 | 点击取消/安全停止   | `WORKFLOW_CTRL ABORT_HOLD`              | `ABORTED_HOLD`，不自动 HOME                     |
 
@@ -756,7 +756,7 @@ TARGET_INIT
 | `FLOW_CAPTURE`              | 当前点完成后的下一点请求 | 单次执行一个固化视图点       | 三张图逐点完成         |
 | `FLOW_CAPTURE_HOME`         | 选择视图请求             | `soft_reset` 后等待选择      | 收到合法`point_id`     |
 | `FLOW_SELECTED_VIEW`        | `TARGET_CTRL START`      | 在选中点保持，激光关闭       | 安全门通过并启用定靶   |
-| `FLOW_TARGET_ACTIVE`        | 视觉帧、P000、停止/完成  | 运行定靶子状态机             | P000松开或完成/异常    |
+| `FLOW_TARGET_ACTIVE`        | 视觉帧、P002、停止/完成  | 运行定靶子状态机             | P002松开或完成/异常    |
 | `FLOW_TARGET_HOLD`          | 完成、取消、重新对准请求 | 激光关闭，机械臂保持         | 完成返回或重新对准     |
 | `FLOW_RETURN_HOME`          | 心跳                     | 关闭定靶并`soft_reset`       | final verify PASS      |
 | `FLOW_RETREAT_WAIT_RESTART` | 新`WORKFLOW START`       | 安全撤离后原地等待           | 人工重新开始           |
@@ -791,7 +791,7 @@ typedef struct
 3. `ABORT_HOLD`、完成返回和状态机关闭；
 4. 安全距离结果；
 5. 当前运动的 `OK/FAILED/ABORTED` 结果；
-6. 视觉超时、视觉误差和 P000；
+6. 视觉超时、视觉误差和 P002；
 7. 普通流程推进命令。
 
 所有打开激光的代码必须集中在一个安全出口中：先计算完整许可条件，再在临界区内确认 `workflow state` 未被并发改变，最后才能调用 `BSP_Laser_On()`。其他分支只能调用 `BSP_Laser_Off()`。
@@ -807,7 +807,7 @@ typedef struct
 | `APP/robot_target.c/.h`             | 只实现等待视觉、对准、确认、输出和保持子状态，不负责比赛开始或三视图流程                       |
 | `src/vision_service_thread_entry.c` | 将协议事件投递给`robot_workflow`，不复制业务判断                                               |
 | `APP/robot.c`                       | 提供可查询结果的 AUTO、`soft_reset` 和真正的运动中止接口                                       |
-| `USER_BSP/bsp_laser.c/.h`           | P801默认关闭、P000读取；不包含业务状态                                                         |
+| `USER_BSP/bsp_laser.c/.h`           | P801默认关闭、P002读取；不包含业务状态                                                         |
 | `USER_BSP/bsp_led.c/.h`             | P003/P503低电平指示输出；具体点亮条件由`robot_workflow`统一决定                                |
 
 ### 10.7 当前实现要点
@@ -824,7 +824,7 @@ typedef struct
 | 定靶起点       | `SELECT` 到位位置直接进入定靶，不重复执行 `TARGET_PRE_POSITION`                                                       |
 | 激光唯一出口   | 业务代码中只有`robot_workflow.c` 调用 `BSP_Laser_On()`；UART `laser_on/target_enable` 默认拒绝                        |
 | 异常中止       | 运动事件带 generation；中止后旧队列事件失效，心跳/限位/运动失败进入保持状态                                           |
-| 输出保护       | P000释放后再按下才允许输出；视觉超时/超限、P000松开或`10 s` 上限立即关闭                                              |
+| 输出保护       | P002释放后再按下才允许输出；视觉超时/超限、P002松开或`10 s` 上限立即关闭                                              |
 | 状态灯观察     | `ALIGN_DONE`后P003亮；P801真实输出时P503亮；丢失许可、退出或故障时熄灭                                                |
 
 ### 10.8 当前超时与参数速查
@@ -849,17 +849,17 @@ typedef struct
 2. 未完成公共测距或距离不安全，`TARGET_CTRL START` 必须被拒绝。
 3. 未选择视图或选中视图未到位，不能启动定靶。
 4. 未收到 `TARGET_READY` 时发送视觉误差，不能越级进入输出。
-5. P000单独按下不能开激光；全部条件满足后才允许输出。
-6. 输出时视觉超时、误差超限、P000松开、限位或心跳超时，P801必须立即拉低。
+5. P002单独按下不能开激光；全部条件满足后才允许输出。
+6. 输出时视觉超时、误差超限、P002松开、限位或心跳超时，P801必须立即拉低。
 7. 心跳恢复后不能自动续跑，必须由用户重新点击“开始”。
 8. 所有 HOME 回传都必须以 `soft reset final verify PASS` 为依据。
 9. 重发同一 `SEQ` 的控制命令不得造成重复运动。
 10. 任一错误路径都不得残留 `distance_safe_latched`、发射许可或激光高电平。
 
-PC 模拟 Jetson 联调使用 `DEBUG/formal_workflow_demo.py`。该脚本只发送正式 `A5 5A + CRC16` 帧，持续维持心跳，并按 ACK/业务完成状态逐步执行测距、三视图、视图选择、定靶、P000 和最终 HOME；旧 `target_state_demo.py` 仅适用于旧协议固件。
+PC 模拟 Jetson 联调使用 `DEBUG/formal_workflow_demo.py`。该脚本只发送正式 `A5 5A + CRC16` 帧，持续维持心跳，并按 ACK/业务完成状态逐步执行测距、三视图、视图选择、定靶、P002 和最终 HOME；旧 `target_state_demo.py` 仅适用于旧协议固件。
 
 ### 10.10 已知联调约束
 
-- 当前视觉线程尚未接入独立急停 GPIO，`estop_active` 观察量默认是 `false`；现阶段真实硬件安全输入是关节限位、P000、心跳和软件故障。若比赛要求独立急停，必须先分配 GPIO 并接入该观察量。
+- 当前视觉线程尚未接入独立急停 GPIO，`estop_active` 观察量默认是 `false`；现阶段真实硬件安全输入是关节限位、P002、心跳和软件故障。若比赛要求独立急停，必须先分配 GPIO 并接入该观察量。
 - UART/MQTT 的 `auto`、关节旋转、`soft_reset` 等手动调试命令仍可直接进入底层运动队列。正式 workflow 运行时不得从 COM7 或 MQTT 下发这些命令，比赛现场应关闭相关上位机自动发送；后续建议将手动运动限制为仅 `FLOW_IDLE` 可用。
 - 当前正式安全距离阈值为 `150 mm`。上板仍需用真实结构验证全部固化视图的最不利距离；若标定要求改变阈值，必须同步修改 RA6M5、`视觉协议.md`、Qt 提示和双方验收标准。

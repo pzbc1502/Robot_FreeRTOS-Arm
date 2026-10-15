@@ -52,7 +52,7 @@ extern "C" {
 #define TARGET_PRE_POSITION_TIMEOUT_MS (8000u)    /* 预定位最长等待时间，超时进入恢复 */
 #define TARGET_READY_STATUS_PERIOD_MS (300u)      /* 等待视觉误差时 READY 状态重发周期，单位 ms */
 #define TARGET_OUTPUT_MAX_MS          (10000u)    /* 单次激光输出硬上限，默认 10 秒 */
-#define TARGET_FIRE_KEY_DEBOUNCE_MS   (40u)       /* P000 按键去抖时间 */
+#define TARGET_FIRE_KEY_DEBOUNCE_MS   (40u)       /* 发射许可开关去抖时间 */
 
 typedef enum
 {

@@ -850,8 +850,9 @@
       <configSetting altId="irq0.mode.enabled" configurationId="irq0.mode"/>
       <configSetting altId="p000.input" configurationId="p000"/>
       <configSetting altId="p000.gpio_mode.gpio_mode_in" configurationId="p000.gpio_mode"/>
-      <configSetting altId="p002.output.low" configurationId="p002"/>
-      <configSetting altId="p002.gpio_mode.gpio_mode_out.low" configurationId="p002.gpio_mode"/>
+      <configSetting altId="p002.input" configurationId="p002"/>
+      <configSetting altId="p002.gpio_mode.gpio_mode_in" configurationId="p002.gpio_mode"/>
+      <configSetting altId="p002.gpio_pupd.gpio_pupd_ip_up" configurationId="p002.gpio_pupd"/>
       <configSetting altId="p003.output.high" configurationId="p003"/>
       <configSetting altId="p003.gpio_mode.gpio_mode_out.high" configurationId="p003.gpio_mode"/>
       <configSetting altId="p108.debug0.swdio" configurationId="p108"/>
