@@ -1767,7 +1767,7 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
          (obs->workflow_action == JETSON_WORKFLOW_ACTION_GLOBAL_SOFT_RESET));
     if (priority_control)
     {
-        /* ABORT works without heartbeat; reset checks it before accepting a HOME. */
+        /* ABORT works without heartbeat; remote reset still requires it. */
         workflow_handle_workflow_command(obs);
     }
     if (reset_requested)
@@ -1776,14 +1776,11 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
         {
             LOG_FAST("[WORKFLOW] P000 reset ignored: priority control or stop/reset busy\r\n");
         }
-        else if (!obs->heartbeat_alive)
-        {
-            LOG_FAST("[WORKFLOW] P000 reset rejected: heartbeat unavailable\r\n");
-        }
         else
         {
             bool stopped = workflow_begin_global_reset(0u, true, obs->now_ms);
-            LOG_FAST("[WORKFLOW] P000 long press: global soft reset waiting for stop\r\n");
+            LOG_FAST("[WORKFLOW] P000 long press: global soft reset heartbeat=%u waiting for stop\r\n",
+                     (unsigned)obs->heartbeat_alive);
             workflow_reject_pending_commands(obs, JETSON_ERROR_BUSY);
             if (!stopped)
             {
@@ -1796,7 +1793,9 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
             return;
         }
     }
-    if (workflow_is_active() && !obs->heartbeat_alive)
+    /* Only the operator's local reset may finish while Jetson is disconnected. */
+    if (workflow_is_active() && !obs->heartbeat_alive &&
+        !(s_global_reset.active && s_global_reset.local))
     {
         workflow_fault(JETSON_ERROR_HEARTBEAT_TIMEOUT, obs->now_ms);
         workflow_reject_pending_commands(obs, JETSON_ERROR_HEARTBEAT_TIMEOUT);

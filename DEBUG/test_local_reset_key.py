@@ -63,8 +63,10 @@ int main(void) {
 
     setup();obs.now_ms=UINT32_MAX-1000u;trigger();complete();cases++;
 
+    for(unsigned linked=0;linked<2;linked++)
     for(unsigned state=FLOW_IDLE;state<=FLOW_SCAN_READY;state++) {
         setup();arm();before_trigger();s_workflow.state=(workflow_state_t)state;
+        obs.heartbeat_alive=linked!=0;
         capture_active=busy=laser=true;s_workflow.laser_active=s_workflow.target_enabled=true;
         capture_result=ROBOT_CAPTURE_RESULT_RUNNING;
         s_scan.id=s_scan.high_water=100;s_scan.start_seq=20;s_scan.state=JETSON_SCAN_SCANNING;
@@ -88,45 +90,73 @@ int main(void) {
     s_stop.deadline=obs.now_ms+5000;stop_feedback_ok=false;step();
     assert(!s_global_reset.active && !abort_calls && !reset_count);
     s_stop.pending=false;s_stop.restart_locked=false;ticks(250);assert(!abort_calls);cases++;
-    setup();arm();before_trigger();s_workflow.state=FLOW_IDLE;obs.heartbeat_alive=false;step();
-    assert(!abort_calls && !reset_count);obs.heartbeat_alive=true;ticks(250);
-    assert(!abort_calls);trigger();complete();cases++;
+    setup();s_workflow.state=FLOW_IDLE;obs.heartbeat_alive=false;trigger();complete();ticks(400);
+    assert(!s_global_reset.local && reset_count==1 && abort_calls==1);
+    command(1,91);assert(reset_count==1 && reported(91,RA6_TO_JETSON_COMMAND_ACK,0,7));
+    command(4,92);assert(!s_global_reset.active && reported(92,RA6_TO_JETSON_COMMAND_ACK,0,7));
+    obs.heartbeat_alive=true;command(1,93);
+    assert(s_workflow.state==FLOW_HOMING && reset_count==2);cases++;
 
     for(unsigned safety=0;safety<2;safety++) {
         setup();arm();before_trigger();
+        obs.heartbeat_alive=false;
         obs.estop_active=safety==0;obs.limit_triggered=safety==1;step();
         assert(!s_global_reset.active && !reset_count);
         obs.estop_active=obs.limit_triggered=false;ticks(250);
         assert(!s_global_reset.active && !reset_count);cases++;
     }
+    for(unsigned stage=0;stage<2;stage++)
+    for(unsigned safety=0;safety<2;safety++) {
+        setup();trigger();obs.heartbeat_alive=false;if(stage)stopped();int homes=reset_count;
+        obs.estop_active=safety==0;obs.limit_triggered=safety==1;step();
+        assert(!s_global_reset.active && !s_global_reset.local && reset_count==homes);
+        assert(s_workflow.state==FLOW_FAULT_HOLD && receive_stop_hold && s_stop.restart_locked);
+        assert(reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,8));cases++;
+    }
 
-    setup();arm();before_trigger();stop_ack_ok=false;step();
-    assert(!s_global_reset.active && s_stop.restart_locked && !reset_count);
-    assert(reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,6));cases++;
-    setup();trigger();stop_feedback_ok=false;obs.now_ms=s_stop.deadline;step();
-    assert(!s_global_reset.active && !reset_count && s_stop.restart_locked);
-    assert(!reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_ABORTED_HOLD,0));cases++;
+    for(unsigned linked=0;linked<2;linked++) {
+        setup();arm();before_trigger();obs.heartbeat_alive=linked!=0;stop_ack_ok=false;step();
+        assert(!s_global_reset.active && !s_global_reset.local && s_stop.restart_locked && !reset_count);
+        assert(reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,6));cases++;
+        setup();trigger();obs.heartbeat_alive=linked!=0;
+        stop_feedback_ok=false;obs.now_ms=s_stop.deadline;step();
+        assert(!s_global_reset.active && !s_global_reset.local && !reset_count && s_stop.restart_locked);
+        assert(!reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_ABORTED_HOLD,0));cases++;
+    }
 
     for(unsigned stage=0;stage<2;stage++) {
-        setup();trigger();if(stage)stopped();int homes=reset_count;
+        setup();trigger();if(stage)stopped();
         obs.heartbeat_alive=false;step();
-        assert(!s_global_reset.active && receive_stop_hold && reset_count==homes);
-        assert(reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,7));cases++;
+        assert(s_global_reset.active && s_global_reset.local && receive_stop_hold);
+        if(!stage)stopped();
+        obs.heartbeat_alive=true;step();obs.heartbeat_alive=false;step();done(0);
+        assert(!s_global_reset.local && reset_count==1);
+        assert(!reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_FAULT_HOLD,7));cases++;
     }
+    for(unsigned linked=0;linked<2;linked++)
     for(unsigned failure=0;failure<4;failure++) {
-        setup();trigger();stopped();
+        setup();trigger();obs.heartbeat_alive=linked!=0;stopped();
         if(failure==0)reset_result=ROBOT_RESET_RESULT_FAILED;
         if(failure==1)reset_result=ROBOT_RESET_RESULT_ABORTED;
         if(failure==2)obs.now_ms=s_workflow.state_deadline_ms;
         if(failure==3){reset_result=ROBOT_RESET_RESULT_OK;verify_ok=false;}
-        step();assert(!s_global_reset.active && receive_stop_hold && s_stop.restart_locked);
+        step();assert(!s_global_reset.active && !s_global_reset.local && receive_stop_hold && s_stop.restart_locked);
         assert(!reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_RETURN_HOME_DONE,0));cases++;
     }
+    for(unsigned linked=0;linked<2;linked++)
     for(unsigned stage=0;stage<2;stage++) {
         setup();trigger();if(stage)stopped();int homes=reset_count;
-        command(3,90);assert(!s_global_reset.active);sample();sample();
+        obs.heartbeat_alive=linked!=0;
+        command(3,90);assert(!s_global_reset.active && !s_global_reset.local);sample();sample();
         assert(reset_count==homes && reported(90,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_ABORTED_HOLD,0));
         assert(!reported(0,RA6_TO_JETSON_WORKFLOW,JETSON_WORKFLOW_RETURN_HOME_DONE,0));cases++;
+    }
+    const workflow_state_t normal_states[]={FLOW_SCAN_ACTIVE,FLOW_TARGET_ACTIVE,FLOW_RETURN_HOME};
+    for(unsigned i=0;i<sizeof(normal_states)/sizeof(normal_states[0]);i++) {
+        setup();s_workflow.state=FLOW_IDLE;obs.heartbeat_alive=false;trigger();complete();
+        s_workflow.state=normal_states[i];step();
+        assert(s_workflow.state==FLOW_FAULT_HOLD && !s_global_reset.local && reset_count==1);
+        assert(receive_stop_hold && s_stop.restart_locked);cases++;
     }
     setup();arm();obs.reset_button=true;ticks(100);robot_workflow_step(NULL);
     ticks(250);assert(!abort_calls && !s_reset_key.armed);cases++;
@@ -141,17 +171,18 @@ INTEGRATION = (
     "received.heartbeat_alive=jetson_is_link_alive(now_ms);"
     "received.reset_button=key_pressed;received.reset_button_valid=key_valid;",
 ) + r'''
-static void hold_key(void) {
+static void hold_key(bool linked) {
     key_pressed=false;key_valid=true;
-    enqueue(heartbeat,sizeof(heartbeat));for(unsigned i=0;i<5;i++)pump();
+    if(linked)enqueue(heartbeat,sizeof(heartbeat));
+    for(unsigned i=0;i<5;i++)pump();
     key_pressed=true;
     for(unsigned i=0;i<200;i++) {
-        if(i%20==0)enqueue(heartbeat,sizeof(heartbeat));pump();
+        if(linked && i%20==0)enqueue(heartbeat,sizeof(heartbeat));pump();
     }
     assert(s_reset_key.armed && !s_global_reset.active);
 }
 int main(void) {
-    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;hold_key();
+    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;hold_key(true);
     int homes=reset_count,captures=capture_count,segments=segment_count;
     enqueue(heartbeat,sizeof(heartbeat));enqueue(start_frame,sizeof(start_frame));
     enqueue(target,sizeof(target));enqueue(capture,sizeof(capture));pump();
@@ -166,14 +197,39 @@ int main(void) {
     enqueue(fresh_start,sizeof(fresh_start));pump();
     assert(s_workflow.state==FLOW_HOMING && reset_count==homes+2);
 
-    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;hold_key();
+    fixture();scanning();jetson_vision_init();now_ms=obs.now_ms;hold_key(true);
     pump();reset_stopped();homes=reset_count;
     enqueue(abort_frame,sizeof(abort_frame));pump();
     now_ms=s_stop.next_sample;pump();now_ms=s_stop.next_sample;pump();
     reset_result=ROBOT_RESET_RESULT_OK;pump();
     assert(!s_global_reset.active && s_workflow.state==FLOW_ABORT_HOLD && reset_count==homes);
     assert(tx[4]==60 && tx[6]==0x20 && tx[7]==6 && tx[8]==0);
-    puts("actual-C P000 reset + UART: stale commands canceled and ABORT priority passed");
+
+    fixture();s_workflow.state=FLOW_IDLE;jetson_vision_init();now_ms=obs.now_ms;hold_key(false);
+    assert(!jetson_is_link_alive(now_ms));homes=reset_count;
+    enqueue(start_frame,sizeof(start_frame));enqueue(target,sizeof(target));pump();
+    assert(s_global_reset.active && s_global_reset.local && s_stop.pending && s_workflow_stop_hold);
+    assert(reset_count==homes && !target_starts);reset_stopped();
+    reset_result=ROBOT_RESET_RESULT_OK;pump();
+    assert(s_workflow.state==FLOW_IDLE && !s_global_reset.active && !s_global_reset.local);
+    assert(!s_workflow_stop_hold && !jetson_is_link_alive(now_ms) && reset_count==homes+1);
+    assert(tx[4]==0 && tx[6]==0x20 && tx[7]==5 && tx[8]==0);
+    enqueue(fresh_start,sizeof(fresh_start));pump();
+    assert(s_workflow.state==FLOW_IDLE && reset_count==homes+1 && tx[4]==22 && tx[8]==7);
+    enqueue(reset_frame,sizeof(reset_frame));pump();
+    assert(!s_global_reset.active && reset_count==homes+1 && tx[4]==70 && tx[8]==7);
+    enqueue(heartbeat,sizeof(heartbeat));enqueue(start_frame,sizeof(start_frame));pump();
+    assert(s_workflow.state==FLOW_IDLE && reset_count==homes+1);
+
+    fixture();s_workflow.state=FLOW_IDLE;jetson_vision_init();now_ms=obs.now_ms;hold_key(false);
+    pump();reset_stopped();homes=reset_count;
+    enqueue(abort_frame,sizeof(abort_frame));pump();
+    now_ms=s_stop.next_sample;pump();now_ms=s_stop.next_sample;pump();
+    reset_result=ROBOT_RESET_RESULT_OK;pump();
+    assert(!s_global_reset.active && !s_global_reset.local && s_workflow.state==FLOW_ABORT_HOLD);
+    assert(reset_count==homes && !jetson_is_link_alive(now_ms));
+    assert(tx[4]==60 && tx[6]==0x20 && tx[7]==6 && tx[8]==0);
+    puts("actual-C P000 reset + UART: 4 integrated online/offline scenarios passed");
 }
 '''
 
