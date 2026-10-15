@@ -20,6 +20,9 @@ extern "C" {
 #define ROBOT_WORKFLOW_MOTION_TIMEOUT_MS      (15000u)
 #define ROBOT_WORKFLOW_RESET_TIMEOUT_MS       (45000u)
 #define ROBOT_WORKFLOW_GLOBAL_RESET_REPLAY_MS (60000u)
+#define ROBOT_WORKFLOW_RESET_KEY_HOLD_MS      (2000u)
+#define ROBOT_WORKFLOW_RESET_KEY_RELEASE_MS   (40u)
+#define ROBOT_WORKFLOW_RESET_KEY_SAMPLE_GAP_MS (250u)
 /* Stop confirmation observes feedback stability, not a hardware emergency stop. */
 #define ROBOT_WORKFLOW_STOP_TIMEOUT_MS        (2000u)
 #define ROBOT_WORKFLOW_STOP_SAMPLE_MS         (100u)
@@ -56,6 +59,8 @@ typedef struct
     bool estop_active;
     bool limit_triggered;
     bool fire_button;
+    bool reset_button;
+    bool reset_button_valid;
 
     bool has_workflow_control;
     uint8_t workflow_action;

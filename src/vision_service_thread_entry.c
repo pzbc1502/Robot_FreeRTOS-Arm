@@ -39,6 +39,7 @@ void vision_service_thread_entry(void * pvParameters)
         obs.now_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
         obs.heartbeat_alive = jetson_is_link_alive(obs.now_ms);
         obs.fire_button = BSP_Laser_FireKey_IsPressed();
+        obs.reset_button_valid = BSP_GlobalResetKey_Read(&obs.reset_button);
         robot_workflow_step(&obs);
         vTaskDelay(pdMS_TO_TICKS(10));
     }

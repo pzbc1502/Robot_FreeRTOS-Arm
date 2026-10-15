@@ -17,9 +17,13 @@
 #define LASER_FIRE_KEY_ACTIVE_LEVEL BSP_IO_LEVEL_LOW
 #endif
 
+#define GLOBAL_RESET_KEY_PIN BSP_IO_PORT_00_PIN_00
+
 void BSP_Laser_Init(void);
 void BSP_Laser_On(void);
 void BSP_Laser_Off(void);
 bool BSP_Laser_FireKey_IsPressed(void);
+/* Returns sample validity; an IO error must not count as a released reset key. */
+bool BSP_GlobalResetKey_Read(bool *pressed);
 
 #endif /* BSP_LASER_H_ */

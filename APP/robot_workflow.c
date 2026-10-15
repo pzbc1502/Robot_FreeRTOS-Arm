@@ -83,9 +83,15 @@ static struct
 } s_stop;
 static struct
 {
-    bool active;
+    bool active, local;
     uint8_t seq;
 } s_global_reset;
+
+static struct
+{
+    bool armed, holding, releasing, sampled;
+    uint32_t press_ms, release_ms, sample_ms;
+} s_reset_key;
 
 /* Round identity survives command-cache expiry. IDs increase within one boot. */
 static struct
@@ -388,6 +394,55 @@ static bool workflow_time_reached(uint32_t now_ms, uint32_t deadline_ms)
     return ((int32_t)(now_ms - deadline_ms) >= 0);
 }
 
+static bool workflow_reset_key_request(const robot_workflow_obs_t *obs)
+{
+    if (!obs->reset_button_valid ||
+        (s_reset_key.sampled && ((uint32_t)(obs->now_ms - s_reset_key.sample_ms) >
+                                ROBOT_WORKFLOW_RESET_KEY_SAMPLE_GAP_MS)))
+    {
+        /* An unobserved interval cannot prove a release or a continuous hold. */
+        memset(&s_reset_key, 0, sizeof(s_reset_key));
+    }
+    if (!obs->reset_button_valid)
+    {
+        return false;
+    }
+    s_reset_key.sampled = true;
+    s_reset_key.sample_ms = obs->now_ms;
+    if (!obs->reset_button)
+    {
+        s_reset_key.holding = false;
+        if (!s_reset_key.releasing)
+        {
+            s_reset_key.releasing = true;
+            s_reset_key.release_ms = obs->now_ms;
+        }
+        if ((uint32_t)(obs->now_ms - s_reset_key.release_ms) >=
+            ROBOT_WORKFLOW_RESET_KEY_RELEASE_MS)
+        {
+            s_reset_key.armed = true;
+        }
+        return false;
+    }
+    s_reset_key.releasing = false;
+    if (!s_reset_key.armed)
+    {
+        return false;
+    }
+    if (!s_reset_key.holding)
+    {
+        s_reset_key.holding = true;
+        s_reset_key.press_ms = obs->now_ms;
+    }
+    if ((uint32_t)(obs->now_ms - s_reset_key.press_ms) < ROBOT_WORKFLOW_RESET_KEY_HOLD_MS)
+    {
+        return false;
+    }
+    s_reset_key.armed = false;
+    s_reset_key.holding = false;
+    return true;
+}
+
 static void workflow_status(uint8_t value, uint8_t error_code)
 {
     command_business(JETSON_MSG_WORKFLOW_CTRL, s_workflow.workflow_seq,
@@ -431,15 +486,48 @@ static void workflow_global_reset_finish(uint8_t error_code, uint32_t now_ms)
     {
         return;
     }
-    command_business(JETSON_MSG_WORKFLOW_CTRL, s_global_reset.seq, RA6_TO_JETSON_WORKFLOW,
-        (error_code == JETSON_ERROR_NONE) ? JETSON_WORKFLOW_RETURN_HOME_DONE :
-                                          JETSON_WORKFLOW_FAULT_HOLD, error_code);
-    command_cache_entry_t *entry = command_find(JETSON_MSG_WORKFLOW_CTRL, s_global_reset.seq);
-    if (entry != NULL)
+    uint8_t value = (error_code == JETSON_ERROR_NONE) ? JETSON_WORKFLOW_RETURN_HOME_DONE :
+                                                       JETSON_WORKFLOW_FAULT_HOLD;
+    if (s_global_reset.local)
     {
-        entry->received_ms = now_ms;
+        (void)jetson_send_status(0u, RA6_TO_JETSON_WORKFLOW, value, error_code);
+    }
+    else
+    {
+        command_business(JETSON_MSG_WORKFLOW_CTRL, s_global_reset.seq,
+                         RA6_TO_JETSON_WORKFLOW, value, error_code);
+        command_cache_entry_t *entry = command_find(JETSON_MSG_WORKFLOW_CTRL, s_global_reset.seq);
+        if (entry != NULL)
+        {
+            entry->received_ms = now_ms;
+        }
     }
     s_global_reset.active = false;
+    s_global_reset.local = false;
+}
+
+static bool workflow_begin_global_reset(uint8_t seq, bool local, uint32_t now_ms)
+{
+    workflow_force_laser_off(JETSON_ERROR_NONE);
+    robot_target_stop_hold();
+    if (robot_capture_is_active())
+    {
+        robot_capture_cancel();
+    }
+    s_global_reset.active = true;
+    s_global_reset.local = local;
+    s_global_reset.seq = seq;
+    s_workflow.workflow_seq = seq;
+    s_stop.pending = s_stop.restart_locked = true;
+    s_stop.stable_count = 0u;
+    s_stop.deadline = now_ms + ROBOT_WORKFLOW_STOP_TIMEOUT_MS;
+    s_stop.next_sample = now_ms;
+    jetson_set_workflow_stop_hold(true);
+    bool stopped = robot_motion_abort();
+    scan_invalidate(JETSON_SCAN_ABORTED_HOLD, JETSON_ERROR_MOTION_ABORTED);
+    workflow_clear_round();
+    workflow_enter(FLOW_ABORT_HOLD, now_ms);
+    return stopped;
 }
 
 static void workflow_stop_finish(uint8_t error_code, uint32_t now_ms)
@@ -475,6 +563,11 @@ static void workflow_stop_finish(uint8_t error_code, uint32_t now_ms)
         LOG_FAST("[WORKFLOW] stop confirmed by fresh J1-J5 feedback\r\n");
         if (s_global_reset.active)
         {
+            if (s_global_reset.local)
+            {
+                (void)jetson_send_status(0u, RA6_TO_JETSON_WORKFLOW,
+                                         JETSON_WORKFLOW_ABORTED_HOLD, JETSON_ERROR_NONE);
+            }
             /* Discard canceled capture results only after the old executor has exited. */
             robot_capture_init();
             robot_target_init();
@@ -831,24 +924,7 @@ static void workflow_handle_workflow_command(const robot_workflow_obs_t *obs)
                 command_ack(entry, false, JETSON_ERROR_HEARTBEAT_TIMEOUT);
                 return;
             }
-            workflow_force_laser_off(JETSON_ERROR_NONE);
-            robot_target_stop_hold();
-            if (robot_capture_is_active())
-            {
-                robot_capture_cancel();
-            }
-            s_global_reset.active = true;
-            s_global_reset.seq = obs->workflow_seq;
-            s_workflow.workflow_seq = obs->workflow_seq;
-            s_stop.pending = s_stop.restart_locked = true;
-            s_stop.stable_count = 0u;
-            s_stop.deadline = obs->now_ms + ROBOT_WORKFLOW_STOP_TIMEOUT_MS;
-            s_stop.next_sample = obs->now_ms;
-            jetson_set_workflow_stop_hold(true);
-            bool stopped = robot_motion_abort();
-            scan_invalidate(JETSON_SCAN_ABORTED_HOLD, JETSON_ERROR_MOTION_ABORTED);
-            workflow_clear_round();
-            workflow_enter(FLOW_ABORT_HOLD, obs->now_ms);
+            bool stopped = workflow_begin_global_reset(obs->workflow_seq, false, obs->now_ms);
             command_ack(entry, true, JETSON_ERROR_NONE);
             LOG_FAST("[WORKFLOW] global soft reset seq=%u waiting for stop\r\n",
                 (unsigned)obs->workflow_seq);
@@ -1658,6 +1734,7 @@ void robot_workflow_init(void)
     memset(&s_scan, 0, sizeof(s_scan));
     memset(&s_stop, 0, sizeof(s_stop));
     memset(&s_global_reset, 0, sizeof(s_global_reset));
+    memset(&s_reset_key, 0, sizeof(s_reset_key));
     s_workflow.state = FLOW_IDLE;
     s_workflow.capture_next_point = 1u;
     robot_capture_init();
@@ -1670,11 +1747,13 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
 {
     if (obs == NULL)
     {
+        memset(&s_reset_key, 0, sizeof(s_reset_key));
         s_workflow.target_aligned = false;
         workflow_force_laser_off(JETSON_ERROR_SAFETY);
         return;
     }
 
+    bool reset_requested = workflow_reset_key_request(obs);
     bool physical_safety_fault = obs->estop_active || obs->limit_triggered ||
                                  workflow_any_limit_triggered();
     if (physical_safety_fault)
@@ -1690,6 +1769,32 @@ void robot_workflow_step(const robot_workflow_obs_t *obs)
     {
         /* ABORT works without heartbeat; reset checks it before accepting a HOME. */
         workflow_handle_workflow_command(obs);
+    }
+    if (reset_requested)
+    {
+        if (priority_control || s_global_reset.active || s_stop.pending)
+        {
+            LOG_FAST("[WORKFLOW] P000 reset ignored: priority control or stop/reset busy\r\n");
+        }
+        else if (!obs->heartbeat_alive)
+        {
+            LOG_FAST("[WORKFLOW] P000 reset rejected: heartbeat unavailable\r\n");
+        }
+        else
+        {
+            bool stopped = workflow_begin_global_reset(0u, true, obs->now_ms);
+            LOG_FAST("[WORKFLOW] P000 long press: global soft reset waiting for stop\r\n");
+            workflow_reject_pending_commands(obs, JETSON_ERROR_BUSY);
+            if (!stopped)
+            {
+                workflow_stop_finish(JETSON_ERROR_MOTION_FAILED, obs->now_ms);
+            }
+            else
+            {
+                workflow_stop_step(obs->now_ms);
+            }
+            return;
+        }
     }
     if (workflow_is_active() && !obs->heartbeat_alive)
     {

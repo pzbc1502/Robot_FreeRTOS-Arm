@@ -46,13 +46,13 @@ FIXTURE = r"""
     return 1; } } while (0)
 const ioport_instance_t g_ioport = {0};
 static unsigned cfg_count, write_count;
-static bsp_io_port_pin_t cfg_pin[2], read_pin, write_pin;
-static uint32_t cfg_value[2];
-static bsp_io_level_t input_level, output_level;
-static fsp_err_t read_result;
+static bsp_io_port_pin_t cfg_pin[3], read_pin, write_pin;
+static uint32_t cfg_value[3];
+static bsp_io_level_t input_level, reset_level, output_level;
+static fsp_err_t read_result, reset_read_result;
 fsp_err_t R_IOPORT_PinCfg(void *ctrl, bsp_io_port_pin_t pin, uint32_t cfg) {
     (void)ctrl;
-    if (cfg_count < 2) { cfg_pin[cfg_count] = pin; cfg_value[cfg_count] = cfg; }
+    if (cfg_count < 3) { cfg_pin[cfg_count] = pin; cfg_value[cfg_count] = cfg; }
     ++cfg_count;
     return FSP_SUCCESS;
 }
@@ -61,17 +61,20 @@ fsp_err_t R_IOPORT_PinWrite(void *ctrl, bsp_io_port_pin_t pin, bsp_io_level_t le
     return FSP_SUCCESS;
 }
 fsp_err_t R_IOPORT_PinRead(void *ctrl, bsp_io_port_pin_t pin, bsp_io_level_t *level) {
-    (void)ctrl; read_pin = pin; *level = input_level;
-    return read_result;
+    (void)ctrl; read_pin = pin;
+    *level = pin == GLOBAL_RESET_KEY_PIN ? reset_level : input_level;
+    return pin == GLOBAL_RESET_KEY_PIN ? reset_read_result : read_result;
 }
 int main(void) {
     CHECK(LASER_FIRE_KEY_PIN == BSP_IO_PORT_00_PIN_02);
     CHECK(LASER_FIRE_KEY_ACTIVE_LEVEL == BSP_IO_LEVEL_LOW);
     BSP_Laser_Init();
-    CHECK(cfg_count == 2 && cfg_pin[0] == BSP_IO_PORT_08_PIN_01);
+    CHECK(cfg_count == 3 && cfg_pin[0] == BSP_IO_PORT_08_PIN_01);
     CHECK(cfg_value[0] == IOPORT_CFG_PORT_DIRECTION_OUTPUT);
     CHECK(cfg_pin[1] == BSP_IO_PORT_00_PIN_02);
     CHECK(cfg_value[1] == (IOPORT_CFG_PORT_DIRECTION_INPUT | IOPORT_CFG_PULLUP_ENABLE));
+    CHECK(cfg_pin[2] == BSP_IO_PORT_00_PIN_00);
+    CHECK(cfg_value[2] == (IOPORT_CFG_PORT_DIRECTION_INPUT | IOPORT_CFG_PULLUP_ENABLE));
     CHECK(write_count == 1 && write_pin == BSP_IO_PORT_08_PIN_01);
     CHECK(output_level == BSP_IO_LEVEL_LOW);
     input_level = BSP_IO_LEVEL_HIGH;
@@ -83,11 +86,21 @@ int main(void) {
     read_result = FSP_SUCCESS;
     input_level = BSP_IO_LEVEL_HIGH;
     CHECK(!BSP_Laser_FireKey_IsPressed());
+    bool pressed = true;
+    reset_level = BSP_IO_LEVEL_HIGH;
+    CHECK(BSP_GlobalResetKey_Read(&pressed) && !pressed);
+    CHECK(read_pin == BSP_IO_PORT_00_PIN_00);
+    reset_level = BSP_IO_LEVEL_LOW;
+    CHECK(BSP_GlobalResetKey_Read(&pressed) && pressed);
+    reset_read_result = 1;
+    CHECK(!BSP_GlobalResetKey_Read(&pressed) && !pressed);
+    CHECK(!BSP_GlobalResetKey_Read(NULL));
+    CHECK(!BSP_Laser_FireKey_IsPressed());
     BSP_Laser_On();
     CHECK(write_pin == BSP_IO_PORT_08_PIN_01 && output_level == BSP_IO_LEVEL_HIGH);
     BSP_Laser_Off();
     CHECK(output_level == BSP_IO_LEVEL_LOW);
-    puts("P002 active-low fire-key GPIO checks passed (fake IO)");
+    puts("P002 fire key + independent P000 reset key GPIO checks passed (fake IO)");
     return 0;
 }
 """
@@ -118,23 +131,26 @@ def test_startup_configuration() -> None:
             ".//raPinConfiguration/pincfg/configSetting"
         )
     }
-    assert settings["p002"] == "p002.input"
-    assert settings["p002.gpio_mode"] == "p002.gpio_mode.gpio_mode_in"
-    assert settings["p002.gpio_pupd"] == "p002.gpio_pupd.gpio_pupd_ip_up"
     generated = (ROOT / "ra_gen/pin_data.c").read_text(encoding="utf-8")
-    block = re.search(
-        r"\.pin\s*=\s*BSP_IO_PORT_00_PIN_02,\s*\.pin_cfg\s*=(.*?)\},",
-        generated, re.S,
-    )
-    assert block is not None
-    assert "IOPORT_CFG_PORT_DIRECTION_INPUT" in block[1]
-    assert "IOPORT_CFG_PULLUP_ENABLE" in block[1]
-    assert "IOPORT_CFG_PORT_DIRECTION_OUTPUT" not in block[1]
+    for pin in ("p000", "p002"):
+        assert settings[pin] == f"{pin}.input"
+        assert settings[f"{pin}.gpio_mode"] == f"{pin}.gpio_mode.gpio_mode_in"
+        assert settings[f"{pin}.gpio_pupd"] == f"{pin}.gpio_pupd.gpio_pupd_ip_up"
+        block = re.search(
+            rf"\.pin\s*=\s*BSP_IO_PORT_00_PIN_{pin[-2:]},\s*\.pin_cfg\s*=(.*?)\}},",
+            generated, re.S,
+        )
+        assert block is not None
+        assert "IOPORT_CFG_PORT_DIRECTION_INPUT" in block[1]
+        assert "IOPORT_CFG_PULLUP_ENABLE" in block[1]
+        assert "IOPORT_CFG_PORT_DIRECTION_OUTPUT" not in block[1]
     # The retained, unused DHT11 driver must not reclaim the fire-key pin.
     for folder in ("APP", "src"):
         for path in (ROOT / folder).glob("*.c"):
             assert not re.search(r"\bDHT11_\w+\s*\(", path.read_text(encoding="utf-8")), path
-    print("P002 startup/configuration and no-DHT-caller checks passed")
+    service = (ROOT / "src/vision_service_thread_entry.c").read_text(encoding="utf-8")
+    assert "obs.reset_button_valid = BSP_GlobalResetKey_Read(&obs.reset_button);" in service
+    print("P000/P002 startup/configuration, service and no-DHT-caller checks passed")
 
 
 if __name__ == "__main__":
