@@ -1,11 +1,11 @@
 import serial, time, threading, sys, datetime
+import argparse
+from pathlib import Path
 
-PORT = "COM7"
 BAUD = 115200
-LOG = r"e:\Renesas\RA6M5-Robot\Robot_FreeRTOS - Arm\DEBUG\debug.txt"
 
 stop = threading.Event()
-logf = open(LOG, "w", encoding="utf-8", newline="")
+logf = None
 lock = threading.Lock()
 
 def ts():
@@ -39,12 +39,22 @@ def send(ser, cmd):
     ser.flush()
 
 def main():
+    global logf
+    parser = argparse.ArgumentParser(description="Legacy real-motion regression; not an offline check")
+    parser.add_argument("--port", required=True)
+    parser.add_argument("--operator-confirmed", action="store_true")
+    parser.add_argument("--log", type=Path, default=Path(__file__).resolve().parents[1]/"artifacts/hardware/serial_test.log")
+    args = parser.parse_args()
+    if not args.operator_confirmed:
+        parser.error("--operator-confirmed is required before any hardware access")
+    args.log.parent.mkdir(parents=True, exist_ok=True)
+    logf = args.log.open("w", encoding="utf-8")
     try:
-        ser = serial.Serial(PORT, BAUD, timeout=0.1)
+        ser = serial.Serial(args.port, BAUD, timeout=0.1)
     except Exception as e:
-        writeln(f"[FATAL] cannot open {PORT}: {e}\n")
+        writeln(f"[FATAL] cannot open {args.port}: {e}\n")
         return
-    writeln(f"[{ts()}] ===== opened {PORT} @ {BAUD} =====\n")
+    writeln(f"[{ts()}] ===== opened {args.port} @ {BAUD} =====\n")
     t = threading.Thread(target=reader, args=(ser,), daemon=True)
     t.start()
 

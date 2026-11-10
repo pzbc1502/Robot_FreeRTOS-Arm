@@ -1,0 +1,16 @@
+# Normalize at the Git boundary, without rewriting the SDK worktree.
+* text=auto
+*.c text eol=crlf
+*.h text eol=crlf
+*.py text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.pdf binary
+*.exe binary
+*.pkg binary
+*.pyc binary
+*.axf binary

@@ -112,8 +112,8 @@ def test_formal_workflow_runner_uses_strict_competition_sequence() -> None:
     assert (EVENT_WORKFLOW, WORKFLOW_RETURN_HOME_DONE, 9) in waits
     assert vision_actions[0][0] == "start"
     assert vision_actions[-1] == "stop"
-    assert any("请按住 P000" in stage for stage in stages)
-    assert any("请松开 P000" in stage for stage in stages)
+    assert any("请先断开再接通 P002 开关" in stage for stage in stages)
+    assert any("断开 P002 开关可关闭" in stage for stage in stages)
     assert stages[-1] == "流程完成，机械臂已回 HOME"
 
 

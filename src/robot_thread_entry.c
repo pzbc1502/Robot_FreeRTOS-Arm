@@ -45,10 +45,12 @@ void robot_thread_entry(void * pvParameters)
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char * pcTaskName)
 {
     (void) xTask;
-    LOG("STACK OVERFLOW: %s\r\n", (pcTaskName != NULL) ? pcTaskName : "unknown");
+    (void) pcTaskName;
+    /* No scheduler, CAN transaction or buffered logging is safe on a damaged stack. */
+    BSP_Laser_Off();
     taskDISABLE_INTERRUPTS();
     while (1)
     {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        __NOP();
     }
 }

@@ -1,8 +1,8 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ROBOT_C = (ROOT / "APP" / "robot.c").read_text(encoding="utf-8")
-DOC = (ROOT / "控制文档.md").read_text(encoding="utf-8")
+DOC = (ROOT / "doc" / "RA6M5 固件说明.md").read_text(encoding="utf-8")
 
 
 def require(text: str, needle: str, label: str) -> None:
@@ -52,7 +52,7 @@ def test_settle_tail_remains_fixed_short_window() -> None:
 
     require(settle_tail, "for (int k = 0; k < ROBOT_PID_SETTLE_PERIODS; k++)",
             "fixed settle loop")
-    require(settle_tail, "robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM);",
+    require(settle_tail, "robot_pid_one_period(target_angle, feedforward, total_error, ROBOT_ARM_JOINT_NUM, false);",
             "settle loop keeps final target")
     assert "ROBOT_JOINT_POS_CONFIRM_TOL_DEG" not in settle_tail, \
         "settle tail must not reintroduce adaptive confirm logic"
@@ -66,7 +66,7 @@ def test_settle_periods_is_documented_as_timeout_upper_bound() -> None:
 def test_per_joint_feedforward_gain_applied() -> None:
     """AUTO 速度环用 ROBOT_JOINT_FF_GAIN[j] 缩放前馈，修比例型跟踪偏差(非单点Kp)。"""
     require(ROBOT_C, "ROBOT_JOINT_FF_GAIN[ROBOT_MAX_JOINT_NUM]", "per-joint FF gain array")
-    require(ROBOT_C, "ROBOT_JOINT_FF_GAIN[j] * feedforward[j] + ROBOT_JOINT_KP[j] * error",
+    require(" ".join(ROBOT_C.split()), "ROBOT_JOINT_FF_GAIN[j] * feedforward[j] + ROBOT_JOINT_KP[j] * error",
             "FF gain applied in velocity law")
 
 

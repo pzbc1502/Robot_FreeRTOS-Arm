@@ -462,8 +462,8 @@ def run_without_status(args, arm, jetson, arm_reader, vision_sender, logger):
 def parse_args():
     default_debug = pathlib.Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="RA6M5 target demo: COM7 arm control + Jetson UART vision/control")
-    parser.add_argument("--arm-port", default=ARM_PORT)
-    parser.add_argument("--jetson-port", default=JETSON_PORT)
+    parser.add_argument("--arm-port", required=True)
+    parser.add_argument("--jetson-port", required=True)
     parser.add_argument("--baud", type=int, default=BAUD)
     parser.add_argument("--debug-dir", type=pathlib.Path, default=default_debug)
     parser.add_argument("--no-status-wait", action="store_true")
@@ -488,7 +488,10 @@ def parse_args():
     parser.add_argument("--ready-timeout", type=float, default=25.0)
     parser.add_argument("--align-timeout", type=float, default=20.0)
     parser.add_argument("--output-timeout", type=float, default=10.0)
+    parser.add_argument("--operator-confirmed", action="store_true")
     args = parser.parse_args()
+    if not args.operator_confirmed:
+        parser.error("--operator-confirmed is required before any hardware access")
     args.vision_sequence_steps = parse_vision_sequence(args.vision_sequence,
                                                        args.vision_step_hold,
                                                        args.vision_dcx,

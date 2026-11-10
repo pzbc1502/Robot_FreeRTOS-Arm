@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "robot_cmd.h"
+#include "robot_workflow.h"
 #include "robot_target.h"
 #include "W800_mqtt.h"
 #include "common_data.h"
@@ -162,7 +163,6 @@ static void robot_visual_servo_fault_set(robot_visual_servo_fault_t fault);
 static bool robot_visual_servo_sync_actual_pose(float T_cmd[4][4]);
 static void robot_visual_servo_wait_period(uint32_t *next_tick);
 static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_joint, float *bad_err);
-static bool robot_try_refresh_joints_feedback(uint8_t retry_times);
 static float robot_angle_normalize(float angle);
 static float robot_angle_diff(float cur_angle, float target_angle);
 static bool robot_motion_abort_is_requested(void);
@@ -220,26 +220,6 @@ static bool robot_verify_home_pose(uint8_t retry_times, float tol_deg, int *bad_
         }
     }
 
-    return true;
-}
-
-static bool robot_try_refresh_joints_feedback(uint8_t retry_times)
-{
-    int fail = 0;
-
-    for (int i = 0; i < ROBOT_ARM_JOINT_NUM; i++) {
-        if (robot_update_current_angle_retry((uint8_t)i, retry_times) != 0) {
-            fail++;
-        }
-    }
-
-    if (fail > 0) {
-        ROBOT_STATUS_SET(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
-        LOG("pose feedback degraded: %d/%d joints read failed, continue with estimated pose.\r\n", fail, ROBOT_ARM_JOINT_NUM);
-        return false;
-    }
-
-    ROBOT_STATUS_CLEAR(g_robot.status, ROBOT_STATUS_POSE_DEGRADED);
     return true;
 }
 
@@ -1693,6 +1673,12 @@ static void robot_event_stamp(struct robot_event *event)
 
     taskENTER_CRITICAL();
     event->generation = g_robot_motion_generation;
+    event->debug_epoch = 0u;
+    if ((xTaskGetCurrentTaskHandle() == g_robot.cmd_service_handle) &&
+        (event->type != ROBOT_READ_ALL_EVENT)) {
+        uint32_t epoch = robot_workflow_debug_epoch();
+        event->debug_epoch = (epoch != 0u) ? epoch : UINT32_MAX;
+    }
     taskEXIT_CRITICAL();
 }
 
@@ -1705,7 +1691,8 @@ static bool robot_event_is_stale(const struct robot_event *event)
     }
 
     taskENTER_CRITICAL();
-    stale = (event->generation != g_robot_motion_generation);
+    stale = (event->generation != g_robot_motion_generation) ||
+        ((event->debug_epoch != 0u) && (event->debug_epoch != robot_workflow_debug_epoch()));
     taskEXIT_CRITICAL();
     return stale;
 }

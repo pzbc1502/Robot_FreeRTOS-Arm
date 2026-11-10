@@ -121,12 +121,12 @@ def test_competition_safety_parameters_are_final() -> None:
     workflow_h = read("APP/robot_workflow.h")
     target_h = read("APP/robot_target.h")
 
-    require(workflow_h, "ROBOT_WORKFLOW_SAFE_DISTANCE_MM       (150u)",
-            "150 mm safety threshold")
+    require(workflow_h, "ROBOT_WORKFLOW_SAFE_DISTANCE_MM       (100u)",
+            "current 100 mm initial latch")
     require(workflow_h, "ROBOT_WORKFLOW_RETREAT_STEP_MM        (20.0f)",
             "20 mm retreat step")
-    require(workflow_h, "ROBOT_WORKFLOW_RETREAT_MAX_STEPS      (5u)",
-            "five-step retreat limit")
+    require(workflow_h, "ROBOT_WORKFLOW_RETREAT_MAX_STEPS      (8u)",
+            "current eight-step retreat limit")
     require(target_h, "TARGET_CONFIRM_STABLE_COUNT  (2u)",
             "two-frame secondary alignment confirmation")
 

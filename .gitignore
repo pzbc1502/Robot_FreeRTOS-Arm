@@ -1,4 +1,4 @@
-﻿# Keil / ARMClang build outputs
+# Keil / ARMClang build outputs
 Objects/
 Listings/
 *.o
@@ -22,3 +22,15 @@ hs_err_pid*.log
 Thumbs.db
 
 git更新操作/
+
+# Local Python/PC build products; retained evidence logs are not globally ignored.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+UpperComputer/build*/
+UpperComputer/dist*/
+artifacts/
+
+# Local reports, proposal materials and generated figures
+/文档/

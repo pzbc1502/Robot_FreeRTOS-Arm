@@ -91,6 +91,8 @@ typedef struct
     uint8_t distance_seq;
 } robot_workflow_obs_t;
 
+/* Nonzero only while standalone debug commands are allowed. */
+uint32_t robot_workflow_debug_epoch(void);
 void robot_workflow_init(void);
 void robot_workflow_step(const robot_workflow_obs_t *obs);
 workflow_state_t robot_workflow_state_get(void);

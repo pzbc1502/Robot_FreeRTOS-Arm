@@ -2,6 +2,11 @@
 #include "bsp_uart.h"
 #include "string.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <math.h>
+#include "robot_workflow.h"
+#include "robot_capture.h"
 #include "robot_cmd.h"
 #include "Emm_V5.h"
 #include "gripper.h"
@@ -27,6 +32,21 @@ static int robot_view_arc_handle(float *param);
 static int robot_motion_abort_handle(float *param);
 
 
+static bool debug_command_allowed(void)
+{
+    if ((robot_workflow_debug_epoch() == 0u) || robot_is_auto_busy() ||
+        robot_capture_is_active() || robot_is_visual_servo_active()) {
+        LOG("debug motion rejected: workflow or motion owns the robot\r\n");
+        return false;
+    }
+    return true;
+}
+
+static bool valid_joint_id(float value)
+{
+    return isfinite(value) && value >= 0.0f && value < ROBOT_MAX_JOINT_NUM && floorf(value) == value;
+}
+
 void robot_mqtt_handle(struct robot_cmd *cmd)
 {
 	float param[6] = {0};
@@ -40,10 +60,14 @@ void robot_mqtt_handle(struct robot_cmd *cmd)
 			&param[0], &param[1], &param[2],
 			&param[3], &param[4], &param[5]);
 	
-	if (result < 8) { // 解析失败
+	if ((result != 8) || !debug_command_allowed()) { // 解析失败
 		return;
 	}
 	
+    for (unsigned i = 0u; i < 6u; i++) {
+        if (!isfinite(param[i])) return;
+    }
+    if ((type == ROBOT_JOINT_ABS_ROTATE) && !valid_joint_id(param[0])) return;
 	switch (type)
 	{
 		case ROBOT_JOINT_ABS_ROTATE:
@@ -161,14 +185,9 @@ static int robot_remote_event_handle(float *param)
 
 static int robot_zero_handle(float *param)
 {
-	(void)param;
-	LOG("robot reset zero.\r\n");
-	for (int i = 0; i < ROBOT_MAX_JOINT_NUM; i++) {
-		Emm_V5_Reset_CurPos_To_Zero((uint8_t)(i + 1));
-		vTaskDelay(10);
-	}
-	LOG("robot reset zero Finish!!!.\r\n");
-	return pdPASS;
+    (void)param;
+    LOG("zero rejected: encoder recalibration requires a dedicated procedure\r\n");
+    return pdFAIL;
 }
 
 /* ===================== 夹爪联调命令 =====================
@@ -257,35 +276,35 @@ static int robot_target_disable_handle(float *param)
 
 static struct robot_cmd_info robot_uart1_cmd_table[] = {
 	/* 远程控制指令 */
-	{"remote_event",   robot_remote_event_handle},
-	{"remote_enable",  robot_remote_enable_handle},
-	{"remote_disable", robot_remote_disable_handle},
+	{"remote_event",   robot_remote_event_handle, 6u, 6u},
+	{"remote_enable",  robot_remote_enable_handle, 0u, 0u},
+	{"remote_disable", robot_remote_disable_handle, 0u, 0u},
 
 	/* 机械臂控制指令 */
-	{"abs_rotate",  robot_abs_rotate_handle},
-	{"rel_rotate",  robot_rel_rotate_handle},
-	{"auto",        robot_auto_handle},
-    {"view_arc",   robot_view_arc_handle},
-	{"circle",      robot_time_func_handle},
-	{"time_func",   robot_time_func_handle},
-	{"hard_reset",  robot_hard_reset_handle},
-	{"soft_reset",  robot_soft_reset_handle},
-    {"motion_abort", robot_motion_abort_handle},
-    {"read_all",    robot_read_all_handle},
-	{"zero",        robot_zero_handle},
+	{"abs_rotate",  robot_abs_rotate_handle, 2u, 2u},
+	{"rel_rotate",  robot_rel_rotate_handle, 2u, 2u},
+	{"auto",        robot_auto_handle, 3u, 3u},
+    {"view_arc",   robot_view_arc_handle, 0u, 1u},
+	{"circle",      robot_time_func_handle, 0u, 2u},
+	{"time_func",   robot_time_func_handle, 0u, 2u},
+	{"hard_reset",  robot_hard_reset_handle, 0u, 0u},
+	{"soft_reset",  robot_soft_reset_handle, 0u, 0u},
+    {"motion_abort", robot_motion_abort_handle, 0u, 0u},
+    {"read_all",    robot_read_all_handle, 0u, 0u},
+	{"zero",        robot_zero_handle, 0u, 0u},
 
 	/* 夹爪控制指令 */
-	{"gripper_stop",  robot_gripper_stop_handle},
-	{"gripper_open",  robot_gripper_open_handle},
-	{"gripper_cur",   robot_gripper_cur_handle},
-	{"gripper_grasp", robot_gripper_grasp_handle},
+	{"gripper_stop",  robot_gripper_stop_handle, 0u, 0u},
+	{"gripper_open",  robot_gripper_open_handle, 0u, 0u},
+	{"gripper_cur",   robot_gripper_cur_handle, 0u, 0u},
+	{"gripper_grasp", robot_gripper_grasp_handle, 1u, 1u},
 
 	/* 激光控制指令 */
-	{"target_enable",  robot_target_enable_handle},
-	{"target_disable", robot_target_disable_handle},
-	{"laser_on",       robot_laser_on_handle},
-	{"laser_off",      robot_laser_off_handle},
-	{NULL, NULL},
+	{"target_enable",  robot_target_enable_handle, 0u, 0u},
+	{"target_disable", robot_target_disable_handle, 0u, 0u},
+	{"laser_on",       robot_laser_on_handle, 0u, 0u},
+	{"laser_off",      robot_laser_off_handle, 0u, 0u},
+	{NULL, NULL, 0u, 0u},
 };
 
 void robot_uart1_handle(struct robot_cmd *rb_cmd)
@@ -308,10 +327,38 @@ void robot_uart1_handle(struct robot_cmd *rb_cmd)
 			char next_char = cmd[len];
 			if (next_char == ' ' || next_char == '\0' || next_char == '\r' || next_char == '\n') {
 				
-				// Try to parse parameters after the command
-				char *param_str = cmd + len;
-				sscanf(param_str, "%f %f %f %f %f %f", &param[0], &param[1], &param[2], 
-					&param[3], &param[4], &param[5]);
+                char *cursor = cmd + len;
+                unsigned count = 0u;
+                while (1) {
+                    while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n') cursor++;
+                    if (*cursor == '\0') break;
+                    char *end = NULL;
+                    errno = 0;
+                    if (count >= 6u) return;
+                    float value = strtof(cursor, &end);
+                    if ((end == cursor) || (errno == ERANGE) || !isfinite(value) ||
+                        (*end != '\0' && *end != ' ' && *end != '\t' && *end != '\r' && *end != '\n')) {
+                        LOG("invalid debug command parameter\r\n");
+                        return;
+                    }
+                    param[count++] = value;
+                    cursor = end;
+                }
+                const struct robot_cmd_info *info = &robot_uart1_cmd_table[i];
+                if ((count < info->min_args) || (count > info->max_args)) {
+                    LOG("wrong debug command argument count\r\n");
+                    return;
+                }
+                if ((info->cmd_func == robot_abs_rotate_handle || info->cmd_func == robot_rel_rotate_handle) &&
+                    !valid_joint_id(param[0])) return;
+                if (info->cmd_func == robot_gripper_grasp_handle &&
+                    (param[0] < 0.0f || param[0] >= (float)GRIPPER_FRUIT_MAX || floorf(param[0]) != param[0])) return;
+                bool safe_command = info->cmd_func == robot_motion_abort_handle ||
+                    info->cmd_func == robot_laser_off_handle || info->cmd_func == robot_target_disable_handle ||
+                    info->cmd_func == robot_read_all_handle || info->cmd_func == robot_gripper_cur_handle ||
+                    info->cmd_func == robot_gripper_stop_handle || info->cmd_func == robot_laser_on_handle ||
+                    info->cmd_func == robot_target_enable_handle;
+                if (!safe_command && !debug_command_allowed()) return;
 
 				// Execute command
 				LOG("Found handler for '%s', executing...\n", event);

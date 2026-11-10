@@ -302,6 +302,7 @@ struct robot_event
 {
     enum robot_event_type type; /* 事件类型 */
     uint8_t joint_id;           /* 关节 ID (如适用) */
+    uint32_t debug_epoch;       /* Zero for workflow/internal events. */
     uint32_t generation;        /* 安全中止代际：旧代际运动事件不得继续执行 */
     float param[6];             /* 事件参数 (角度、坐标等) */
 };

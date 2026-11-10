@@ -429,8 +429,8 @@ def parse_args():
     default_debug = pathlib.Path(__file__).resolve().parent
     default_sequence = default_debug / "shooting_sequence.txt"
     parser = argparse.ArgumentParser(description="RA6M5 robot shooting demo script")
-    parser.add_argument("--arm-port", default=ARM_PORT)
-    parser.add_argument("--jetson-port", default=JETSON_PORT)
+    parser.add_argument("--arm-port", required=True)
+    parser.add_argument("--jetson-port", required=True)
     parser.add_argument("--baud", type=int, default=BAUD)
     parser.add_argument("--mode", choices=("full", "motion", "target"), default="full")
     parser.add_argument("--sequence-file", type=pathlib.Path, default=default_sequence,
@@ -448,7 +448,12 @@ def parse_args():
     parser.add_argument("--ready-timeout", type=float, default=25.0)
     parser.add_argument("--align-timeout", type=float, default=10.0)
     parser.add_argument("--output-timeout", type=float, default=10.0)
-    return parser.parse_args()
+    parser.add_argument("--operator-confirmed", action="store_true",
+                        help="fixed model, physical output isolated, operator and emergency stop ready")
+    args = parser.parse_args()
+    if not args.operator_confirmed:
+        parser.error("--operator-confirmed is required before any hardware access")
+    return args
 
 
 def main():

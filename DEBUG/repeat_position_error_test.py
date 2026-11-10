@@ -320,7 +320,7 @@ def write_summary(logger: Logger, results: list[CycleResult]) -> None:
 def parse_args() -> argparse.Namespace:
     default_debug_dir = pathlib.Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="RA6M5 repeated joint-position error test over COM7")
-    parser.add_argument("--port", default=ARM_PORT)
+    parser.add_argument("--port", required=True)
     parser.add_argument("--baud", type=int, default=BAUD)
     parser.add_argument("--cycles", type=int, default=DEFAULT_CYCLES)
     parser.add_argument("--x", type=float, default=DEFAULT_X)
@@ -330,7 +330,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--auto-timeout", type=float, default=60.0)
     parser.add_argument("--soft-reset-timeout", type=float, default=20.0)
     parser.add_argument("--continue-on-fail", action="store_true")
-    return parser.parse_args()
+    parser.add_argument("--operator-confirmed", action="store_true",
+                        help="fixed model, physical output isolated, operator and emergency stop ready")
+    args = parser.parse_args()
+    if not args.operator_confirmed:
+        parser.error("--operator-confirmed is required before any hardware access")
+    return args
 
 
 def main() -> int:

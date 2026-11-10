@@ -42,7 +42,7 @@ typedef struct
 
 typedef struct
 {
-    workflow_state_t state;
+    volatile workflow_state_t state;
     uint8_t selected_view_id;
     uint8_t capture_next_point;
     uint8_t capture_done_mask;
@@ -72,6 +72,8 @@ typedef enum
 } command_prepare_result_t;
 
 static robot_workflow_ctx_t s_workflow;
+static volatile bool s_workflow_initialized;
+static volatile uint32_t s_debug_epoch = 1u;
 static command_cache_entry_t s_command_cache[WORKFLOW_COMMAND_CACHE_SIZE];
 static uint32_t s_command_cache_age = 0u;
 static struct
@@ -187,6 +189,11 @@ static bool workflow_safe_seq_seen(uint8_t seq)
 
 static void workflow_enter(workflow_state_t state, uint32_t now_ms)
 {
+    if (s_workflow.state != state)
+    {
+        /* Invalidate queued debug events across every business transition. */
+        s_debug_epoch = (s_debug_epoch >= UINT32_MAX - 1u) ? 1u : s_debug_epoch + 1u;
+    }
     if (s_workflow.state != state)
     {
         LOG_FAST("[WORKFLOW] %s -> %s\r\n",
@@ -1726,8 +1733,14 @@ static void workflow_reject_pending_commands(const robot_workflow_obs_t *obs,
     }
 }
 
+uint32_t robot_workflow_debug_epoch(void)
+{
+    return (s_workflow_initialized && (s_workflow.state == FLOW_IDLE)) ? s_debug_epoch : 0u;
+}
+
 void robot_workflow_init(void)
 {
+    s_workflow_initialized = false;
     memset(&s_workflow, 0, sizeof(s_workflow));
     memset(s_command_cache, 0, sizeof(s_command_cache));
     s_command_cache_age = 0u;
@@ -1741,6 +1754,7 @@ void robot_workflow_init(void)
     robot_target_init();
     BSP_Laser_Off();
     workflow_update_target_indicators();
+    s_workflow_initialized = true;
 }
 
 void robot_workflow_step(const robot_workflow_obs_t *obs)

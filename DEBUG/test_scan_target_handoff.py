@@ -6,6 +6,7 @@ import tempfile
 
 import test_scan_workflow as workflow
 from test_scan_motion import function
+from test_stop_confirmation import run_c
 
 
 TARGET_IO = r'''
@@ -278,14 +279,7 @@ def main():
     source += "\n#undef robot_target_start_at_current_pose\n"
     source += "bool robot_target_start_at_current_pose(void) { target_starts++; return target_start_ok && target_start_real(); }\n"
     source += CHECKS
-    env = os.environ.copy()
-    env["PATH"] = str(Path(workflow.GCC).parent) + os.pathsep + env.get("PATH", "")
-    with tempfile.TemporaryDirectory(prefix="scan_target_handoff_") as directory:
-        exe = Path(directory) / "check.exe"
-        subprocess.run([workflow.GCC, "-std=c11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
-                        "-x", "c", "-", "-o", str(exe)], input=source, text=True,
-                       encoding="utf-8", check=True, env=env)
-        subprocess.run([str(exe)], check=True, env=env)
+    run_c(source, "scan_target_handoff")
 
 
 if __name__ == "__main__":

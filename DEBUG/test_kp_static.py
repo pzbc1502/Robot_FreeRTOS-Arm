@@ -3,7 +3,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 ROBOT_C = (ROOT / "APP" / "robot.c").read_text(encoding="utf-8")
-DOC = (ROOT / "控制文档.md").read_text(encoding="utf-8")
+DOC = (ROOT / "doc" / "RA6M5 固件说明.md").read_text(encoding="utf-8")
 
 EXPECTED_KP = "{0.65f, 3.00f, 3.00f, 2.00f, 2.30f, 10.0f}"
 EXPECTED_DOC_KP = "{0.65, 3.00, 3.00, 2.00, 2.30, 10.0}"
@@ -16,7 +16,7 @@ def test_robot_joint_kp_matches_tuned_values() -> None:
 
 
 def test_control_doc_records_current_kp_values() -> None:
-    assert EXPECTED_DOC_KP in DOC
+    assert EXPECTED_DOC_KP in re.sub(r"(?<=\d)f", "", DOC)
 
 
 if __name__ == "__main__":

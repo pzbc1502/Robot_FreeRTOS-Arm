@@ -467,9 +467,9 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="PC Jetson simulator for the formal RA6M5 A5 5A competition workflow"
     )
-    parser.add_argument("--arm-port", default=DEFAULT_ARM_PORT,
+    parser.add_argument("--arm-port", required=True,
                         help="RA6M5 text log port, or 'none' to disable")
-    parser.add_argument("--jetson-port", default=DEFAULT_JETSON_PORT)
+    parser.add_argument("--jetson-port", required=True)
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--debug-dir", type=pathlib.Path,
                         default=pathlib.Path(__file__).resolve().parent)
@@ -487,9 +487,12 @@ def parse_args():
     parser.add_argument("--output-off-timeout", type=float, default=12.0)
     parser.add_argument("--auto-advance", action="store_true")
     parser.add_argument("--skip-final-reset", action="store_true")
+    parser.add_argument("--operator-confirmed", action="store_true")
     args = parser.parse_args()
-    if not 150 <= args.safe_distance_mm <= 65535:
-        parser.error("--safe-distance-mm must be at least the firmware threshold of 150 mm")
+    if not args.operator_confirmed:
+        parser.error("--operator-confirmed is required before any hardware access")
+    if not 100 <= args.safe_distance_mm <= 65535:
+        parser.error("--safe-distance-mm must be at least the firmware initial threshold of 100 mm")
     return args
 
 

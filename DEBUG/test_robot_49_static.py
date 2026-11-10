@@ -3,7 +3,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 ROBOT_C = ROOT / "APP" / "robot.c"
-DOC = ROOT / "控制文档.md"
+DOC = ROOT / "doc" / "RA6M5 固件说明.md"
 
 
 def _read(path: Path) -> str:

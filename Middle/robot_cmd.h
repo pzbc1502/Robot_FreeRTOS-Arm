@@ -7,10 +7,14 @@ extern "C" {
 
 #include "robot.h"
 
+#include <stdint.h>
+
 struct robot_cmd_info
 {
     char *event_type;
     int (*cmd_func)(float *args);
+    uint8_t min_args;
+    uint8_t max_args;
 };
 
 extern void robot_mqtt_handle(struct robot_cmd *rb_cmd);

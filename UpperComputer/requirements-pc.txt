@@ -1,0 +1,4 @@
+# PC simulated tests and GUI; firmware/offline core needs none of these.
+PySide6
+pyserial
+# Packaging is separate: install PyInstaller on the Windows build machine.
